@@ -1,0 +1,112 @@
+<mvc:View
+    controllerName="com.sut.bolgeyonetim.controller.Home"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m">
+    <Page title="Depo Yönetimi Uygulaması" showNavButton="false">
+        <content>
+            <FlexBox
+                alignItems="Start"
+                justifyContent="SpaceBetween"
+                wrap="Wrap"
+                class="sapUiMediumMargin">
+                
+                <!-- Main Tiles -->
+                <GenericTile
+                    class="sapUiTinyMargin"
+                    header="Mal Kabul"
+                    subheader="Gelen ürünlerin kontrolü ve onaylanması işlemleri"
+                    press="onGoodsReceiptPress">
+                    <TileContent>
+                        <ImageContent src="sap-icon://accept"/>
+                    </TileContent>
+                </GenericTile>
+
+                <GenericTile
+                    class="sapUiTinyMargin"
+                    header="Yükleme Formu Ataması"
+                    subheader="Araçlara yükleme formlarının atanması ve takibi"
+                    press="onShipmentAssignmentPress">
+                    <TileContent>
+                        <ImageContent src="sap-icon://document"/>
+                    </TileContent>
+                </GenericTile>
+
+                <GenericTile
+                    class="sapUiTinyMargin"
+                    header="Araç Yükleme"
+                    subheader="Ürünlerin araçlara yüklenmesi ve sevkiyat hazırlığı"
+                    press="onGoodsIssuePress">
+                    <TileContent>
+                        <ImageContent src="sap-icon://shipping-status"/>
+                    </TileContent>
+                </GenericTile>
+
+                <GenericTile
+                    class="sapUiTinyMargin"
+                    header="Stok Sayım"
+                    subheader="Depo stoklarının sayım ve takip işlemleri"
+                    press="onInventoryCountPress">
+                    <TileContent>
+                        <ImageContent src="sap-icon://inventory"/>
+                    </TileContent>
+                </GenericTile>
+            </FlexBox>
+
+            <!-- Status Tiles (FlexBox with GenericTiles) -->
+            <FlexBox
+                alignItems="Start"
+                justifyContent="SpaceBetween"
+                wrap="Wrap"
+                class="sapUiMediumMargin">
+
+                <GenericTile class="sapUiTinyMargin">
+                    <TileContent>
+                        <NumericContent 
+                            value="{homeView>/pendingReceipts}" 
+                            scale="{i18n>status.pendingReceipts}" 
+                            valueColor="{homeView>/pendingReceiptsColor}" 
+                            indicator="{homeView>/pendingReceiptsIndicator}"
+                            withMargin="false"
+                            animateTextChange="true"/>
+                    </TileContent>
+                </GenericTile>
+
+                <GenericTile class="sapUiTinyMargin">
+                    <TileContent>
+                        <NumericContent 
+                            value="{homeView>/pendingShipments}" 
+                            scale="{i18n>status.pendingShipments}" 
+                            valueColor="{homeView>/pendingShipmentsColor}" 
+                            indicator="{homeView>/pendingShipmentsIndicator}"
+                            withMargin="false"
+                            animateTextChange="true"/>
+                    </TileContent>
+                </GenericTile>
+
+                <GenericTile class="sapUiTinyMargin">
+                    <TileContent>
+                        <NumericContent 
+                            value="{homeView>/pendingDeliveries}" 
+                            scale="{i18n>status.pendingDeliveries}" 
+                            valueColor="{homeView>/pendingDeliveriesColor}" 
+                            indicator="{homeView>/pendingDeliveriesIndicator}"
+                            withMargin="false"
+                            animateTextChange="true"/>
+                    </TileContent>
+                </GenericTile>
+
+                <GenericTile class="sapUiTinyMargin">
+                    <TileContent>
+                        <NumericContent 
+                            value="{homeView>/pendingCounts}" 
+                            scale="{i18n>status.pendingCounts}" 
+                            valueColor="{homeView>/pendingCountsColor}" 
+                            indicator="{homeView>/pendingCountsIndicator}"
+                            withMargin="false"
+                            animateTextChange="true"/>
+                    </TileContent>
+                </GenericTile>
+            </FlexBox>
+        </content>
+    </Page>
+</mvc:View>

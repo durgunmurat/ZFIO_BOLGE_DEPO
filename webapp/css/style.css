@@ -1,0 +1,42 @@
+.loginPage {
+    background-image: url('https://www.sutas.com.tr/assets/uploads/hakkimizda/kisaca-sutas.png');
+    background-size: cover;
+    background-position: center;
+}
+
+.loginForm {
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 0.25rem;
+    padding: 1rem;
+    max-width: 400px;
+}
+
+/* Responsive Tile Container */
+.sapMFlexBox {
+    gap: 1rem;
+}
+
+/* Main Navigation Tiles */
+.sapMGT {
+    min-width: 300px !important;
+}
+
+/* Status Tiles Styling */
+.sapMGT {
+    min-width: 220px !important;
+}
+
+.sapMNCValue {
+    font-size: 2.25rem !important;
+    font-weight: bold !important;
+}
+
+.sapMNCScale {
+    font-size: 0.875rem !important;
+    margin-top: 0.5rem !important;
+}
+
+/* List Item Spacing */
+.sapMListItems .sapMLIB {
+    margin-bottom: 0.5rem;
+}

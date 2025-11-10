@@ -1,0 +1,38 @@
+<mvc:View
+    controllerName="com.sut.bolgeyonetim.controller.ShipmentAssignment"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m">
+    <Page
+        title="Yükleme Planlaması"
+        showNavButton="true"
+        navButtonPress="onNavBack">
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <SearchField
+                    placeholder="Planlayıcı veya nakliye no ile arayın..."
+                    width="100%"
+                    search="onSearch"
+                    class="sapUiSmallMarginBottom"/>
+                
+                <List
+                    items="{/shipments}"
+                    class="sapUiSmallMarginBottom">
+                    <CustomListItem>
+                        <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiSmallMargin">
+                            <VBox>
+                                <ObjectIdentifier
+                                    title="Nakliye No: 6092740"
+                                    text="14/07/2025"/>
+                                <Text text="YETİŞ YILDIRIM"/>
+                            </VBox>
+                            <HBox>
+                                <Text text="0/35 ÜRÜN" class="sapUiTinyMarginEnd"/>
+                                <Button text="Bekliyor" type="Emphasized"/>
+                            </HBox>
+                        </HBox>
+                    </CustomListItem>
+                </List>
+            </VBox>
+        </content>
+    </Page>
+</mvc:View>

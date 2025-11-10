@@ -1,0 +1,67 @@
+<mvc:View
+    controllerName="com.sut.bolgeyonetim.controller.GoodsIssue"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m">
+    <Page
+        title="Araç Yükleme"
+        showNavButton="true"
+        navButtonPress="onNavBack">
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <SegmentedButton
+                    selectedKey="pending"
+                    class="sapUiSmallMarginBottom">
+                    <items>
+                        <SegmentedButtonItem text="Bekleyenler (3)" key="pending"/>
+                        <SegmentedButtonItem text="Tamamlananlar (0)" key="completed"/>
+                    </items>
+                </SegmentedButton>
+                
+                <List
+                    items="{/deliveries}"
+                    class="sapUiSmallMarginBottom">
+                    <CustomListItem type="Active">
+                        <VBox class="sapUiSmallMargin">
+                            <HBox alignItems="Center" justifyContent="SpaceBetween">
+                                <ObjectIdentifier
+                                    title="Nakliye #6092740"
+                                    text="YETİŞ YILDIRIM • 14/07/2025"/>
+                                <HBox>
+                                    <Text text="0/35" class="sapUiTinyMarginEnd"/>
+                                    <ObjectStatus
+                                        text="% Tamamlandı"
+                                        state="Warning"/>
+                                </HBox>
+                            </HBox>
+                            <ProgressIndicator
+                                percentValue="0"
+                                displayValue="0/35"
+                                state="Warning"
+                                class="sapUiTinyMarginTop"/>
+                        </VBox>
+                    </CustomListItem>
+                    <CustomListItem type="Active">
+                        <VBox class="sapUiSmallMargin">
+                            <HBox alignItems="Center" justifyContent="SpaceBetween">
+                                <ObjectIdentifier
+                                    title="Nakliye #6092743"
+                                    text="CELİL ÖKTEN_TSL.MT_SQE #DS • 14/07/2025"/>
+                                <HBox>
+                                    <Text text="0/21" class="sapUiTinyMarginEnd"/>
+                                    <ObjectStatus
+                                        text="% Tamamlandı"
+                                        state="Warning"/>
+                                </HBox>
+                            </HBox>
+                            <ProgressIndicator
+                                percentValue="0"
+                                displayValue="0/21"
+                                state="Warning"
+                                class="sapUiTinyMarginTop"/>
+                        </VBox>
+                    </CustomListItem>
+                </List>
+            </VBox>
+        </content>
+    </Page>
+</mvc:View>

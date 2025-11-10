@@ -1,0 +1,87 @@
+<mvc:View
+    controllerName="com.sut.bolgeyonetim.controller.Login"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:l="sap.ui.layout"
+    xmlns:f="sap.ui.layout.form"
+    xmlns:core="sap.ui.core"
+    displayBlock="true"
+    height="100%">
+    <Page showHeader="false" class="loginPage" backgroundDesign="Transparent">
+        <content>
+            <FlexBox
+                height="100%"
+                alignItems="Center"
+                justifyContent="Center">
+                <VBox
+                    alignItems="Center"
+                    justifyContent="Center"
+                    class="sapUiMediumMargin">
+                    <Title 
+                        text="Sütaş" 
+                        level="H1"
+                        titleStyle="H1"
+                        class="sapUiMediumMarginBottom loginTitle"/>
+                    <Title 
+                        text="Bölge Depo Yönetim Sistemi" 
+                        level="H2"
+                        titleStyle="H2"
+                        class="sapUiMediumMarginBottom"/>
+                    <Panel
+                        class="loginForm"
+                        backgroundDesign="Transparent">
+                        <f:SimpleForm
+                            editable="true"
+                            layout="ResponsiveGridLayout"
+                            labelSpanXL="4"
+                            labelSpanL="4"
+                            labelSpanM="4"
+                            labelSpanS="12"
+                            adjustLabelSpan="false"
+                            emptySpanXL="0"
+                            emptySpanL="0"
+                            emptySpanM="0"
+                            emptySpanS="0"
+                            columnsXL="1"
+                            columnsL="1"
+                            columnsM="1">
+                            <f:content>
+                                <Label text="Sicil numaranızı girin"/>
+                                <Input
+                                    id="userIdInput"
+                                    placeholder="Sicil numaranızı girin"
+                                    type="Number"
+                                    submit="onLoginPress"/>
+                                <Label text="Şifrenizi girin"/>
+                                <Input
+                                    id="passwordInput"
+                                    placeholder="şifrenizi girin"
+                                    type="Password"
+                                    submit="onLoginPress"/>
+                                <Button
+                                    text="Giriş Yap"
+                                    type="Emphasized"
+                                    press="onLoginPress"
+                                    width="100%"
+                                    class="sapUiSmallMarginTop"/>
+                                <Link
+                                    text="Şifremi unuttum"
+                                    press="onForgotPasswordPress"
+                                    class="sapUiSmallMarginTop sapUiSmallMarginBottom"
+                                    textAlign="Center"
+                                    width="100%"/>
+                            </f:content>
+                        </f:SimpleForm>
+                    </Panel>
+                </VBox>
+            </FlexBox>
+        </content>
+        <footer>
+            <Toolbar>
+                <ToolbarSpacer/>
+                <Text text="Depo Yönetim Sistemi Ver:System 3.8"/>
+                <ToolbarSpacer/>
+            </Toolbar>
+        </footer>
+    </Page>
+</mvc:View>

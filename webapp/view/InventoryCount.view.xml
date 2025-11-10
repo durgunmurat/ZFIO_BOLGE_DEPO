@@ -1,0 +1,53 @@
+<mvc:View
+    controllerName="com.sut.bolgeyonetim.controller.InventoryCount"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m">
+    <Page
+        title="Stok Sayım"
+        showNavButton="true"
+        navButtonPress="onNavBack">
+        <headerContent>
+            <Button 
+                icon="sap-icon://add"
+                text="Yeni Sayım"
+                type="Emphasized"
+                press="onNewCount"/>
+        </headerContent>
+        <content>
+            <SearchField
+                placeholder="Sayım numarası ile ara..."
+                width="100%"
+                search="onSearch"
+                class="sapUiSmallMargin"/>
+                
+            <IconTabBar
+                expanded="{device>/isNoPhone}"
+                class="sapUiSmallMarginBeginEnd">
+                <items>
+                    <IconTabFilter
+                        key="pending"
+                        text="Bekleyenler"
+                        count="3">
+                        <VBox class="sapUiSmallMargin">
+                            <List
+                                items="{/counts}"
+                                class="sapUiSmallMarginBottom">
+                                <CustomListItem type="Active">
+                                    <VBox class="sapUiSmallMargin">
+                                        <ObjectIdentifier
+                                            title="Stok Sayım No"
+                                            text="Sayım numarası seçiniz..."/>
+                                    </VBox>
+                                </CustomListItem>
+                            </List>
+                        </VBox>
+                    </IconTabFilter>
+                    <IconTabFilter
+                        key="completed"
+                        text="Tamamlananlar"
+                        count="0"/>
+                </items>
+            </IconTabBar>
+        </content>
+    </Page>
+</mvc:View>

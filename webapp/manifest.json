@@ -1,0 +1,138 @@
+{
+    "_version": "1.8.0",
+    "sap.app": {
+        "id": "com.sut.bolgeyonetim",
+        "type": "application",
+        "i18n": "i18n/i18n.properties",
+        "title": "{{appTitle}}",
+        "description": "{{appDescription}}",
+        "applicationVersion": {
+            "version": "1.0.0"
+        },
+        "sourceTemplate": {
+            "id": "@sap/ux-app-migrator:freestyle",
+            "version": "1.19.3",
+            "toolsId": "8c775fe5-845c-417f-a519-e6d6ed98070f"
+        }
+    },
+    "sap.ui": {
+        "technology": "UI5",
+        "deviceTypes": {
+            "desktop": true,
+            "tablet": true,
+            "phone": false
+        },
+        "supportedThemes": [
+            "sap_belize"
+        ]
+    },
+    "sap.ui5": {
+        "rootView": {
+            "viewName": "com.sut.bolgeyonetim.view.App",
+            "type": "XML",
+            "id": "app"
+        },
+        "dependencies": {
+            "minUI5Version": "1.48.11",
+            "libs": {
+                "sap.m": {},
+                "sap.ui.core": {},
+                "sap.ui.layout": {}
+            }
+        },
+        "models": {
+            "i18n": {
+                "type": "sap.ui.model.resource.ResourceModel",
+                "settings": {
+                    "bundleName": "com.sut.bolgeyonetim.i18n.i18n"
+                }
+            }
+        },
+        "routing": {
+            "config": {
+                "routerClass": "sap.m.routing.Router",
+                "viewType": "XML",
+                "viewPath": "com.sut.bolgeyonetim.view",
+                "controlId": "app",
+                "controlAggregation": "pages",
+                "async": true
+            },
+            "routes": [
+                {
+                    "pattern": "",
+                    "name": "login",
+                    "target": "login"
+                },
+                {
+                    "pattern": "passwordReset",
+                    "name": "passwordReset",
+                    "target": "passwordReset"
+                },
+                {
+                    "pattern": "passwordResetVerify/{userId}",
+                    "name": "passwordResetVerify",
+                    "target": "passwordResetVerify"
+                },
+                {
+                    "pattern": "home",
+                    "name": "home",
+                    "target": "home"
+                },
+                {
+                    "pattern": "goodsReceipt",
+                    "name": "goodsReceipt",
+                    "target": "goodsReceipt"
+                },
+                {
+                    "pattern": "shipmentAssignment",
+                    "name": "shipmentAssignment",
+                    "target": "shipmentAssignment"
+                },
+                {
+                    "pattern": "goodsIssue",
+                    "name": "goodsIssue",
+                    "target": "goodsIssue"
+                },
+                {
+                    "pattern": "inventoryCount",
+                    "name": "inventoryCount",
+                    "target": "inventoryCount"
+                }
+            ],
+            "targets": {
+                "login": {
+                    "viewName": "Login",
+                    "viewLevel": 0
+                },
+                "passwordReset": {
+                    "viewName": "PasswordReset",
+                    "viewLevel": 1
+                },
+                "home": {
+                    "viewName": "Home",
+                    "viewLevel": 1
+                },
+                "goodsReceipt": {
+                    "viewName": "GoodsReceipt",
+                    "viewLevel": 2
+                },
+                "shipmentAssignment": {
+                    "viewName": "ShipmentAssignment",
+                    "viewLevel": 2
+                },
+                "goodsIssue": {
+                    "viewName": "GoodsIssue",
+                    "viewLevel": 2
+                },
+                "inventoryCount": {
+                    "viewName": "InventoryCount",
+                    "viewLevel": 2
+                },
+                "passwordResetVerify": {
+                    "viewName": "PasswordResetVerify",
+                    "viewLevel": 1
+                }
+            }
+        }
+    }
+}

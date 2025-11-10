@@ -1,0 +1,13 @@
+{
+ "base":"./dist", 
+ "conn_usestrictssl":false, 
+ "conn_server":"https://sapfioridev.sutas.com.tr:8443", 
+ "conn_client":"100", 
+ "conn_user":"E.GUNGORMEZ",
+ "conn_password":"Inervo.2025",
+ "abap_package":"ZFIO",
+ "abap_bsp":"ZFIO_BOLGE_DEPO",
+ "abap_bsp_text":"Bölge Depo Yönetim Sistemi",
+ "abap_transport":"FRDK901139",
+ "abap_language": "EN" 
+}

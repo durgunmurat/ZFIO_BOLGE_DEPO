@@ -1,0 +1,10 @@
+<mvc:View
+    controllerName="com.sut.bolgeyonetim.controller.App"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    displayBlock="true"
+    height="100%">
+    <Shell>
+        <App id="app"/>
+    </Shell>
+</mvc:View>

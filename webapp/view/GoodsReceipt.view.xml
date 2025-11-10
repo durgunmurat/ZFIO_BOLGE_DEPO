@@ -1,0 +1,49 @@
+<mvc:View
+    controllerName="com.sut.bolgeyonetim.controller.GoodsReceipt"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:f="sap.f">
+    <Page
+        title="Mal Kabul"
+        showNavButton="true"
+        navButtonPress="onNavBack">
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <SegmentedButton
+                    selectedKey="pending"
+                    class="sapUiSmallMarginBottom">
+                    <items>
+                        <SegmentedButtonItem text="Bekleyenler (10)" key="pending"/>
+                        <SegmentedButtonItem text="Tamamlananlar (0)" key="completed"/>
+                    </items>
+                </SegmentedButton>
+
+                <List
+                    items="{/goodsReceipts}"
+                    class="sapUiSmallMarginBottom">
+                    <CustomListItem type="Active" press="onItemPress">
+                        <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiSmallMargin">
+                            <VBox>
+                                <ObjectIdentifier
+                                    title="35CK015STR"
+                                    text="DR: İstanbul"/>
+                                <Text text="ÜY: Aksaray Fabrika"/>
+                            </VBox>
+                            <Button text="Mal Kabul" type="Emphasized" press="onAcceptPress"/>
+                            <Link text="Foto (0/5)" press="onPhotoPress"/>
+                        </HBox>
+                        <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiSmallMargin">
+                            <VBox>
+                                <Text text="İrsaliye Listesi"/>
+                                <ObjectStatus
+                                    text="İrsaliye No: ST220225000013022"
+                                    state="None"/>
+                                <Link text="13 farklı ürün" press="onProductListPress"/>
+                            </VBox>
+                        </HBox>
+                    </CustomListItem>
+                </List>
+            </VBox>
+        </content>
+    </Page>
+</mvc:View>
