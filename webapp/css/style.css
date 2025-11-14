@@ -1,14 +1,37 @@
-.loginPage {
-    background-image: url('https://www.sutas.com.tr/assets/uploads/hakkimizda/kisaca-sutas.png');
+.loginPage,
+.authBackground {
+    /* Use local image placed at webapp/images/login-bg.jpg */
+    background-image: linear-gradient(rgba(0,0,0,0.25), rgba(0,0,0,0.25)), url('../images/login-bg.jpg');
     background-size: cover;
-    background-position: center;
+    background-position: center center;
+    background-repeat: no-repeat;
+    min-height: 100vh;
+    position: relative;
+}
+
+/* subtle overlay to improve contrast if needed */
+.authBackground::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.18);
+    pointer-events: none;
 }
 
 .loginForm {
-    background-color: rgba(255, 255, 255, 0.9);
+    background-color: rgba(255, 255, 255, 0.92);
     border-radius: 0.25rem;
-    padding: 1rem;
-    max-width: 400px;
+    padding: 0.75rem;
+    max-width: 360px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+}
+
+/* Center titles inside the login panel without affecting form alignment */
+.loginForm .loginTitle,
+.loginForm .loginSubtitle {
+    text-align: center;
+    display: block;
+    width: 100%;
 }
 
 /* Responsive Tile Container */
@@ -34,9 +57,19 @@
 .sapMNCScale {
     font-size: 0.875rem !important;
     margin-top: 0.5rem !important;
+    /* Allow scale text to wrap instead of being truncated to a single short line */
+    white-space: normal !important;
+    display: block !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
 }
 
 /* List Item Spacing */
 .sapMListItems .sapMLIB {
     margin-bottom: 0.5rem;
+}
+
+.sapMSampleTileContainer {
+	width: 100%;
 }

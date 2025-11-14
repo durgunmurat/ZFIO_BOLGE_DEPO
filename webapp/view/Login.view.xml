@@ -7,7 +7,7 @@
     xmlns:core="sap.ui.core"
     displayBlock="true"
     height="100%">
-    <Page showHeader="false" class="loginPage" backgroundDesign="Transparent">
+    <Page showHeader="false" class="loginPage authBackground" backgroundDesign="Transparent">
         <content>
             <FlexBox
                 height="100%"
@@ -17,19 +17,19 @@
                     alignItems="Center"
                     justifyContent="Center"
                     class="sapUiMediumMargin">
-                    <Title 
-                        text="Sütaş" 
-                        level="H1"
-                        titleStyle="H1"
-                        class="sapUiMediumMarginBottom loginTitle"/>
-                    <Title 
-                        text="Bölge Depo Yönetim Sistemi" 
-                        level="H2"
-                        titleStyle="H2"
-                        class="sapUiMediumMarginBottom"/>
                     <Panel
                         class="loginForm"
                         backgroundDesign="Transparent">
+                        <Title 
+                            text="Sütaş" 
+                            level="H1"
+                            titleStyle="H1"
+                            class="sapUiMediumMarginBottom loginTitle"/>
+                        <Title 
+                            text="Bölge Depo Yönetim Sistemi" 
+                            level="H2"
+                            titleStyle="H2"
+                            class="sapUiMediumMarginBottom loginSubtitle"/>
                         <f:SimpleForm
                             editable="true"
                             layout="ResponsiveGridLayout"
@@ -48,13 +48,13 @@
                             <f:content>
                                 <Label text="Sicil numaranızı girin"/>
                                 <Input
-                                    id="userIdInput"
+                                    id="idUserInput"
                                     placeholder="Sicil numaranızı girin"
-                                    type="Number"
+                                    type="Text"
                                     submit="onLoginPress"/>
                                 <Label text="Şifrenizi girin"/>
                                 <Input
-                                    id="passwordInput"
+                                    id="idPasswordInput"
                                     placeholder="şifrenizi girin"
                                     type="Password"
                                     submit="onLoginPress"/>
@@ -79,7 +79,7 @@
         <footer>
             <Toolbar>
                 <ToolbarSpacer/>
-                <Text text="Depo Yönetim Sistemi Ver:System 3.8"/>
+                <Text text="Depo Yönetim Sistemi Ver:System 1.0"/>
                 <ToolbarSpacer/>
             </Toolbar>
         </footer>

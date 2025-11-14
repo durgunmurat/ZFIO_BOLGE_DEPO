@@ -8,26 +8,37 @@ sap.ui.define([
 
     return BaseController.extend("com.sut.bolgeyonetim.controller.Home", {
         onInit: function() {
-            // Initialize view model with counter data
-            var oViewModel = new JSONModel({
-                pendingReceipts: 10,
-                pendingShipments: 3,
-                pendingDeliveries: 3,
-                pendingCounts: 3,
-                // computed fields for UI state (using enum values)
-                pendingReceiptsColor: ValueColor.Critical,
-                pendingReceiptsIndicator: DeviationIndicator.Up,
-                pendingShipmentsColor: ValueColor.Critical,
-                pendingShipmentsIndicator: DeviationIndicator.Up,
-                pendingDeliveriesColor: ValueColor.Critical,
-                pendingDeliveriesIndicator: DeviationIndicator.Up,
-                pendingCountsColor: ValueColor.Critical,
-                pendingCountsIndicator: DeviationIndicator.Up
-            });
-            this.setModel(oViewModel, "homeView");
+            // Initialize filter model with today's date
+            var oToday = new Date();
+            var sYear = oToday.getFullYear();
+            var sMonth = String(oToday.getMonth() + 1).padStart(2, '0');
+            var sDay = String(oToday.getDate()).padStart(2, '0');
+            var sTodayFormatted = sYear + "-" + sMonth + "-" + sDay;
 
-            // compute initial colors/indicators
+            var oFilterModel = new JSONModel({
+                selectedDate: sTodayFormatted,
+                selectedDateFormatted: sTodayFormatted + "T00:00:00"
+            });
+            this.getOwnerComponent().setModel(oFilterModel, "filterModel");
+
+            // Remove hardcoded test values. Dashboard counts come from global "dashboardData" model populated at login.
+            var oDashboardModel = this.getOwnerComponent().getModel("dashboardData");
+            if (!oDashboardModel) {
+                // create an empty dashboardData model so bindings won't break
+                oDashboardModel = new JSONModel({
+                    pendingReceipts: 0,
+                    pendingShipments: 0,
+                    pendingDeliveries: 0,
+                    pendingCounts: 0
+                });
+                this.getOwnerComponent().setModel(oDashboardModel, "dashboardData");
+            }
+
+            // compute indicators initially and whenever dashboardData changes
             this._updateStatusIndicators();
+            oDashboardModel.attachEvent("change", function() {
+                this._updateStatusIndicators();
+            }.bind(this));
         },
 
         onGoodsReceiptPress: function() {
@@ -44,6 +55,29 @@ sap.ui.define([
 
         onInventoryCountPress: function() {
             this.getRouter().navTo("inventoryCount");
+        },
+
+        onDateChange: function(oEvent) {
+            // Update the formatted date for OData queries when user changes the date
+            var sSelectedDate = oEvent.getParameter("value");
+            var oFilterModel = this.getOwnerComponent().getModel("filterModel");
+            
+            if (sSelectedDate && oFilterModel) {
+                // Convert from display format (dd.MM.yyyy) to OData format (yyyy-MM-ddT00:00:00)
+                var oDatePicker = oEvent.getSource();
+                var oDate = oDatePicker.getDateValue();
+                
+                if (oDate) {
+                    var sYear = oDate.getFullYear();
+                    var sMonth = String(oDate.getMonth() + 1).padStart(2, '0');
+                    var sDay = String(oDate.getDate()).padStart(2, '0');
+                    var sFormattedDate = sYear + "-" + sMonth + "-" + sDay;
+                    var sODataDate = sFormattedDate + "T00:00:00";
+                    
+                    oFilterModel.setProperty("/selectedDate", sFormattedDate);
+                    oFilterModel.setProperty("/selectedDateFormatted", sODataDate);
+                }
+            }
         }
         ,
 
@@ -52,7 +86,7 @@ sap.ui.define([
          * based on simple thresholds. This keeps UI bindings declarative.
          */
         _updateStatusIndicators: function() {
-            var oModel = this.getModel("homeView");
+            var oModel = this.getOwnerComponent().getModel("dashboardData");
             if (!oModel) {
                 return;
             }
@@ -70,12 +104,13 @@ sap.ui.define([
                     indicator: DeviationIndicator.Up 
                 };
             };
+            var oData = oModel.getData() || {};
+            var oReceipts = fnState(oData.pendingReceipts);
+            var oShipments = fnState(oData.pendingShipments);
+            var oDeliveries = fnState(oData.pendingDeliveries);
+            var oCounts = fnState(oData.pendingCounts);
 
-            var oReceipts = fnState(oModel.getProperty("/pendingReceipts"));
-            var oShipments = fnState(oModel.getProperty("/pendingShipments"));
-            var oDeliveries = fnState(oModel.getProperty("/pendingDeliveries"));
-            var oCounts = fnState(oModel.getProperty("/pendingCounts"));
-
+            // Set computed indicator/color properties back on dashboardData model so bindings update
             oModel.setProperty("/pendingReceiptsColor", oReceipts.color);
             oModel.setProperty("/pendingReceiptsIndicator", oReceipts.indicator);
 

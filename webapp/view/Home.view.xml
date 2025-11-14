@@ -1,20 +1,47 @@
 <mvc:View
     controllerName="com.sut.bolgeyonetim.controller.Home"
     xmlns:mvc="sap.ui.core.mvc"
-    xmlns="sap.m">
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
     <Page title="Depo Yönetimi Uygulaması" showNavButton="false">
+        <customHeader>
+            <Toolbar>
+                <DatePicker
+                    id="idDateFilter"
+                    value="{filterModel>/selectedDate}"
+                    displayFormat="dd.MM.yyyy"
+                    valueFormat="yyyy-MM-dd"
+                    change="onDateChange"
+                    placeholder="Tarih"
+                    width="10rem"
+                    class="sapUiTinyMarginEnd"/>
+                <ToolbarSpacer/>
+                <HBox alignItems="Center" class="sapUiMediumMarginEnd">
+                    <core:Icon 
+                        src="sap-icon://person-placeholder" 
+                        size="1.5rem"
+                        color="#0854A0"
+                        class="sapUiSmallMarginEnd"/>
+                    <Label 
+                        text="{sessionModel>/Login/DisplayName}"
+                        class="sapUiSmallMarginEnd"/>
+                    <Label 
+                        text="({sessionModel>/Login/WarehouseNum} - {sessionModel>/Login/Warehouse})"/>
+                </HBox>
+            </Toolbar>
+        </customHeader>
         <content>
             <FlexBox
                 alignItems="Start"
                 justifyContent="SpaceBetween"
                 wrap="Wrap"
-                class="sapUiMediumMargin">
-                
+                class="sapUiMediumMargin"> 
                 <!-- Main Tiles -->
                 <GenericTile
-                    class="sapUiTinyMargin"
+                    class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout"
                     header="Mal Kabul"
                     subheader="Gelen ürünlerin kontrolü ve onaylanması işlemleri"
+
                     press="onGoodsReceiptPress">
                     <TileContent>
                         <ImageContent src="sap-icon://accept"/>
@@ -22,7 +49,7 @@
                 </GenericTile>
 
                 <GenericTile
-                    class="sapUiTinyMargin"
+                    class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout"
                     header="Yükleme Formu Ataması"
                     subheader="Araçlara yükleme formlarının atanması ve takibi"
                     press="onShipmentAssignmentPress">
@@ -32,7 +59,7 @@
                 </GenericTile>
 
                 <GenericTile
-                    class="sapUiTinyMargin"
+                    class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout"
                     header="Araç Yükleme"
                     subheader="Ürünlerin araçlara yüklenmesi ve sevkiyat hazırlığı"
                     press="onGoodsIssuePress">
@@ -41,8 +68,8 @@
                     </TileContent>
                 </GenericTile>
 
-                <GenericTile
-                    class="sapUiTinyMargin"
+                <GenericTile visible="false"
+                    class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout"
                     header="Stok Sayım"
                     subheader="Depo stoklarının sayım ve takip işlemleri"
                     press="onInventoryCountPress">
@@ -59,49 +86,50 @@
                 wrap="Wrap"
                 class="sapUiMediumMargin">
 
-                <GenericTile class="sapUiTinyMargin">
+                <GenericTile class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout" 
+                scope="Display">
                     <TileContent>
-                        <NumericContent 
-                            value="{homeView>/pendingReceipts}" 
+                        <NumericContent
+                            value="{dashboardData>/pendingReceipts}" 
                             scale="{i18n>status.pendingReceipts}" 
-                            valueColor="{homeView>/pendingReceiptsColor}" 
-                            indicator="{homeView>/pendingReceiptsIndicator}"
+                            valueColor="{dashboardData>/pendingReceiptsColor}" 
+                            indicator="{dashboardData>/pendingReceiptsIndicator}"
                             withMargin="false"
                             animateTextChange="true"/>
                     </TileContent>
                 </GenericTile>
 
-                <GenericTile class="sapUiTinyMargin">
+                <GenericTile class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout">
                     <TileContent>
-                        <NumericContent 
-                            value="{homeView>/pendingShipments}" 
+                        <NumericContent
+                            value="{dashboardData>/pendingShipments}" 
                             scale="{i18n>status.pendingShipments}" 
-                            valueColor="{homeView>/pendingShipmentsColor}" 
-                            indicator="{homeView>/pendingShipmentsIndicator}"
+                            valueColor="{dashboardData>/pendingShipmentsColor}" 
+                            indicator="{dashboardData>/pendingShipmentsIndicator}"
                             withMargin="false"
                             animateTextChange="true"/>
                     </TileContent>
                 </GenericTile>
 
-                <GenericTile class="sapUiTinyMargin">
+                <GenericTile class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout">
                     <TileContent>
-                        <NumericContent 
-                            value="{homeView>/pendingDeliveries}" 
+                        <NumericContent
+                            value="{dashboardData>/pendingDeliveries}" 
                             scale="{i18n>status.pendingDeliveries}" 
-                            valueColor="{homeView>/pendingDeliveriesColor}" 
-                            indicator="{homeView>/pendingDeliveriesIndicator}"
+                            valueColor="{dashboardData>/pendingDeliveriesColor}" 
+                            indicator="{dashboardData>/pendingDeliveriesIndicator}"
                             withMargin="false"
                             animateTextChange="true"/>
                     </TileContent>
                 </GenericTile>
 
-                <GenericTile class="sapUiTinyMargin">
+                <GenericTile visible="false" class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout">
                     <TileContent>
-                        <NumericContent 
-                            value="{homeView>/pendingCounts}" 
+                        <NumericContent
+                            value="{dashboardData>/pendingCounts}" 
                             scale="{i18n>status.pendingCounts}" 
-                            valueColor="{homeView>/pendingCountsColor}" 
-                            indicator="{homeView>/pendingCountsIndicator}"
+                            valueColor="{dashboardData>/pendingCountsColor}" 
+                            indicator="{dashboardData>/pendingCountsIndicator}"
                             withMargin="false"
                             animateTextChange="true"/>
                     </TileContent>

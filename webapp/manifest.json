@@ -9,6 +9,15 @@
         "applicationVersion": {
             "version": "1.0.0"
         },
+        "dataSources": {
+            "ZMM_BOLGE_DEPO_YONETIM_SRV": {
+                "uri": "/sap/opu/odata/sap/ZMM_BOLGE_DEPO_YONETIM_SRV/",
+                "type": "OData",
+                "settings": {
+                    "odataVersion": "2.0"
+                }
+            }
+        },
         "sourceTemplate": {
             "id": "@sap/ux-app-migrator:freestyle",
             "version": "1.19.3",
@@ -41,12 +50,29 @@
             }
         },
         "models": {
+            "": {
+                "dataSource": "ZMM_BOLGE_DEPO_YONETIM_SRV",
+                "settings": {
+                    "defaultOperationMode": "Server",
+                    "defaultBindingMode": "TwoWay",
+                    "useBatch": true,
+                    "refreshAfterChange": false
+                },
+                "preload": true
+            },
             "i18n": {
                 "type": "sap.ui.model.resource.ResourceModel",
                 "settings": {
                     "bundleName": "com.sut.bolgeyonetim.i18n.i18n"
                 }
             }
+        },
+        "resources": {
+            "css": [
+                {
+                    "uri": "css/style.css"
+                }
+            ]
         },
         "routing": {
             "config": {
