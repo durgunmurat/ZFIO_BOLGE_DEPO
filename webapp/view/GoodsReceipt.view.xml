@@ -104,13 +104,14 @@
                                                             type="Number"
                                                             textAlign="Center"
                                                             width="100%"
+                                                            editable="false"
                                                             change="onCountChange"/>
                                                         <Text text="{itemsModel>SM}"/>
                                                         <Button
-                                                            text="Onayla"
+                                                            text="{= ${itemsModel>Approved} === 'X' ? 'Düzenle' : 'Onayla' }"
                                                             type="Emphasized"
                                                             press="onApproveItem"
-                                                            icon="sap-icon://accept"/>
+                                                            icon="{= ${itemsModel>Approved} === 'X' ? 'sap-icon://edit' : 'sap-icon://accept' }"/>
                                                     </cells>
                                                 </ColumnListItem>
                                             </items>

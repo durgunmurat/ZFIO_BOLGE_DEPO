@@ -322,7 +322,7 @@ sap.ui.define([
                 { key: "07", totalField: "Total7", textField: "Total7Text" },
                 { key: "08", totalField: "Total8", textField: "Total8Text" },
                 { key: "09", totalField: "Total9", textField: "Total9Text" },
-                { key: "D", totalField: "TotalDepozito", textField: "TotalDepozitoText" }
+                { key: "99", totalField: "TotalDepozito", textField: "TotalDepozitoText" }
             ];
             
             aCategoryMapping.forEach(function(oMapping) {
@@ -427,14 +427,39 @@ sap.ui.define([
         },
 
         onApproveItem: function(oEvent) {
-            // Get the item context
+            // Get the item context and button
             var oButton = oEvent.getSource();
             var oContext = oButton.getBindingContext("itemsModel");
             var sPath = oContext.getPath();
+            var oItemsModel = this.getView().getModel("itemsModel");
+            var oItem = oContext.getObject();
             
-            // Set Approved flag to 'X'
-            this.getView().getModel("itemsModel").setProperty(sPath + "/Approved", "X");
+            // Store current item path for dialog
+            this._sCurrentEditPath = sPath;
+            this._oCurrentEditButton = oButton;
             
+            // Check if already approved (button text is "Düzenle")
+            if (oItem.Approved === "X") {
+                // Open edit dialog
+                this._openEditDialog(oItem);
+            } else {
+                // Set Approved flag to 'X'
+                oItemsModel.setProperty(sPath + "/Approved", "X");
+                
+                // Copy ReceivedQuantity to ExpectedQuantity
+                var sReceivedQty = oItem.ReceivedQuantity;
+                oItemsModel.setProperty(sPath + "/ExpectedQuantity", sReceivedQty);
+                
+                // Change button text to "Düzenle"
+                oButton.setText("Düzenle");
+                oButton.setIcon("sap-icon://edit");
+                
+                // Check Mal Kabul button state
+                this._updateMalKabulButton(oButton);
+            }
+        },
+
+        _updateMalKabulButton: function(oButton) {
             // Find the "Mal Kabul" button from control tree
             var oPanel = oButton.getParent();
             while (oPanel && oPanel.getMetadata().getName() !== "sap.m.Panel") {
@@ -455,8 +480,178 @@ sap.ui.define([
                     }
                 }
             }
+        },
+
+        _openEditDialog: function(oItem) {
+            if (!this._oEditDialog) {
+                this._oEditDialog = new sap.m.Dialog({
+                    title: "Miktar Düzenleme",
+                    contentWidth: "450px",
+                    draggable: true,
+                    resizable: true,
+                    content: [
+                        new sap.m.VBox({
+                            items: [
+                                // Product Info Section
+                                new sap.m.VBox({
+                                    items: [
+                                        new sap.m.Label({
+                                            text: "Ürün Bilgisi",
+                                            design: "Bold"
+                                        }).addStyleClass("sapUiTinyMarginBottom"),
+                                        new sap.m.Text({
+                                            id: this.createId("editDialogProductName"),
+                                            text: ""
+                                        })
+                                    ]
+                                }).addStyleClass("sapUiSmallMarginBottom"),
+                                
+                                // Current Quantity Info
+                                new sap.m.HBox({
+                                    justifyContent: "SpaceBetween",
+                                    alignItems: "Center",
+                                    items: [
+                                        new sap.m.Label({
+                                            text: "Beklenen Miktar:",
+                                            width: "100%"
+                                        }),
+                                        new sap.m.Text({
+                                            id: this.createId("editDialogReceivedQty"),
+                                            text: ""
+                                        })
+                                    ]
+                                }).addStyleClass("sapUiSmallMarginBottom"),
+                                
+                                // Divider
+                                new sap.m.VBox({ height: "0.5rem" }),
+                                
+                                // New Quantity Input
+                                new sap.m.Label({
+                                    text: "Yeni Miktar",
+                                    required: true,
+                                    labelFor: this.createId("editDialogNewQty")
+                                }).addStyleClass("sapUiTinyMarginTop"),
+                                new sap.m.Input({
+                                    id: this.createId("editDialogNewQty"),
+                                    type: "Number",
+                                    placeholder: "Yeni miktarı girin",
+                                    width: "100%",
+                                    valueState: "None",
+                                    valueLiveUpdate: true,
+                                    liveChange: function(oEvent) {
+                                        var sValue = oEvent.getParameter("value");
+                                        var oInput = oEvent.getSource();
+                                        if (!sValue || sValue === "0" || parseFloat(sValue) < 0) {
+                                            oInput.setValueState("Error");
+                                            oInput.setValueStateText("Lütfen geçerli bir miktar girin");
+                                        } else {
+                                            oInput.setValueState("None");
+                                        }
+                                    }
+                                }).addStyleClass("sapUiTinyMarginTop sapUiSmallMarginBottom"),
+                                
+                                // Edit Reason ComboBox
+                                new sap.m.Label({
+                                    text: "Düzenleme Nedeni",
+                                    required: true,
+                                    labelFor: this.createId("editDialogReason")
+                                }),
+                                new sap.m.ComboBox({
+                                    id: this.createId("editDialogReason"),
+                                    placeholder: "Neden seçin",
+                                    width: "100%",
+                                    valueState: "None",
+                                    items: [
+                                        new sap.ui.core.Item({ key: "hasar", text: "Hasarlı Ürün" }),
+                                        new sap.ui.core.Item({ key: "eksik", text: "Eksik Teslimat" }),
+                                        new sap.ui.core.Item({ key: "fazla", text: "Fazla Teslimat" }),
+                                        new sap.ui.core.Item({ key: "yanlis", text: "Yanlış Ürün" }),
+                                        new sap.ui.core.Item({ key: "diger", text: "Diğer" })
+                                    ],
+                                    selectionChange: function(oEvent) {
+                                        var oComboBox = oEvent.getSource();
+                                        if (oComboBox.getSelectedKey()) {
+                                            oComboBox.setValueState("None");
+                                        }
+                                    }
+                                }).addStyleClass("sapUiTinyMarginTop")
+                            ]
+                        }).addStyleClass("sapUiMediumMargin")
+                    ],
+                    beginButton: new sap.m.Button({
+                        text: "Kaydet",
+                        type: "Emphasized",
+                        icon: "sap-icon://save",
+                        press: function() {
+                            this._onEditDialogSave();
+                        }.bind(this)
+                    }),
+                    endButton: new sap.m.Button({
+                        text: "İptal",
+                        icon: "sap-icon://decline",
+                        press: function() {
+                            this._oEditDialog.close();
+                        }.bind(this)
+                    }),
+                    afterClose: function() {
+                        // Reset value states when dialog closes
+                        this.byId("editDialogNewQty").setValueState("None");
+                        this.byId("editDialogReason").setValueState("None");
+                    }.bind(this)
+                });
+                this.getView().addDependent(this._oEditDialog);
+            }
             
-            MessageBox.success("Ürün onaylandı");
+            // Set current item data to dialog
+            this.byId("editDialogProductName").setText(oItem.MaterialText);
+            this.byId("editDialogReceivedQty").setText(oItem.ReceivedQuantity + " " + oItem.UoM);
+            this.byId("editDialogNewQty").setValue(oItem.ExpectedQuantity);
+            this.byId("editDialogNewQty").setValueState("None");
+            this.byId("editDialogReason").setSelectedKey("");
+            this.byId("editDialogReason").setValueState("None");
+            
+            this._oEditDialog.open();
+        },
+
+        _onEditDialogSave: function() {
+            var oNewQtyInput = this.byId("editDialogNewQty");
+            var oReasonComboBox = this.byId("editDialogReason");
+            var sNewQty = oNewQtyInput.getValue();
+            var sReason = oReasonComboBox.getSelectedKey();
+            
+            var bValid = true;
+            
+            // Validation with visual feedback
+            if (!sNewQty || sNewQty === "0" || parseFloat(sNewQty) < 0) {
+                oNewQtyInput.setValueState("Error");
+                oNewQtyInput.setValueStateText("Lütfen geçerli bir miktar girin");
+                bValid = false;
+            } else {
+                oNewQtyInput.setValueState("None");
+            }
+            
+            if (!sReason) {
+                oReasonComboBox.setValueState("Error");
+                oReasonComboBox.setValueStateText("Lütfen düzenleme nedeni seçin");
+                bValid = false;
+            } else {
+                oReasonComboBox.setValueState("None");
+            }
+            
+            if (!bValid) {
+                return;
+            }
+            
+            // Update the item
+            var oItemsModel = this.getView().getModel("itemsModel");
+            oItemsModel.setProperty(this._sCurrentEditPath + "/ExpectedQuantity", sNewQty);
+            oItemsModel.setProperty(this._sCurrentEditPath + "/EditReason", sReason);
+            
+            // Update Mal Kabul button
+            this._updateMalKabulButton(this._oCurrentEditButton);
+            
+            this._oEditDialog.close();
+            MessageBox.success("Miktar başarıyla güncellendi.");
         },
 
         onMalKabulPress: function(oEvent) {

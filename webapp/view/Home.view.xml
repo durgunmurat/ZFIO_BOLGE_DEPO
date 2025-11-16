@@ -35,10 +35,10 @@
                 alignItems="Start"
                 justifyContent="SpaceBetween"
                 wrap="Wrap"
-                class="sapUiMediumMargin"> 
+                class="sapUiMediumMargin tileContainer"> 
                 <!-- Main Tiles -->
                 <GenericTile
-                    class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout"
+                    class="sapUiTinyMarginBegin sapUiTinyMarginTop mainTile"
                     header="Mal Kabul"
                     subheader="Gelen ürünlerin kontrolü ve onaylanması işlemleri"
 
@@ -49,7 +49,7 @@
                 </GenericTile>
 
                 <GenericTile
-                    class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout"
+                    class="sapUiTinyMarginBegin sapUiTinyMarginTop mainTile"
                     header="Yükleme Formu Ataması"
                     subheader="Araçlara yükleme formlarının atanması ve takibi"
                     press="onShipmentAssignmentPress">
@@ -59,7 +59,7 @@
                 </GenericTile>
 
                 <GenericTile
-                    class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout"
+                    class="sapUiTinyMarginBegin sapUiTinyMarginTop mainTile"
                     header="Araç Yükleme"
                     subheader="Ürünlerin araçlara yüklenmesi ve sevkiyat hazırlığı"
                     press="onGoodsIssuePress">
@@ -69,7 +69,7 @@
                 </GenericTile>
 
                 <GenericTile visible="false"
-                    class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout"
+                    class="sapUiTinyMarginBegin sapUiTinyMarginTop mainTile"
                     header="Stok Sayım"
                     subheader="Depo stoklarının sayım ve takip işlemleri"
                     press="onInventoryCountPress">
@@ -84,9 +84,9 @@
                 alignItems="Start"
                 justifyContent="SpaceBetween"
                 wrap="Wrap"
-                class="sapUiMediumMargin">
+                class="sapUiMediumMargin statusContainer">
 
-                <GenericTile class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout" 
+                <GenericTile class="sapUiTinyMarginBegin sapUiTinyMarginTop statusTile" 
                 scope="Display">
                     <TileContent>
                         <NumericContent
@@ -99,7 +99,7 @@
                     </TileContent>
                 </GenericTile>
 
-                <GenericTile class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout">
+                <GenericTile class="sapUiTinyMarginBegin sapUiTinyMarginTop statusTile">
                     <TileContent>
                         <NumericContent
                             value="{dashboardData>/pendingShipments}" 
@@ -111,7 +111,7 @@
                     </TileContent>
                 </GenericTile>
 
-                <GenericTile class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout">
+                <GenericTile class="sapUiTinyMarginBegin sapUiTinyMarginTop statusTile">
                     <TileContent>
                         <NumericContent
                             value="{dashboardData>/pendingDeliveries}" 
@@ -123,7 +123,7 @@
                     </TileContent>
                 </GenericTile>
 
-                <GenericTile visible="false" class="sapUiTinyMarginBegin sapUiTinyMarginTop tileLayout">
+                <GenericTile visible="false" class="sapUiTinyMarginBegin sapUiTinyMarginTop statusTile">
                     <TileContent>
                         <NumericContent
                             value="{dashboardData>/pendingCounts}" 
