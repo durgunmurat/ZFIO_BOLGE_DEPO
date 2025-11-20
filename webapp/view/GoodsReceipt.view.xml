@@ -29,14 +29,14 @@
                                     <Label text="DB: {goodsReceiptModel>Warehouse}"/>
                                     <Label text="ÜY: {goodsReceiptModel>WerksText}" class="sapUiTinyMarginBegin"/>
                                     <Button
-                                        text="Foto (0/5)"
+                                        text="Foto ({goodsReceiptModel>PhotoCount}/5)"
                                         press="onPhotoPress"
                                         class="sapUiTinyMarginBegin"/>
                                     <Button
                                         text="Mal Kabul"
                                         type="Emphasized"
                                         press="onMalKabulPress"
-                                        enabled="false"
+                                        enabled="{path: 'itemsModel>/', formatter: '.isMalKabulEnabled'}"
                                         class="sapUiTinyMarginBegin"/>
                                 </OverflowToolbar>
                             </headerToolbar>
@@ -47,15 +47,18 @@
                                         items="{goodsReceiptModel>ToDeliveryNotes/results}"
                                         mode="None"
                                         noDataText="İrsaliye bulunamadı">
+                                        <!-- <headerToolbar>
+                                            <OverflowToolbar>
+                                                <Title text="İrsaliyeler" level="H4"/>
+                                            </OverflowToolbar>
+                                        </headerToolbar> -->
                                         <CustomListItem>
-                                            <HBox alignItems="Center" justifyContent="SpaceBetween" width="100%">
-                                                <HBox alignItems="Center">
-                                                    <CheckBox select="onDeliveryNoteSelect"/>
-                                                    <VBox class="sapUiTinyMarginBegin">
-                                                        <Text text="İrsaliye No: {goodsReceiptModel>DeliveryNumber}"/>
-                                                        <Text text="{= parseInt(${goodsReceiptModel>TotalMaterialNo}) } farklı ürün" class="sapUiTinyMarginTop"/>
-                                                    </VBox>
-                                                </HBox>
+                                            <HBox alignItems="Center" width="100%">
+                                                <CheckBox select="onDeliveryNoteSelect"/>
+                                                <VBox class="sapUiTinyMarginBegin">
+                                                    <Text text="İrsaliye No: {goodsReceiptModel>DeliveryNumber}"/>
+                                                    <Text text="{= parseInt(${goodsReceiptModel>TotalMaterialNo}) } farklı ürün" class="sapUiTinyMarginTop"/>
+                                                </VBox>
                                             </HBox>
                                         </CustomListItem>
                                     </List>
@@ -96,11 +99,11 @@
                                                         <Text text="{itemsModel>MaterialText}"/>
                                                         <Text text="{itemsModel>KategoriText}"/>
                                                         <ObjectNumber
-                                                            number="{itemsModel>ReceivedQuantity}"
+                                                            number="{itemsModel>ExpectedQuantity}"
                                                             unit="{itemsModel>UoM}"
                                                             state="None"/>
                                                         <Input
-                                                            value="{itemsModel>ExpectedQuantity}"
+                                                            value="{itemsModel>ReceivedQuantity}"
                                                             type="Number"
                                                             textAlign="Center"
                                                             width="100%"

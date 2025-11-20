@@ -49,11 +49,16 @@ sap.ui.define([
                 return;
             }
 
+            // Get today's date as Date object for ArrivalDate parameter (OData DateTime)
+            var oToday = new Date();
+            var oArrivalDate = new Date(Date.UTC(oToday.getFullYear(), oToday.getMonth(), oToday.getDate(), 0, 0, 0));
+
             // Call the Login function import via BaseController helper
             this.callFunctionImport("Login", {
                 urlParameters: {
                     Username: sUsername,
-                    Password: sPassword
+                    Password: sPassword,
+                    ArrivalDate: oArrivalDate
                 }
             }).then(function(oData) {
                 if (!oData) {

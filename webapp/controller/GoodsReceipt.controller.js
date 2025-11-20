@@ -3,11 +3,29 @@ sap.ui.define([
     "sap/ui/model/json/JSONModel",
     "sap/ui/model/Filter",
     "sap/ui/model/FilterOperator",
-    "sap/m/MessageBox"
-], function(BaseController, JSONModel, Filter, FilterOperator, MessageBox) {
+    "sap/m/MessageBox",
+    "sap/m/MessageToast"
+], function(BaseController, JSONModel, Filter, FilterOperator, MessageBox, MessageToast) {
     "use strict";
 
     return BaseController.extend("com.sut.bolgeyonetim.controller.GoodsReceipt", {
+        /**
+         * Formatter: Determines if "Mal Kabul" button should be enabled
+         * Returns true only if itemsModel has data AND all items are approved
+         */
+        isMalKabulEnabled: function(aItems) {
+            if (!aItems || aItems.length === 0) {
+                return false;
+            }
+            
+            // Check if ALL items are approved
+            var bAllApproved = aItems.every(function(oItem) {
+                return oItem.Approved === "X";
+            });
+            
+            return bAllApproved;
+        },
+
         onInit: function() {
             // Initialize empty itemsModel for L3 display
             this.getView().setModel(new JSONModel([]), "itemsModel");
@@ -16,6 +34,14 @@ sap.ui.define([
             var oEditReasonsModel = new JSONModel([]);
             this.getView().setModel(oEditReasonsModel, "editReasonsModel");
             this._loadEditReasons();
+            
+            // Initialize photoModel for photo dialog
+            var oPhotoModel = new JSONModel({
+                photos: [],
+                photoCount: 0,
+                lpId: null
+            });
+            this.getView().setModel(oPhotoModel, "photoModel");
             
             // Attach route matched handler to load data when navigating to this view
             this.getRouter().getRoute("goodsReceipt").attachPatternMatched(this._onRouteMatched, this);
@@ -225,7 +251,7 @@ sap.ui.define([
 
         /**
          * Event handler when a delivery note checkbox is selected/deselected.
-         * Collects all selected delivery notes' items and displays them in the L3 table.
+         * Supports multi-selection - collects items from ALL selected delivery notes.
          */
         onDeliveryNoteSelect: function(oEvent) {
             var oCheckBox = oEvent.getSource();
@@ -236,7 +262,7 @@ sap.ui.define([
             }
             
             // Navigate up the control tree to find the Panel and VBox (L3 Section)
-            var oPanel = oCheckBox.getParent(); // HBox
+            var oPanel = oCheckBox.getParent();
             while (oPanel && oPanel.getMetadata().getName() !== "sap.m.Panel") {
                 oPanel = oPanel.getParent();
             }
@@ -245,6 +271,10 @@ sap.ui.define([
                 console.error("Panel not found in control tree");
                 return;
             }
+            
+            // Get L1 context to retrieve LpId
+            var oL1Context = oPanel.getBindingContext("goodsReceiptModel");
+            var sLpId = oL1Context ? oL1Context.getObject().LpId : null;
             
             // Get the VBox container (first child of Panel content)
             var oVBoxContainer = oPanel.getContent()[0];
@@ -263,60 +293,184 @@ sap.ui.define([
             // Get IconTabBar (first child of L3 Section)
             var oIconTabBar = oL3Section.getItems()[0];
             
-            // Get Table (second child of L3 Section)
-            var oTable = oL3Section.getItems()[1];
+            // MULTI-SELECTION: Collect items from ALL selected delivery notes and aggregate by Material
+            var oL2List = oVBoxContainer.getItems()[0];
+            var aL2Items = oL2List.getItems();
+            var oMaterialMap = {}; // Map to aggregate items by Material number
+            var aTotalCounts = {
+                Total1: 0, Total2: 0, Total3: 0, Total4: 0, Total5: 0,
+                Total6: 0, Total7: 0, Total8: 0, Total9: 0, TotalDepozito: 0
+            };
+            var oFirstSelectedDeliveryNote = null;
             
-            // Get "Mal Kabul" button from Panel's headerToolbar
-            var oHeaderToolbar = oPanel.getHeaderToolbar();
-            var oMalKabulBtn = null;
-            if (oHeaderToolbar) {
-                var aToolbarContent = oHeaderToolbar.getContent();
-                // Find button with text "Mal Kabul"
-                oMalKabulBtn = aToolbarContent.find(function(oControl) {
-                    return oControl.getMetadata().getName() === "sap.m.Button" && 
-                           oControl.getText() === "Mal Kabul";
-                });
-            }
-            
-            var aItemsToShow = [];
-            var oSelectedDeliveryNote = null;
-            
-            if (oCheckBox.getSelected()) {
-                // Store the selected delivery note context for category filters
-                oSelectedDeliveryNote = oL2Context.getObject();
-                
-                // Get L3 items from selected delivery note
-                var aL3Items = oL2Context.getProperty("ToItems/results");
-                if (aL3Items && aL3Items.length > 0) {
-                    aItemsToShow = aL3Items;
+            aL2Items.forEach(function(oL2Item) {
+                var oChkBox = oL2Item.getContent()[0].getItems ? oL2Item.getContent()[0].getItems()[0] : null;
+                if (oChkBox && oChkBox.getSelected && oChkBox.getSelected()) {
+                    var oCtx = oChkBox.getBindingContext("goodsReceiptModel");
+                    if (oCtx) {
+                        var oDeliveryNote = oCtx.getObject();
+                        
+                        // Store first selected for text references
+                        if (!oFirstSelectedDeliveryNote) {
+                            oFirstSelectedDeliveryNote = oDeliveryNote;
+                        }
+                        
+                        // Collect and aggregate items by Material
+                        var aL3Items = oCtx.getProperty("ToItems/results");
+                        if (aL3Items && aL3Items.length > 0) {
+                            aL3Items.forEach(function(oItem) {
+                                var sMaterial = oItem.Material;
+                                
+                                // Get session model for Username to check localStorage
+                                var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
+                                var sSicilNo = oSessionModel ? oSessionModel.getProperty("/Login/Username") : null;
+                                
+                                // Check if there's a draft in localStorage for this item
+                                var sKey = sSicilNo + "_" + oItem.DeliveryItemId;
+                                var oDraft = null;
+                                var sReceivedQtyToUse = oItem.ReceivedQuantity;
+                                var sApprovedToUse = oItem.Approved || "";
+                                var sEditReasonToUse = oItem.EditReason || "";
+                                
+                                if (sSicilNo) {
+                                    try {
+                                        var sDraftStr = localStorage.getItem(sKey);
+                                        if (sDraftStr) {
+                                            oDraft = JSON.parse(sDraftStr);
+                                            // Use draft values instead of OData values
+                                            sReceivedQtyToUse = oDraft.expectedquantity || "0";
+                                            sApprovedToUse = oDraft.approved || "";
+                                            sEditReasonToUse = oDraft.editreason || "";
+                                        }
+                                    } catch (e) {
+                                        console.error("Failed to parse draft from localStorage:", e);
+                                    }
+                                }
+                                
+                                if (oMaterialMap[sMaterial]) {
+                                    // Material already exists - aggregate quantities
+                                    var fExpectedQty = parseFloat(oMaterialMap[sMaterial].ExpectedQuantity || "0");
+                                    var fNewExpectedQty = parseFloat(oItem.ExpectedQuantity || "0");
+                                    oMaterialMap[sMaterial].ExpectedQuantity = String(fExpectedQty + fNewExpectedQty);
+                                    
+                                    var fReceivedQty = parseFloat(oMaterialMap[sMaterial].ReceivedQuantity || "0");
+                                    var fNewReceivedQty = parseFloat(sReceivedQtyToUse || "0");
+                                    oMaterialMap[sMaterial].ReceivedQuantity = String(fReceivedQty + fNewReceivedQty);
+                                    
+                                    // Aggregate Approved status - only 'X' if all are approved
+                                    if (oMaterialMap[sMaterial].Approved === "X" && sApprovedToUse !== "X") {
+                                        oMaterialMap[sMaterial].Approved = "";
+                                    }
+                                } else {
+                                    // First occurrence of this Material - create new entry
+                                    oMaterialMap[sMaterial] = {
+                                        LpId: sLpId,
+                                        Material: oItem.Material,
+                                        MaterialText: oItem.MaterialText,
+                                        Kategori: oItem.Kategori,
+                                        KategoriText: oItem.KategoriText,
+                                        ExpectedQuantity: oItem.ExpectedQuantity,
+                                        ReceivedQuantity: sReceivedQtyToUse,
+                                        UoM: oItem.UoM,
+                                        SM: oItem.SM,
+                                        Ebeln: oItem.Ebeln,
+                                        Ebelp: oItem.Ebelp,
+                                        DeliveryItemId: oItem.DeliveryItemId, // Keep first occurrence
+                                        ItemNumber: oItem.ItemNumber,
+                                        Approved: sApprovedToUse,
+                                        EditReason: sEditReasonToUse
+                                    };
+                                }
+                            }.bind(this));
+                        }
+                        
+                        // Aggregate totals
+                        for (var key in aTotalCounts) {
+                            aTotalCounts[key] += parseInt(oDeliveryNote[key] || "0");
+                        }
+                    }
                 }
+            }.bind(this));
+            
+            // Convert map to array
+            var aItemsToShow = [];
+            for (var sMat in oMaterialMap) {
+                aItemsToShow.push(oMaterialMap[sMat]);
             }
             
             // Update the itemsModel with collected items
             this.getView().getModel("itemsModel").setData(aItemsToShow);
             
             // Debug: Log collected items
-            console.log("Collected L3 Items:", JSON.stringify(aItemsToShow, null, 2));
-            console.log("Total items count:", aItemsToShow.length);
+            console.log("Collected L3 Items (Multi-Selection):", aItemsToShow.length);
             
             // Show/hide L3 section based on whether items are selected
             if (oL3Section) {
                 oL3Section.setVisible(aItemsToShow.length > 0);
             }
             
-            // Update category filters from DeliveryNote totals
-            if (oSelectedDeliveryNote && oIconTabBar) {
-                this._updateCategoryFiltersForTabBar(oSelectedDeliveryNote, oIconTabBar);
-            }
-            
-            // Check if all items are approved to enable "Mal Kabul" button
-            if (oMalKabulBtn) {
-                this._checkMalKabulEnabledForButton(oMalKabulBtn);
+            // Update category filters with aggregated totals
+            if (oFirstSelectedDeliveryNote && oIconTabBar) {
+                this._updateCategoryFiltersForTabBarMulti(oFirstSelectedDeliveryNote, aTotalCounts, oIconTabBar);
             }
         },
 
         /**
-         * Update category filters based on DeliveryNote Total fields
+         * Update category filters based on aggregated totals from multiple delivery notes
+         */
+        _updateCategoryFiltersForTabBarMulti: function(oFirstDeliveryNote, aTotalCounts, oIconTabBar) {
+            if (!oIconTabBar) {
+                return;
+            }
+            
+            // Remove all existing filters
+            oIconTabBar.destroyItems();
+            
+            // Calculate total count
+            var iTotalCount = 0;
+            for (var key in aTotalCounts) {
+                iTotalCount += aTotalCounts[key];
+            }
+            
+            // Add "Tümü" filter
+            oIconTabBar.addItem(new sap.m.IconTabFilter({
+                key: "all",
+                text: "Tümü (" + iTotalCount + ")",
+                count: iTotalCount
+            }));
+            
+            oIconTabBar.addItem(new sap.m.IconTabSeparator());
+            
+            // Add category filters dynamically
+            var aCategoryMapping = [
+                { key: "01", totalField: "Total1", textField: "Total1Text" },
+                { key: "02", totalField: "Total2", textField: "Total2Text" },
+                { key: "03", totalField: "Total3", textField: "Total3Text" },
+                { key: "04", totalField: "Total4", textField: "Total4Text" },
+                { key: "05", totalField: "Total5", textField: "Total5Text" },
+                { key: "06", totalField: "Total6", textField: "Total6Text" },
+                { key: "07", totalField: "Total7", textField: "Total7Text" },
+                { key: "08", totalField: "Total8", textField: "Total8Text" },
+                { key: "09", totalField: "Total9", textField: "Total9Text" },
+                { key: "99", totalField: "TotalDepozito", textField: "TotalDepozitoText" }
+            ];
+            
+            aCategoryMapping.forEach(function(oMapping) {
+                var iCount = aTotalCounts[oMapping.totalField];
+                var sText = oFirstDeliveryNote[oMapping.textField] || "";
+                
+                if (iCount > 0 && sText) {
+                    oIconTabBar.addItem(new sap.m.IconTabFilter({
+                        key: oMapping.key,
+                        text: sText + " (" + iCount + ")",
+                        count: iCount
+                    }));
+                }
+            });
+        },
+
+        /**
+         * Update category filters based on DeliveryNote Total fields (legacy single-selection)
          */
         _updateCategoryFiltersForTabBar: function(oDeliveryNote, oIconTabBar) {
             if (!oIconTabBar) {
@@ -372,23 +526,7 @@ sap.ui.define([
             });
         },
 
-        /**
-         * Check if all items are approved and enable/disable specific "Mal Kabul" button
-         */
-        _checkMalKabulEnabledForButton: function(oMalKabulBtn) {
-            if (!oMalKabulBtn) {
-                return;
-            }
-            
-            var oItemsModel = this.getView().getModel("itemsModel");
-            var aItems = oItemsModel.getData();
-            
-            var bAllApproved = aItems.length > 0 && aItems.every(function(oItem) {
-                return oItem.Approved === "X";
-            });
-            
-            oMalKabulBtn.setEnabled(bAllApproved);
-        },
+
 
         /**
          * Update category filter counts based on items
@@ -436,27 +574,8 @@ sap.ui.define([
         },
 
         onCountChange: function(oEvent) {
-            // Get the button from control tree
-            var oInput = oEvent.getSource();
-            var oPanel = oInput.getParent();
-            while (oPanel && oPanel.getMetadata().getName() !== "sap.m.Panel") {
-                oPanel = oPanel.getParent();
-            }
-            
-            if (oPanel) {
-                var oHeaderToolbar = oPanel.getHeaderToolbar();
-                if (oHeaderToolbar) {
-                    var aToolbarContent = oHeaderToolbar.getContent();
-                    var oMalKabulBtn = aToolbarContent.find(function(oControl) {
-                        return oControl.getMetadata().getName() === "sap.m.Button" && 
-                               oControl.getText() === "Mal Kabul";
-                    });
-                    
-                    if (oMalKabulBtn) {
-                        this._checkMalKabulEnabledForButton(oMalKabulBtn);
-                    }
-                }
-            }
+            // Trigger model refresh to update button enabled state via formatter
+            this.getView().getModel("itemsModel").refresh(true);
         },
 
         onApproveItem: function(oEvent) {
@@ -479,39 +598,21 @@ sap.ui.define([
                 // Set Approved flag to 'X'
                 oItemsModel.setProperty(sPath + "/Approved", "X");
                 
-                // Copy ReceivedQuantity to ExpectedQuantity
-                var sReceivedQty = oItem.ReceivedQuantity;
-                oItemsModel.setProperty(sPath + "/ExpectedQuantity", sReceivedQty);
+                // Copy ExpectedQuantity to ReceivedQuantity
+                var sExpectedQty = oItem.ExpectedQuantity;
+                oItemsModel.setProperty(sPath + "/ReceivedQuantity", sExpectedQty);
                 
                 // Save draft to localStorage
-                this._saveDraftToLocalStorage(oButton, oItem, sReceivedQty, "");
+                this._saveDraftToLocalStorage(oItem.LpId, oItem, sExpectedQty, "");
                 
-                // Check Mal Kabul button state
-                this._updateMalKabulButton(oButton);
+                // Trigger model refresh to update button state
+                oItemsModel.refresh(true);
             }
         },
 
         _updateMalKabulButton: function(oButton) {
-            // Find the "Mal Kabul" button from control tree
-            var oPanel = oButton.getParent();
-            while (oPanel && oPanel.getMetadata().getName() !== "sap.m.Panel") {
-                oPanel = oPanel.getParent();
-            }
-            
-            if (oPanel) {
-                var oHeaderToolbar = oPanel.getHeaderToolbar();
-                if (oHeaderToolbar) {
-                    var aToolbarContent = oHeaderToolbar.getContent();
-                    var oMalKabulBtn = aToolbarContent.find(function(oControl) {
-                        return oControl.getMetadata().getName() === "sap.m.Button" && 
-                               oControl.getText() === "Mal Kabul";
-                    });
-                    
-                    if (oMalKabulBtn) {
-                        this._checkMalKabulEnabledForButton(oMalKabulBtn);
-                    }
-                }
-            }
+            // Trigger model refresh to update button enabled state via formatter
+            this.getView().getModel("itemsModel").refresh(true);
         },
 
         _openEditDialog: function(oItem) {
@@ -636,8 +737,8 @@ sap.ui.define([
             
             // Set current item data to dialog
             this.byId("editDialogProductName").setText(oItem.MaterialText);
-            this.byId("editDialogReceivedQty").setText(oItem.ReceivedQuantity + " " + oItem.UoM);
-            this.byId("editDialogNewQty").setValue(oItem.ExpectedQuantity);
+            this.byId("editDialogReceivedQty").setText(oItem.ExpectedQuantity + " " + oItem.UoM);
+            this.byId("editDialogNewQty").setValue(oItem.ReceivedQuantity);
             this.byId("editDialogNewQty").setValueState("None");
             this.byId("editDialogReason").setSelectedKey("");
             this.byId("editDialogReason").setValueState("None");
@@ -676,16 +777,16 @@ sap.ui.define([
             
             // Update the item
             var oItemsModel = this.getView().getModel("itemsModel");
-            oItemsModel.setProperty(this._sCurrentEditPath + "/ExpectedQuantity", sNewQty);
+            oItemsModel.setProperty(this._sCurrentEditPath + "/ReceivedQuantity", sNewQty);
             oItemsModel.setProperty(this._sCurrentEditPath + "/EditReason", sReason);
             
             // Get the updated item and save draft
             var oContext = this._oCurrentEditButton.getBindingContext("itemsModel");
             var oUpdatedItem = oContext.getObject();
-            this._saveDraftToLocalStorage(this._oCurrentEditButton, oUpdatedItem, sNewQty, sReason);
+            this._saveDraftToLocalStorage(oUpdatedItem.LpId, oUpdatedItem, sNewQty, sReason);
             
-            // Update Mal Kabul button
-            this._updateMalKabulButton(this._oCurrentEditButton);
+            // Trigger model refresh to update button state
+            oItemsModel.refresh(true);
             
             this._oEditDialog.close();
             MessageBox.success("Miktar başarıyla güncellendi.");
@@ -724,14 +825,469 @@ sap.ui.define([
         },
 
         onPhotoPress: function(oEvent) {
-            // TODO: Implement photo capture/upload logic
-            MessageBox.information("Fotoğraf ekleme özelliği");
+            // Check if online
+            if (!navigator.onLine) {
+                MessageBox.error("İnternet bağlantısı yok. Fotoğraf yüklenemez.");
+                return;
+            }
+            
+            // Get button and its binding context (Level 1 - LicensePlate)
+            var oButton = oEvent.getSource();
+            var oContext = oButton.getBindingContext("goodsReceiptModel");
+            
+            if (!oContext) {
+                MessageBox.error("License Plate bilgisi bulunamadı.");
+                return;
+            }
+            
+            var oLicensePlate = oContext.getObject();
+            var sLpId = oLicensePlate.LpId;
+            var iPhotoCount = parseInt(oLicensePlate.PhotoCount || "0");
+            
+            // Store context and LpId for later use
+            this._oCurrentPhotoContext = oContext;
+            this._sCurrentLpId = sLpId;
+            
+            // Update photoModel
+            var oPhotoModel = this.getView().getModel("photoModel");
+            oPhotoModel.setProperty("/lpId", sLpId);
+            oPhotoModel.setProperty("/photoCount", iPhotoCount);
+            
+            // Load and open dialog
+            if (!this._oPhotoDialog) {
+                this._oPhotoDialog = sap.ui.xmlfragment(
+                    "photoDialog",
+                    "com.sut.bolgeyonetim.view.PhotoUploadDialog",
+                    this
+                );
+                this.getView().addDependent(this._oPhotoDialog);
+            }
+            
+            // Lazy load photos from OData
+            this._loadPhotos(sLpId);
+            
+            this._oPhotoDialog.open();
+        },
+        
+        _loadPhotos: function(sLpId) {
+            var oModel = this.getOwnerComponent().getModel();
+            var oPhotoModel = this.getView().getModel("photoModel");
+            
+            if (!sLpId) {
+                console.error("LpId is missing");
+                return;
+            }
+            
+            sap.ui.core.BusyIndicator.show(0);
+            
+            // Try reading with URL parameters instead of filters
+            var sPath = "/PlatePhotoSet";
+            
+            oModel.read(sPath, {
+                urlParameters: {
+                    "$filter": "LpId eq '" + sLpId + "'",
+                    "$select": "PhotoId,LpId,FileName,MimeType"  // Exclude Stream field to avoid serialization error
+                },
+                success: function(oData) {
+                    sap.ui.core.BusyIndicator.hide();
+                    
+                    var aPhotos = oData.results || [];
+                    oPhotoModel.setProperty("/photos", aPhotos);
+                    oPhotoModel.setProperty("/photoCount", aPhotos.length);
+                    
+                    console.log("Photos loaded for LpId", sLpId, ":", aPhotos.length);
+                }.bind(this),
+                error: function(oError) {
+                    sap.ui.core.BusyIndicator.hide();
+                    console.error("Failed to load photos:", oError);
+                    
+                    // If still fails, try without filter (get all photos)
+                    console.warn("Trying to load all photos without filter...");
+                    oModel.read(sPath, {
+                        success: function(oData) {
+                            // Filter client-side
+                            var aAllPhotos = oData.results || [];
+                            var aFilteredPhotos = aAllPhotos.filter(function(oPhoto) {
+                                return oPhoto.LpId === sLpId;
+                            });
+                            
+                            oPhotoModel.setProperty("/photos", aFilteredPhotos);
+                            oPhotoModel.setProperty("/photoCount", aFilteredPhotos.length);
+                            
+                            console.log("Photos loaded (client-side filter):", aFilteredPhotos.length);
+                        }.bind(this),
+                        error: function(oErr) {
+                            MessageBox.error(this.getView().getModel("i18n").getResourceBundle().getText("photoLoadError"));
+                        }.bind(this)
+                    });
+                }.bind(this)
+            });
+        },
+        
+        onClosePhotoDialog: function() {
+            if (this._oPhotoDialog) {
+                this._oPhotoDialog.close();
+            }
+        },
+        
+        onFilePress: function(oEvent) {
+            // Get the pressed item
+            var oItem = oEvent.getSource();
+            var oContext = oItem.getBindingContext("photoModel");
+            
+            if (!oContext) {
+                return;
+            }
+            
+            var oPhoto = oContext.getObject();
+            var sPhotoId = oPhoto.PhotoId;
+            
+            // Construct image URL (PhotoId is now String, not GUID)
+            var sImageUrl = "/sap/opu/odata/sap/ZMM_BOLGE_DEPO_YONETIM_SRV/PlatePhotoSet('" + sPhotoId + "')/$value";
+            
+            // Create and open LightBox
+            if (!this._oLightBox) {
+                this._oLightBox = new sap.m.LightBox({
+                    imageContent: [
+                        new sap.m.LightBoxItem({
+                            imageSrc: sImageUrl,
+                            title: oPhoto.FileName || "Fotoğraf"
+                        })
+                    ]
+                });
+                this.getView().addDependent(this._oLightBox);
+            } else {
+                // Update existing LightBox
+                var oLightBoxItem = this._oLightBox.getImageContent()[0];
+                oLightBoxItem.setImageSrc(sImageUrl);
+                oLightBoxItem.setTitle(oPhoto.FileName || "Fotoğraf");
+            }
+            
+            this._oLightBox.open();
+        },
+        
+        onBeforeUploadStarts: function(oEvent) {
+            var oModel = this.getOwnerComponent().getModel();
+            
+            // Refresh CSRF token
+            oModel.refreshSecurityToken();
+            var sToken = oModel.getSecurityToken();
+            
+            console.log("CSRF Token:", sToken);
+            
+            // Get file name and create slug
+            var sFileName = oEvent.getParameter("fileName");
+            var sLpId = this._sCurrentLpId;
+            
+            if (!sLpId || !sFileName) {
+                MessageBox.error(this.getView().getModel("i18n").getResourceBundle().getText("photoInvalidData"));
+                oEvent.preventDefault();
+                return;
+            }
+            
+            // Create slug: LpId|FileName
+            var sSlug = sLpId + "|" + sFileName;
+            
+            // Add headers using the newer approach
+            var oCustomerHeaderToken = new sap.m.UploadCollectionParameter({
+                name: "x-csrf-token",
+                value: sToken
+            });
+            oEvent.getParameters().addHeaderParameter(oCustomerHeaderToken);
+            
+            var oCustomerHeaderSlug = new sap.m.UploadCollectionParameter({
+                name: "slug",
+                value: sSlug
+            });
+            oEvent.getParameters().addHeaderParameter(oCustomerHeaderSlug);
+            
+            console.log("=== Upload Starting ===");
+            console.log("Slug:", sSlug);
+            console.log("LpId:", sLpId);
+            console.log("FileName:", sFileName);
+        },
+        
+        onUploadComplete: function(oEvent) {
+            console.log("=== Upload Complete ===");
+            console.log("Full Event:", oEvent);
+            console.log("Event Parameters:", oEvent.getParameters());
+            
+            // Check response status
+            var mParams = oEvent.getParameters();
+            var iStatus = mParams.status || mParams.getParameter("status");
+            var sResponse = mParams.response || mParams.getParameter("response");
+            var sResponseRaw = mParams.responseRaw || mParams.getParameter("responseRaw");
+            
+            console.log("Status:", iStatus);
+            console.log("Response:", sResponse);
+            console.log("ResponseRaw:", sResponseRaw);
+            
+            if (iStatus === 201) {
+                MessageToast.show(this.getView().getModel("i18n").getResourceBundle().getText("photoUploadSuccess"));
+                
+                // Reload photos
+                this._loadPhotos(this._sCurrentLpId);
+                
+                // Update PhotoCount in goodsReceiptModel
+                var oContext = this._oCurrentPhotoContext;
+                if (oContext) {
+                    var sPath = oContext.getPath();
+                    var oGoodsReceiptModel = oContext.getModel();
+                    var iCurrentCount = parseInt(oContext.getProperty("PhotoCount") || "0");
+                    oGoodsReceiptModel.setProperty(sPath + "/PhotoCount", String(iCurrentCount + 1));
+                }
+            } else {
+                var sErrorMsg = this.getView().getModel("i18n").getResourceBundle().getText("photoUploadError");
+                
+                if (sResponse) {
+                    try {
+                        var oErrorResponse = JSON.parse(sResponse);
+                        if (oErrorResponse.error && oErrorResponse.error.message && oErrorResponse.error.message.value) {
+                            sErrorMsg += "\n\nDetay: " + oErrorResponse.error.message.value;
+                        }
+                    } catch (e) {
+                        sErrorMsg += "\n\nDetay: " + sResponse.substring(0, 200);
+                    }
+                }
+                
+                MessageBox.error(sErrorMsg);
+            }
+        },
+        
+        onUploadTerminated: function(oEvent) {
+            console.log("=== Upload Terminated (Error) ===");
+            console.log("Full Event:", oEvent);
+            console.log("Event Parameters:", oEvent.getParameters());
+            
+            var mParams = oEvent.getParameters();
+            var sFileName = mParams.fileName || mParams.getParameter("fileName");
+            
+            MessageBox.error(this.getView().getModel("i18n").getResourceBundle().getText("photoUploadError") + ": " + sFileName + "\n\nLütfen SAP backend loglarını kontrol edin.");
+        },
+        
+        onFileChange: function(oEvent) {
+            // Validate file before upload
+            var aFiles = oEvent.getParameter("files");
+            
+            if (!aFiles || aFiles.length === 0) {
+                return;
+            }
+            
+            var oFile = aFiles[0];
+            
+            // Check photo count limit
+            var oPhotoModel = this.getView().getModel("photoModel");
+            var iPhotoCount = oPhotoModel.getProperty("/photoCount");
+            
+            if (iPhotoCount >= 5) {
+                MessageBox.warning(this.getView().getModel("i18n").getResourceBundle().getText("photoMaxLimitWarning"));
+                oEvent.preventDefault();
+                return;
+            }
+            
+            // Validate file size (5 MB)
+            var iMaxSize = 5 * 1024 * 1024;
+            if (oFile.size > iMaxSize) {
+                MessageBox.error(this.getView().getModel("i18n").getResourceBundle().getText("photoFileSizeError"));
+                oEvent.preventDefault();
+                return;
+            }
+        },
+        
+        onFileDeleted: function(oEvent) {
+            // Get deleted item
+            var oItem = oEvent.getParameter("item");
+            var sDocumentId = oItem.getDocumentId(); // PhotoId
+            
+            if (!sDocumentId) {
+                MessageBox.error(this.getView().getModel("i18n").getResourceBundle().getText("photoInvalidId"));
+                return;
+            }
+            
+            // Confirm deletion
+            var oResourceBundle = this.getView().getModel("i18n").getResourceBundle();
+            MessageBox.confirm(oResourceBundle.getText("photoDeleteConfirm"), {
+                title: oResourceBundle.getText("photoDeleteTitle"),
+                onClose: function(sAction) {
+                    if (sAction === MessageBox.Action.OK) {
+                        this._deletePhoto(sDocumentId);
+                    }
+                }.bind(this)
+            });
+        },
+        
+        _deletePhoto: function(sPhotoId) {
+            var oModel = this.getOwnerComponent().getModel();
+            var sPath = "/PlatePhotoSet('" + sPhotoId + "')";  // PhotoId is String now
+            
+            sap.ui.core.BusyIndicator.show(0);
+            
+            oModel.remove(sPath, {
+                success: function() {
+                    sap.ui.core.BusyIndicator.hide();
+                    MessageToast.show(this.getView().getModel("i18n").getResourceBundle().getText("photoDeleteSuccess"));
+                    
+                    // Reload photos
+                    this._loadPhotos(this._sCurrentLpId);
+                    
+                    // Update PhotoCount in goodsReceiptModel
+                    var oContext = this._oCurrentPhotoContext;
+                    if (oContext) {
+                        var sContextPath = oContext.getPath();
+                        var oGoodsReceiptModel = oContext.getModel();
+                        var iCurrentCount = parseInt(oContext.getProperty("PhotoCount") || "0");
+                        oGoodsReceiptModel.setProperty(sContextPath + "/PhotoCount", String(Math.max(0, iCurrentCount - 1)));
+                    }
+                }.bind(this),
+                error: function(oError) {
+                    sap.ui.core.BusyIndicator.hide();
+                    
+                    var sErrorMsg = this.getView().getModel("i18n").getResourceBundle().getText("photoDeleteError");
+                    if (oError && oError.responseText) {
+                        try {
+                            var oErrorResponse = JSON.parse(oError.responseText);
+                            if (oErrorResponse.error && oErrorResponse.error.message && oErrorResponse.error.message.value) {
+                                sErrorMsg += "\n\nDetay: " + oErrorResponse.error.message.value;
+                            }
+                        } catch (e) {
+                            // ignore parse error
+                        }
+                    }
+                    
+                    MessageBox.error(sErrorMsg);
+                }.bind(this)
+            });
         },
 
         /**
-         * Save a draft to localStorage with all 17 required fields
+         * Get the current logged-in user's ID (Sicil No)
+         * @returns {string} Username from sessionModel
          */
-        _saveDraftToLocalStorage: function(oButton, oItem, sReceivedQuantity, sEditReason) {
+        _getUserId: function() {
+            var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
+            return oSessionModel ? oSessionModel.getProperty("/Login/Username") : null;
+        },
+
+        /**
+         * Handler for "Kaydet" button - syncs drafts to staging table
+         * @deprecated - No longer used in simplified workflow
+         */
+        onSavePress: function(oEvent) {
+            var sUserId = this._getUserId();
+            
+            // Debug logging
+            console.log("=== onSavePress Debug ===");
+            console.log("UserID:", sUserId);
+            
+            if (!sUserId) {
+                MessageBox.error("Kullanıcı bilgisi bulunamadı. Lütfen tekrar giriş yapın.");
+                return;
+            }
+
+            // Get the button to navigate to Panel for LpId
+            var oButton = oEvent.getSource();
+            var oPanel = oButton.getParent();
+            while (oPanel && oPanel.getMetadata().getName() !== "sap.m.Panel") {
+                oPanel = oPanel.getParent();
+            }
+
+            if (!oPanel) {
+                MessageBox.error("Panel bulunamadı.");
+                return;
+            }
+
+            var oL1Context = oPanel.getBindingContext("goodsReceiptModel");
+            if (!oL1Context) {
+                MessageBox.error("License Plate context bulunamadı.");
+                return;
+            }
+
+            var sLpId = oL1Context.getObject().LpId;
+            console.log("LpId:", sLpId);
+
+            // Collect all drafts from localStorage for this user and LpId
+            var aPendingDrafts = [];
+            var aKeysToRemove = [];
+
+            for (var i = 0; i < localStorage.length; i++) {
+                var sKey = localStorage.key(i);
+                if (sKey && sKey.startsWith(sUserId + "_")) {
+                    try {
+                        var oDraft = JSON.parse(localStorage.getItem(sKey));
+                        if (oDraft && oDraft.lpid === sLpId) {
+                            aPendingDrafts.push(oDraft);
+                            aKeysToRemove.push(sKey);
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse draft from localStorage:", e);
+                    }
+                }
+            }
+
+            if (aPendingDrafts.length === 0) {
+                MessageBox.information("Kaydedilecek değişiklik bulunmamaktadır.");
+                return;
+            }
+
+            // Convert to JSON string for backend
+            var sPendingItemsJson = JSON.stringify(aPendingDrafts);
+
+            // Debug: Log parameters before call
+            console.log("PostGoodsReceipt Parameters:");
+            console.log("  LpId:", sLpId);
+            console.log("  UserID:", sUserId);
+            console.log("  PendingItemsJson:", sPendingItemsJson);
+            console.log("  Total items:", aPendingDrafts.length);
+
+            // Call PostGoodsReceipt function import
+            var oModel = this.getOwnerComponent().getModel();
+            var mParameters = {
+                method: "POST",
+                urlParameters: {
+                    LpId: sLpId,
+                    PendingItemsJson: sPendingItemsJson,
+                    UserID: sUserId
+                },
+                success: function(oData) {
+                    // Remove synced drafts from localStorage
+                    aKeysToRemove.forEach(function(sKey) {
+                        localStorage.removeItem(sKey);
+                    });
+
+                    MessageToast.show("Değişiklikler başarıyla kaydedildi (" + aPendingDrafts.length + " adet)");
+                    
+                    // Trigger model refresh
+                    this.getView().getModel("itemsModel").refresh(true);
+                }.bind(this),
+                error: function(oError) {
+                    // Leave drafts in localStorage
+                    var sErrorMsg = "Sunucuya kaydedilemedi. Veriler cihazda saklandı.";
+                    
+                    if (oError && oError.responseText) {
+                        try {
+                            var oErrorResponse = JSON.parse(oError.responseText);
+                            if (oErrorResponse.error && oErrorResponse.error.message && oErrorResponse.error.message.value) {
+                                sErrorMsg += "\n\nDetay: " + oErrorResponse.error.message.value;
+                            }
+                        } catch (e) {
+                            // Ignore JSON parse errors
+                        }
+                    }
+                    
+                    MessageBox.error(sErrorMsg);
+                }.bind(this)
+            };
+
+            oModel.callFunction("/PostGoodsReceipt", mParameters);
+        },
+
+
+
+        /**
+         * Save a draft to localStorage with all 17 required fields
+         * For aggregated items (multi-selection), distributes the quantity proportionally to original items
+         */
+        _saveDraftToLocalStorage: function(sLpId, oItem, sExpectedQuantity, sEditReason) {
             // Get session model for Username (Sicil No)
             var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
             var sSicilNo = oSessionModel ? oSessionModel.getProperty("/Login/Username") : null;
@@ -741,80 +1297,147 @@ sap.ui.define([
                 return;
             }
             
-            // Navigate up to find Panel and get L1 context
-            var oPanel = oButton.getParent();
-            while (oPanel && oPanel.getMetadata().getName() !== "sap.m.Panel") {
-                oPanel = oPanel.getParent();
-            }
-            
-            if (!oPanel) {
-                console.error("Panel not found");
+            if (!sLpId) {
+                console.error("LpId not provided");
                 return;
             }
             
-            var oL1Context = oPanel.getBindingContext("goodsReceiptModel");
-            if (!oL1Context) {
-                console.error("L1 context not found");
-                return;
-            }
+            // Get goodsReceiptModel to find LicensePlate and DeliveryNotes
+            var oGoodsReceiptModel = this.getView().getModel("goodsReceiptModel");
+            var aLicensePlates = oGoodsReceiptModel.getData();
             
-            var oLicensePlate = oL1Context.getObject();
+            // Find the LicensePlate
+            var oLicensePlate = null;
+            var aAllDeliveryNotes = [];
             
-            // Get L2 context (DeliveryNote) - navigate from Panel to VBox to L2 List
-            var oVBoxContainer = oPanel.getContent()[0];
-            var oL2List = oVBoxContainer.getItems()[0];
-            var aL2Items = oL2List.getItems();
-            
-            // Find the selected delivery note (checkbox is checked)
-            var oSelectedDeliveryNote = null;
-            for (var i = 0; i < aL2Items.length; i++) {
-                var oCheckBox = aL2Items[i].getContent()[0].getItems()[0].getItems()[0];
-                if (oCheckBox && oCheckBox.getSelected && oCheckBox.getSelected()) {
-                    var oL2Context = oCheckBox.getBindingContext("goodsReceiptModel");
-                    if (oL2Context) {
-                        oSelectedDeliveryNote = oL2Context.getObject();
-                        break;
+            for (var i = 0; i < aLicensePlates.length; i++) {
+                if (aLicensePlates[i].LpId === sLpId) {
+                    oLicensePlate = aLicensePlates[i];
+                    if (oLicensePlate.ToDeliveryNotes && oLicensePlate.ToDeliveryNotes.results) {
+                        aAllDeliveryNotes = oLicensePlate.ToDeliveryNotes.results;
                     }
+                    break;
                 }
             }
             
-            if (!oSelectedDeliveryNote) {
-                console.error("Selected delivery note not found");
+            if (!oLicensePlate) {
+                console.error("LicensePlate not found for LpId:", sLpId);
                 return;
             }
             
-            // Create the draft object with all 17 fields
-            var oDraft = {
-                lpid: oLicensePlate.LpId || "",
-                warehousenum: oLicensePlate.WarehouseNum || "",
-                platenumber: oLicensePlate.PlateNumber || "",
-                arrivaldate: oLicensePlate.ArrivalDate || "",
-                werks: oLicensePlate.Werks || "",
-                deliveryitemid: oItem.DeliveryItemId || "",
-                deliverynumber: oSelectedDeliveryNote.DeliveryNumber || "",
-                itemnumber: oItem.ItemNumber || "",
-                material: oItem.Material || "",
-                expectedquantity: oItem.ExpectedQuantity || "",
-                receivedaquantity: oItem.ExpectedQuantity || "", // Use ExpectedQuantity (user's edited value)
-                uom: oItem.UoM || "",
-                sm: oItem.SM || "",
-                ebeln: oItem.Ebeln || "",
-                ebelp: oItem.Ebelp || "",
-                approved: oItem.Approved || "",
-                editreason: sEditReason || oItem.EditReason || ""
-            };
+            // Collect ALL items for this Material from all delivery notes
+            var aOriginalItemsForMaterial = [];
             
-            // Create localStorage key: Username_DeliveryItemId
-            var sKey = sSicilNo + "_" + oDraft.deliveryitemid;
-            
-            // Save to localStorage
-            try {
-                localStorage.setItem(sKey, JSON.stringify(oDraft));
-                console.log("Draft saved to localStorage:", sKey, oDraft);
-            } catch (e) {
-                console.error("Failed to save draft to localStorage:", e);
-                MessageBox.error("Draft kaydedilemedi. Lütfen depolama alanınızı kontrol edin.");
+            for (var i = 0; i < aAllDeliveryNotes.length; i++) {
+                var oDeliveryNote = aAllDeliveryNotes[i];
+                
+                // Get items from this delivery note that match the current Material
+                if (oDeliveryNote.ToItems && oDeliveryNote.ToItems.results) {
+                    var aL3Items = oDeliveryNote.ToItems.results;
+                    aL3Items.forEach(function(oOriginalItem) {
+                        if (oOriginalItem.Material === oItem.Material) {
+                            aOriginalItemsForMaterial.push({
+                                item: oOriginalItem,
+                                deliveryNote: oDeliveryNote
+                            });
+                        }
+                    });
+                }
             }
+            
+            if (aOriginalItemsForMaterial.length === 0) {
+                console.error("No original items found for material:", oItem.Material);
+                return;
+            }
+            
+            // Calculate total original ExpectedQuantity for proportional distribution
+            var fTotalOriginalExpected = 0;
+            aOriginalItemsForMaterial.forEach(function(oItemData) {
+                fTotalOriginalExpected += parseFloat(oItemData.item.ExpectedQuantity || "0");
+            });
+            
+            // Get the user-entered ReceivedQuantity from the aggregated item
+            var fAggregatedReceivedQty = parseFloat(oItem.ReceivedQuantity || "0");
+            
+            console.log("=== Distributing Aggregated Item ===");
+            console.log("Material:", oItem.Material);
+            console.log("Total Original Expected:", fTotalOriginalExpected);
+            console.log("User Entered ReceivedQuantity:", fAggregatedReceivedQty);
+            console.log("Original Items Count:", aOriginalItemsForMaterial.length);
+            
+            // First pass: Calculate proportional values and floor them
+            var aDistributedAmounts = [];
+            var iTotalDistributed = 0;
+            
+            aOriginalItemsForMaterial.forEach(function(oItemData, index) {
+                var fOriginalExpected = parseFloat(oItemData.item.ExpectedQuantity || "0");
+                var fProportionalReceived;
+                
+                if (fTotalOriginalExpected > 0) {
+                    fProportionalReceived = (fOriginalExpected / fTotalOriginalExpected) * fAggregatedReceivedQty;
+                } else {
+                    // If total is 0, distribute equally
+                    fProportionalReceived = fAggregatedReceivedQty / aOriginalItemsForMaterial.length;
+                }
+                
+                // Floor to get whole number
+                var iFlooredAmount = Math.floor(fProportionalReceived);
+                aDistributedAmounts.push(iFlooredAmount);
+                iTotalDistributed += iFlooredAmount;
+            });
+            
+            // Calculate remainder and add to last item
+            var iRemainder = Math.floor(fAggregatedReceivedQty) - iTotalDistributed;
+            if (aDistributedAmounts.length > 0) {
+                aDistributedAmounts[aDistributedAmounts.length - 1] += iRemainder;
+            }
+            
+            console.log("Distribution:", aDistributedAmounts, "Total:", aDistributedAmounts.reduce(function(a, b) { return a + b; }, 0));
+            
+            // Second pass: Save drafts with whole number amounts
+            aOriginalItemsForMaterial.forEach(function(oItemData, index) {
+                var oOriginalItem = oItemData.item;
+                var oDeliveryNote = oItemData.deliveryNote;
+                var fOriginalExpected = parseFloat(oOriginalItem.ExpectedQuantity || "0");
+                var iProportionalReceived = aDistributedAmounts[index];
+                
+                console.log("  Item", index + 1, "- DeliveryItemId:", oOriginalItem.DeliveryItemId);
+                console.log("    Original Expected:", fOriginalExpected);
+                console.log("    Proportional Received:", iProportionalReceived);
+                
+                // Create the draft object with all 17 fields
+                var oDraft = {
+                    lpid: oLicensePlate.LpId || "",
+                    warehousenum: oLicensePlate.WarehouseNum || "",
+                    platenumber: oLicensePlate.PlateNumber || "",
+                    arrivaldate: oLicensePlate.ArrivalDate || "",
+                    werks: oLicensePlate.Werks || "",
+                    deliveryitemid: oOriginalItem.DeliveryItemId || "",
+                    deliverynumber: oDeliveryNote.DeliveryNumber || "",
+                    itemnumber: oOriginalItem.ItemNumber || "",
+                    material: oOriginalItem.Material || "",
+                    expectedquantity: String(iProportionalReceived), // User-entered value (distributed as whole number)
+                    receivedquantity: oOriginalItem.ExpectedQuantity || "", // Backend original value (read-only)
+                    uom: oOriginalItem.UoM || "",
+                    sm: oOriginalItem.SM || "",
+                    ebeln: oOriginalItem.Ebeln || "",
+                    ebelp: oOriginalItem.Ebelp || "",
+                    approved: oItem.Approved || "",
+                    editreason: sEditReason || oItem.EditReason || ""
+                };
+                
+                // Create localStorage key: Username_DeliveryItemId
+                var sKey = sSicilNo + "_" + oDraft.deliveryitemid;
+                
+                // Save to localStorage
+                try {
+                    localStorage.setItem(sKey, JSON.stringify(oDraft));
+                    console.log("    Draft saved to localStorage:", sKey);
+                } catch (e) {
+                    console.error("Failed to save draft to localStorage:", e);
+                    MessageBox.error("Draft kaydedilemedi. Lütfen depolama alanınızı kontrol edin.");
+                }
+            });
         },
 
         /**
@@ -854,8 +1477,8 @@ sap.ui.define([
                                         for (var l = 0; l < oDN.ToItems.results.length; l++) {
                                             var oItem = oDN.ToItems.results[l];
                                             if (oItem.DeliveryItemId === oDraft.deliveryitemid) {
-                                                // Overwrite with draft data (DO NOT change ReceivedQuantity - keep backend value)
-                                                oItem.ExpectedQuantity = oDraft.expectedquantity;
+                                                // Overwrite with draft data (DO NOT change ExpectedQuantity - keep backend value)
+                                                oItem.ReceivedQuantity = oDraft.expectedquantity;
                                                 oItem.Approved = oDraft.approved;
                                                 oItem.EditReason = oDraft.editreason;
                                                 bFound = true;
@@ -895,6 +1518,12 @@ sap.ui.define([
                 return;
             }
             
+            // Debug: Log current LpId and localStorage state
+            console.log("=== _syncDraftsToBackend Debug ===");
+            console.log("Looking for LpId:", sLpId);
+            console.log("UserId:", sSicilNo);
+            console.log("Total localStorage items:", localStorage.length);
+            
             // Collect all drafts for this user and this LpId
             var sPrefix = sSicilNo + "_";
             var aPendingDrafts = [];
@@ -906,11 +1535,15 @@ sap.ui.define([
                 if (sKey.indexOf(sPrefix) === 0) {
                     try {
                         var oDraft = JSON.parse(localStorage.getItem(sKey));
+                        console.log("  Checking draft:", sKey, "→ lpid:", oDraft.lpid);
                         
                         // Only include drafts for this LpId
                         if (oDraft.lpid === sLpId) {
                             aPendingDrafts.push(oDraft);
                             aKeysToRemove.push(sKey);
+                            console.log("    ✓ MATCHED - Adding to pending drafts");
+                        } else {
+                            console.log("    ✗ NOT MATCHED (expected:", sLpId, ", got:", oDraft.lpid, ")");
                         }
                     } catch (e) {
                         console.error("Failed to parse draft:", sKey, e);
@@ -918,8 +1551,10 @@ sap.ui.define([
                 }
             }
             
+            console.log("Total pending drafts found:", aPendingDrafts.length);
+            
             if (aPendingDrafts.length === 0) {
-                MessageBox.information("Senkronize edilecek değişiklik bulunamadı.");
+                MessageBox.information("Kaydedilecek değişiklik bulunmamaktadır.");
                 return;
             }
             
@@ -940,7 +1575,8 @@ sap.ui.define([
                 method: "POST",
                 urlParameters: {
                     "LpId": sLpId,
-                    "PendingItemsJson": sJsonPayload
+                    "PendingItemsJson": sJsonPayload,
+                    "UserID": sSicilNo
                 },
                 success: function(oData, oResponse) {
                     sap.ui.core.BusyIndicator.hide();
@@ -951,10 +1587,10 @@ sap.ui.define([
                         console.log("Draft removed from localStorage:", sKey);
                     });
                     
-                    MessageBox.success("Mal kabul işlemi başarıyla tamamlandı. " + aPendingDrafts.length + " kayıt senkronize edildi.", {
+                    MessageBox.success("Mal kabul işlemi başarıyla tamamlandı!", {
                         onClose: function() {
-                            // Reload data
-                            this._loadGoodsReceiptData();
+                            // Navigate back to Dashboard
+                            this.getRouter().navTo("home");
                         }.bind(this)
                     });
                 }.bind(this),
