@@ -9,7 +9,8 @@
         draggable="true"
         afterClose="onClosePhotoDialog">
         <content>
-            <UploadCollection
+            <UploadCollection 
+            numberOfAttachmentsText="{= ${photoModel>/photoCount} + ' / 5 Fotoğraf Yüklendi' }"
                 id="idPhotoUploadCollection"
                 instantUpload="true"
                 uploadUrl="/sap/opu/odata/sap/ZMM_BOLGE_DEPO_YONETIM_SRV/PlatePhotoSet"
@@ -18,11 +19,13 @@
                 maximumFileSize="5"
                 multiple="false"
                 uploadEnabled="{= ${photoModel>/photoCount} &lt; 5 }"
+                mode="SingleSelectMaster"
                 beforeUploadStarts="onBeforeUploadStarts"
                 uploadComplete="onUploadComplete"
                 uploadTerminated="onUploadTerminated"
                 fileDeleted="onFileDeleted"
                 change="onFileChange"
+                selectionChange="onFilePress"
                 items="{photoModel>/photos}">
                 <items>
                     <UploadCollectionItem
@@ -30,12 +33,10 @@
                         fileName="{photoModel>FileName}"
                         mimeType="{photoModel>MimeType}"
                         thumbnailUrl="/sap/opu/odata/sap/ZMM_BOLGE_DEPO_YONETIM_SRV/PlatePhotoSet('{photoModel>PhotoId}')/$value"
-                        url="/sap/opu/odata/sap/ZMM_BOLGE_DEPO_YONETIM_SRV/PlatePhotoSet('{photoModel>PhotoId}')/$value"
                         enableEdit="false"
                         enableDelete="true"
                         visibleEdit="false"
-                        visibleDelete="true"
-                        press="onFilePress">
+                        visibleDelete="true">
                     </UploadCollectionItem>
                 </items>
             </UploadCollection>

@@ -8,18 +8,30 @@ sap.ui.define([
 
     return BaseController.extend("com.sut.bolgeyonetim.controller.Home", {
         onInit: function() {
-            // Initialize filter model with today's date
-            var oToday = new Date();
-            var sYear = oToday.getFullYear();
-            var sMonth = String(oToday.getMonth() + 1).padStart(2, '0');
-            var sDay = String(oToday.getDate()).padStart(2, '0');
-            var sTodayFormatted = sYear + "-" + sMonth + "-" + sDay;
+            // Initialize or retrieve filter model
+            var oFilterModel = this.getOwnerComponent().getModel("filterModel");
+            
+            // Only set default date if filterModel doesn't exist or selectedDate is not set
+            if (!oFilterModel || !oFilterModel.getProperty("/selectedDate")) {
+                var oToday = new Date();
+                var sYear = oToday.getFullYear();
+                var sMonth = String(oToday.getMonth() + 1).padStart(2, '0');
+                var sDay = String(oToday.getDate()).padStart(2, '0');
+                var sTodayFormatted = sYear + "-" + sMonth + "-" + sDay;
 
-            var oFilterModel = new JSONModel({
-                selectedDate: sTodayFormatted,
-                selectedDateFormatted: sTodayFormatted + "T00:00:00"
-            });
-            this.getOwnerComponent().setModel(oFilterModel, "filterModel");
+                if (!oFilterModel) {
+                    oFilterModel = new JSONModel({
+                        selectedDate: sTodayFormatted,
+                        selectedDateFormatted: sTodayFormatted + "T00:00:00"
+                    });
+                    this.getOwnerComponent().setModel(oFilterModel, "filterModel");
+                } else {
+                    // Model exists but selectedDate is null/undefined - set default
+                    oFilterModel.setProperty("/selectedDate", sTodayFormatted);
+                    oFilterModel.setProperty("/selectedDateFormatted", sTodayFormatted + "T00:00:00");
+                }
+            }
+            // If filterModel exists and has a selectedDate, keep it (persist during session)
 
             // Remove hardcoded test values. Dashboard counts come from global "dashboardData" model populated at login.
             var oDashboardModel = this.getOwnerComponent().getModel("dashboardData");

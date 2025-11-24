@@ -35,18 +35,72 @@
 }
 
 /* Responsive Tile Container */
-.sapMFlexBox {
+.tileContainer,
+.statusContainer {
     gap: 1rem;
 }
 
 /* Main Navigation Tiles */
-.sapMGT {
-    min-width: 300px !important;
+.mainTile {
+    min-width: 240px !important;
+    max-width: 240px !important;
+    flex: 0 0 240px;
+    height: auto !important;
+    min-height: 200px !important;
+}
+
+.mainTile .sapMGTHdrTxt,
+.mainTile .sapMTileContent .sapMGTHdrTxt {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    height: auto !important;
+    max-height: none !important;
+}
+
+.mainTile .sapMGTSubHdrTxt,
+.mainTile .sapMTileContent .sapMGTSubHdrTxt {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    max-height: none !important;
+    height: auto !important;
+    line-height: 1.4 !important;
+    padding-bottom: 0.5rem !important;
+}
+
+.mainTile .sapMGT {
+    height: auto !important;
+    min-height: 200px !important;
+}
+
+.mainTile .sapMTileContent {
+    height: auto !important;
 }
 
 /* Status Tiles Styling */
-.sapMGT {
-    min-width: 300px !important;
+.statusTile {
+    min-width: 240px !important;
+    max-width: 240px !important;
+    flex: 0 0 240px;
+    height: auto !important;
+    min-height: 120px !important;
+}
+
+.statusTile .sapMTileCnt {
+    padding: 0.75rem !important;
+}
+
+/* Force status tile to have auto height */
+.statusTile .sapMGT {
+    height: auto !important;
+    min-height: 120px !important;
+}
+
+.statusTile .sapMTileContent {
+    height: auto !important;
 }
 
 .sapMNCValue {
@@ -63,6 +117,49 @@
     max-width: 100% !important;
     overflow: visible !important;
     text-overflow: clip !important;
+    word-wrap: break-word !important;
+    word-break: break-word !important;
+    line-height: 1.3 !important;
+}
+
+/* Force wrapping for status tile scale text with ultra-high specificity */
+.statusContainer .statusTile .sapMNCScale,
+.statusContainer .statusTile .sapMNC .sapMNCScale,
+.statusContainer .statusTile .sapMTileCnt .sapMNCScale,
+.statusContainer .statusTile .sapMTileContent .sapMNCScale {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    height: auto !important;
+    max-height: none !important;
+    word-wrap: break-word !important;
+    word-break: break-word !important;
+}
+
+/* Ensure NumericContent container allows wrapping */
+.sapMNC {
+    min-height: 80px !important;
+    height: auto !important;
+}
+
+.sapMTileCnt {
+    min-height: 80px !important;
+    height: auto !important;
+}
+
+.statusTile .sapMNC {
+    height: auto !important;
+}
+
+.statusTile .sapMTileCnt {
+    height: auto !important;
+}
+
+/* Additional force for NumericContent inside status tiles */
+.statusContainer .statusTile .sapMNC,
+.statusContainer .statusTile .sapMTileCnt,
+.statusContainer .statusTile .sapMTileContent {
+    height: auto !important;
 }
 
 /* List Item Spacing */
