@@ -33,7 +33,7 @@ sap.ui.define([
         onVerifyPress: function () {
             var sSmsCode = this.byId("idSmsCodeInput") && this.byId("idSmsCodeInput").getValue ? this.byId("idSmsCodeInput").getValue() : "";
 
-            if (!sSmsCode || sSmsCode.length !== 6) {
+            if (!sSmsCode || sSmsCode.length !== 4) {
                 MessageBox.error("Lütfen geçerli bir SMS kodu giriniz.");
                 return;
             }

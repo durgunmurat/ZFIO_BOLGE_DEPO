@@ -10,6 +10,51 @@ sap.ui.define([
 
     return BaseController.extend("com.sut.bolgeyonetim.controller.GoodsReceipt", {
         /**
+         * Formatter: Row highlighting based on ReceivedQuantity vs ExpectedQuantity
+         * @param {string} sReceivedQty - Received quantity
+         * @param {string} sExpectedQty - Expected quantity
+         * @param {string} sApproved - Approved status ('X' or '')
+         * @returns {string} MessageType for row highlighting
+         */
+        formatRowHighlight: function(sReceivedQty, sExpectedQty, sApproved) {
+            var fReceived = parseFloat(sReceivedQty || "0");
+            var fExpected = parseFloat(sExpectedQty || "0");
+            
+            // If ReceivedQuantity is 0 AND not approved, it's not counted yet (Yellow)
+            // If ReceivedQuantity is 0 AND approved, user explicitly set it to 0 (Red - error/mismatch)
+            if (fReceived === 0) {
+                if (sApproved === 'X') {
+                    return sap.ui.core.MessageType.Error; // Red - approved with 0 quantity (mismatch)
+                } else {
+                    return sap.ui.core.MessageType.Warning; // Yellow - not counted yet
+                }
+            } else if (fReceived !== fExpected) {
+                return sap.ui.core.MessageType.Error; // Red for mismatch
+            } else {
+                return sap.ui.core.MessageType.Success; // Green for match
+            }
+        },
+
+        /**
+         * Formatter: Format number with thousands separator (Turkish locale)
+         * @param {string|number} vValue - The number to format
+         * @returns {string} Formatted number with dot as thousands separator (e.g., 1.200)
+         */
+        formatNumberWithSeparator: function(vValue) {
+            if (!vValue && vValue !== 0) {
+                return "";
+            }
+            
+            var fNumber = parseFloat(vValue);
+            if (isNaN(fNumber)) {
+                return vValue;
+            }
+            
+            // Format with Turkish locale (dot as thousands separator)
+            return fNumber.toLocaleString('tr-TR');
+        },
+
+        /**
          * Formatter: Determines if "Mal Kabul" button should be enabled
          * Returns true only if ALL unique materials from ALL delivery notes of this LpId are approved
          * @param {string} sLpId - The License Plate ID from current context
@@ -250,6 +295,7 @@ sap.ui.define([
 
             // 1. Get WarehouseNum from session
             var sWarehouseNum = oSessionModel ? oSessionModel.getProperty("/Login/WarehouseNum") : null;
+            
             if (!sWarehouseNum) {
                 MessageBox.error("Depo numarası bulunamadı. Lütfen tekrar giriş yapın.");
                 return;
@@ -281,9 +327,6 @@ sap.ui.define([
                 new Filter("WarehouseNum", FilterOperator.EQ, sWarehouseNum),
                 new Filter("ArrivalDate", FilterOperator.EQ, oDateForFilter)
             ];
-
-            // Debug: Log filter values
-            console.log("Filters - WarehouseNum:", sWarehouseNum, "ArrivalDate (string):", sArrivalDate, "ArrivalDate (Date):", oDateForFilter);
 
             // 4. Call OData read with $expand to fetch all 3 levels
             oModel.read("/LicensePlateSet", {
@@ -329,6 +372,7 @@ sap.ui.define([
                     }
                 }.bind(this),
                 error: function(oError) {
+                    console.error("[DEBUG] OData read ERROR:", oError);
                     // 6. Handle error
                     var sMessage = "Mal kabul verileri yüklenirken hata oluştu.";
                     if (oError && oError.responseText) {
@@ -348,25 +392,112 @@ sap.ui.define([
 
         /**
          * Event handler when a delivery note checkbox is selected/deselected.
-         * Supports multi-selection - collects items from ALL selected delivery notes ACROSS ALL LICENSE PLATES.
-         * OPTIMIZED FOR MOBILE: Async processing with BusyIndicator to prevent UI freezing
+         * Implements DEBOUNCE PATTERN to prevent UI flicker and unnecessary recalculations.
+         * Waits 300ms after last checkbox click before running the expensive calculation.
          */
         onDeliveryNoteSelect: function(oEvent) {
-            // MOBILE PERFORMANCE: Show BusyIndicator immediately to prevent perceived freeze
-            sap.ui.core.BusyIndicator.show(0);
+            // DEBOUNCE PATTERN: Clear existing timer if user is clicking fast
+            if (this._iDelayTimer) {
+                clearTimeout(this._iDelayTimer);
+            }
             
-            // MOBILE PERFORMANCE: Unblock UI thread with setTimeout - allows BusyIndicator to render
-            setTimeout(function() {
-                console.time("[PERF] Data Calculation");
-                
-                // CRITICAL FIX: Scan ALL panels across ALL license plates for selected delivery notes
-                var oL1List = this.byId("idL1List");
-                if (!oL1List) {
-                    sap.ui.core.BusyIndicator.hide();
+            // Set new timer - wait 200ms after last click before calculating
+            this._iDelayTimer = setTimeout(function() {
+                this._calculateAndRenderItems();
+            }.bind(this), 200);
+        },
+
+        /**
+         * Event handler for "Select All" checkbox in panel header.
+         * Selects or deselects all delivery notes for the specific license plate.
+         */
+        onSelectAllDeliveryNotes: function(oEvent) {
+            var bSelected = oEvent.getParameter("selected");
+            var oCheckBox = oEvent.getSource();
+            
+            // Navigate up to find the Panel
+            var oPanel = oCheckBox.getParent().getParent(); // OverflowToolbar > Panel
+            while (oPanel && oPanel.getMetadata().getName() !== "sap.m.Panel") {
+                oPanel = oPanel.getParent();
+            }
+            
+            if (!oPanel) {
+                console.error("Could not find Panel");
+                return;
+            }
+            
+            // Get VBox content and then the delivery notes List
+            var oVBoxContainer = oPanel.getContent()[0];
+            if (!oVBoxContainer) {
+                console.error("Could not find VBox container");
+                return;
+            }
+            
+            var oList = oVBoxContainer.getItems()[0]; // First item is delivery notes list
+            if (!oList || oList.getMetadata().getName() !== "sap.m.List") {
+                console.error("Could not find delivery notes list");
+                return;
+            }
+            
+            // Get all list items and update their selected state
+            var aItems = oList.getItems();
+            aItems.forEach(function(oItem) {
+                var oBindingContext = oItem.getBindingContext("goodsReceiptModel");
+                if (oBindingContext) {
+                    var oDeliveryNote = oBindingContext.getObject();
+                    // Only update if status is not completed
+                    if (oDeliveryNote.Status !== "X") {
+                        oBindingContext.getModel().setProperty(oBindingContext.getPath() + "/selected", bSelected);
+                    }
+                }
+            });
+            
+            // Trigger debounced calculation
+            if (this._iDelayTimer) {
+                clearTimeout(this._iDelayTimer);
+            }
+            
+            this._iDelayTimer = setTimeout(function() {
+                this._calculateAndRenderItems();
+            }.bind(this), 200);
+        },
+        
+        /**
+         * Calculate and render items from ALL selected delivery notes across ALL license plates.
+         * This is the debounced calculation logic separated from the event handler.
+         * OPTIMIZED FOR MOBILE: No BusyIndicator, no redundant refresh, smooth updates.
+         */
+        _calculateAndRenderItems: function() {
+            // CRITICAL FIX: Process each panel INDEPENDENTLY instead of aggregating globally
+            var oL1List = this.byId("idL1List");
+            if (!oL1List) {
+                return;
+            }
+            
+            var aL1Items = oL1List.getItems();
+            
+            // Get session model once (performance optimization)
+            var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
+            var sSicilNo = oSessionModel ? oSessionModel.getProperty("/Login/Username") : null;
+            
+            // ITERATE THROUGH ALL LICENSE PLATES - PROCESS EACH INDEPENDENTLY
+            aL1Items.forEach(function(oL1Item) {
+                var oPanel = oL1Item.getContent()[0]; // Panel is first child of CustomListItem
+                if (!oPanel) {
                     return;
                 }
                 
-                var aL1Items = oL1List.getItems();
+                // Get L1 context to retrieve LpId and Status
+                var oL1Context = oPanel.getBindingContext("goodsReceiptModel");
+                var oLicensePlate = oL1Context ? oL1Context.getObject() : null;
+                var sLpId = oLicensePlate ? oLicensePlate.LpId : null;
+                var sStatus = oLicensePlate ? oLicensePlate.Status : null;
+                
+                if (!sLpId) {
+                    return;
+                }
+                
+                // Per-panel data structures
                 var oMaterialMap = {}; // Map to aggregate items by Material number
                 var oMaterialDeliveryCount = {}; // Track how many delivery items per material
                 var oMaterialApprovedCount = {}; // Track how many approved delivery items per material
@@ -375,159 +506,119 @@ sap.ui.define([
                     Total6: 0, Total7: 0, Total8: 0, Total9: 0, TotalDepozito: 0
                 };
                 var oFirstSelectedDeliveryNote = null;
-                var aL3SectionsToUpdate = []; // Track which L3 sections need visibility update
                 
-                // Get session model once (performance optimization)
-                var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
-                var sSicilNo = oSessionModel ? oSessionModel.getProperty("/Login/Username") : null;
+                // Get the VBox container (first child of Panel content)
+                var oVBoxContainer = oPanel.getContent()[0];
+                if (!oVBoxContainer) {
+                    return;
+                }
                 
-                // ITERATE THROUGH ALL LICENSE PLATES
-                aL1Items.forEach(function(oL1Item) {
-                    var oPanel = oL1Item.getContent()[0]; // Panel is first child of CustomListItem
-                    if (!oPanel) {
-                        return;
-                    }
-                    
-                    // Get L1 context to retrieve LpId and Status
-                    var oL1Context = oPanel.getBindingContext("goodsReceiptModel");
-                    var oLicensePlate = oL1Context ? oL1Context.getObject() : null;
-                    var sLpId = oLicensePlate ? oLicensePlate.LpId : null;
-                    var sStatus = oLicensePlate ? oLicensePlate.Status : null;
-                    
-                    // Get the VBox container (first child of Panel content)
-                    var oVBoxContainer = oPanel.getContent()[0];
-                    if (!oVBoxContainer) {
-                        return;
-                    }
-                    
-                    // L3 Section is the second child of VBox (after L2 List)
-                    var oL3Section = oVBoxContainer.getItems()[1];
-                    var oIconTabBar = oL3Section ? oL3Section.getItems()[0] : null;
-                    
-                    // Track this L3 section for later visibility update
-                    if (oL3Section) {
-                        aL3SectionsToUpdate.push({
-                            section: oL3Section,
-                            iconTabBar: oIconTabBar,
-                            lpId: sLpId
-                        });
-                    }
-                    
-                    // Get L2 List (delivery notes)
-                    var oL2List = oVBoxContainer.getItems()[0];
-                    if (!oL2List) {
-                        return;
-                    }
-                    
-                    var aL2Items = oL2List.getItems();
-                    var bHasSelectedInThisPanel = false;
-                    var aL2Items = oL2List.getItems();
-                    var bHasSelectedInThisPanel = false;
-                    
-                    // ITERATE THROUGH DELIVERY NOTES IN THIS PANEL
-                    aL2Items.forEach(function(oL2Item) {
-                        var oChkBox = oL2Item.getContent()[0].getItems ? oL2Item.getContent()[0].getItems()[0] : null;
-                        if (oChkBox && oChkBox.getSelected && oChkBox.getSelected()) {
-                            bHasSelectedInThisPanel = true;
-                            var oCtx = oChkBox.getBindingContext("goodsReceiptModel");
-                            if (oCtx) {
-                                var oDeliveryNote = oCtx.getObject();
-                                
-                                // Store first selected for text references
-                                if (!oFirstSelectedDeliveryNote) {
-                                    oFirstSelectedDeliveryNote = oDeliveryNote;
-                                }
-                                
-                                // Collect and aggregate items by Material
-                                var aL3Items = oCtx.getProperty("ToItems/results");
-                                if (aL3Items && aL3Items.length > 0) {
-                                    aL3Items.forEach(function(oItem) {
-                                        var sMaterial = oItem.Material;
-                                        
-                                        // Check if there's a draft in localStorage for this item
-                                        var sKey = sSicilNo + "_" + oItem.DeliveryItemId;
-                                        var oDraft = null;
-                                        var sReceivedQtyToUse = oItem.ReceivedQuantity;
-                                        var sApprovedToUse = oItem.Approved || "";
-                                        var sEditReasonToUse = oItem.EditReason || "";
-                                        
-                                        if (sSicilNo) {
-                                            try {
-                                                var sDraftStr = localStorage.getItem(sKey);
-                                                if (sDraftStr) {
-                                                    oDraft = JSON.parse(sDraftStr);
-                                                    // Use draft values instead of OData values
-                                                    sReceivedQtyToUse = oDraft.expectedquantity || "0";
-                                                    sApprovedToUse = oDraft.approved || "";
-                                                    sEditReasonToUse = oDraft.editreason || "";
-                                                }
-                                            } catch (e) {
-                                                console.error("Failed to parse draft from localStorage:", e);
+                // L3 Section is the second child of VBox (after L2 List)
+                var oL3Section = oVBoxContainer.getItems()[1];
+                var oIconTabBar = oL3Section ? oL3Section.getItems()[0] : null;
+                var oTable = oL3Section ? oL3Section.getItems()[1] : null;
+                
+                // Get L2 List (delivery notes)
+                var oL2List = oVBoxContainer.getItems()[0];
+                if (!oL2List) {
+                    return;
+                }
+                
+                var aL2Items = oL2List.getItems();
+                var bHasSelectedInThisPanel = false;
+                
+                // ITERATE THROUGH DELIVERY NOTES IN THIS PANEL ONLY
+                aL2Items.forEach(function(oL2Item) {
+                    var oChkBox = oL2Item.getContent()[0].getItems ? oL2Item.getContent()[0].getItems()[0] : null;
+                    if (oChkBox && oChkBox.getSelected && oChkBox.getSelected()) {
+                        bHasSelectedInThisPanel = true;
+                        var oCtx = oChkBox.getBindingContext("goodsReceiptModel");
+                        if (oCtx) {
+                            var oDeliveryNote = oCtx.getObject();
+                            
+                            // Store first selected for text references
+                            if (!oFirstSelectedDeliveryNote) {
+                                oFirstSelectedDeliveryNote = oDeliveryNote;
+                            }
+                            
+                            // Collect and aggregate items by Material
+                            var aL3Items = oCtx.getProperty("ToItems/results");
+                            if (aL3Items && aL3Items.length > 0) {
+                                aL3Items.forEach(function(oItem) {
+                                    var sMaterial = oItem.Material;
+                                    
+                                    // Check if there's a draft in localStorage for this item
+                                    var sKey = sSicilNo + "_" + oItem.DeliveryItemId;
+                                    var oDraft = null;
+                                    var sReceivedQtyToUse = oItem.ReceivedQuantity;
+                                    var sApprovedToUse = oItem.Approved || "";
+                                    var sEditReasonToUse = oItem.EditReason || "";
+                                    
+                                    if (sSicilNo) {
+                                        try {
+                                            var sDraftStr = localStorage.getItem(sKey);
+                                            if (sDraftStr) {
+                                                oDraft = JSON.parse(sDraftStr);
+                                                // Use draft values instead of OData values
+                                                sReceivedQtyToUse = oDraft.expectedquantity || "0";
+                                                sApprovedToUse = oDraft.approved || "";
+                                                sEditReasonToUse = oDraft.editreason || "";
                                             }
+                                        } catch (e) {
+                                            console.error("Failed to parse draft from localStorage:", e);
                                         }
+                                    }
+                                    
+                                    if (oMaterialMap[sMaterial]) {
+                                        // Material already exists - aggregate quantities
+                                        var fExpectedQty = parseFloat(oMaterialMap[sMaterial].ExpectedQuantity || "0");
+                                        var fNewExpectedQty = parseFloat(oItem.ExpectedQuantity || "0");
+                                        oMaterialMap[sMaterial].ExpectedQuantity = String(fExpectedQty + fNewExpectedQty);
                                         
-                                        if (oMaterialMap[sMaterial]) {
-                                            // Material already exists - aggregate quantities
-                                            var fExpectedQty = parseFloat(oMaterialMap[sMaterial].ExpectedQuantity || "0");
-                                            var fNewExpectedQty = parseFloat(oItem.ExpectedQuantity || "0");
-                                            oMaterialMap[sMaterial].ExpectedQuantity = String(fExpectedQty + fNewExpectedQty);
-                                            
-                                            var fReceivedQty = parseFloat(oMaterialMap[sMaterial].ReceivedQuantity || "0");
-                                            var fNewReceivedQty = parseFloat(sReceivedQtyToUse || "0");
-                                            oMaterialMap[sMaterial].ReceivedQuantity = String(fReceivedQty + fNewReceivedQty);
-                                            
-                                            // Track delivery item count and approved count
-                                            oMaterialDeliveryCount[sMaterial] = (oMaterialDeliveryCount[sMaterial] || 0) + 1;
-                                            if (sApprovedToUse === "X") {
-                                                oMaterialApprovedCount[sMaterial] = (oMaterialApprovedCount[sMaterial] || 0) + 1;
-                                            }
-                                            
-                                            // Aggregate will be approved only if ALL delivery items are approved
-                                            // This will be set after the loop
-                                        } else {
-                                            // First occurrence of this Material - create new entry
-                                            oMaterialMap[sMaterial] = {
-                                                LpId: sLpId,
-                                                Status: sStatus,
-                                                Material: oItem.Material,
-                                                MaterialText: oItem.MaterialText,
-                                                Kategori: oItem.Kategori,
-                                                KategoriText: oItem.KategoriText,
-                                                ExpectedQuantity: oItem.ExpectedQuantity,
-                                                ReceivedQuantity: sReceivedQtyToUse,
-                                                UoM: oItem.UoM,
-                                                SM: oItem.SM,
-                                                Ebeln: oItem.Ebeln,
-                                                Ebelp: oItem.Ebelp,
-                                                DeliveryItemId: oItem.DeliveryItemId, // Keep first occurrence
-                                                ItemNumber: oItem.ItemNumber,
-                                                Approved: sApprovedToUse,
-                                                EditReason: sEditReasonToUse
-                                            };
-                                            
-                                            // Initialize counters
-                                            oMaterialDeliveryCount[sMaterial] = 1;
-                                            oMaterialApprovedCount[sMaterial] = (sApprovedToUse === "X") ? 1 : 0;
+                                        var fReceivedQty = parseFloat(oMaterialMap[sMaterial].ReceivedQuantity || "0");
+                                        var fNewReceivedQty = parseFloat(sReceivedQtyToUse || "0");
+                                        oMaterialMap[sMaterial].ReceivedQuantity = String(fReceivedQty + fNewReceivedQty);
+                                        
+                                        // Track delivery item count and approved count
+                                        oMaterialDeliveryCount[sMaterial] = (oMaterialDeliveryCount[sMaterial] || 0) + 1;
+                                        if (sApprovedToUse === "X") {
+                                            oMaterialApprovedCount[sMaterial] = (oMaterialApprovedCount[sMaterial] || 0) + 1;
                                         }
-                                    }.bind(this));
-                                }
-                                
-                                // Aggregate totals
-                                for (var key in aTotalCounts) {
-                                    aTotalCounts[key] += parseInt(oDeliveryNote[key] || "0");
-                                }
+                                    } else {
+                                        // First occurrence of this Material - create new entry
+                                        oMaterialMap[sMaterial] = {
+                                            LpId: sLpId,
+                                            Status: sStatus,
+                                            Material: oItem.Material,
+                                            MaterialText: oItem.MaterialText,
+                                            Kategori: oItem.Kategori,
+                                            KategoriText: oItem.KategoriText,
+                                            ExpectedQuantity: oItem.ExpectedQuantity,
+                                            ReceivedQuantity: sReceivedQtyToUse,
+                                            UoM: oItem.UoM,
+                                            SM: oItem.SM,
+                                            Ebeln: oItem.Ebeln,
+                                            Ebelp: oItem.Ebelp,
+                                            DeliveryItemId: oItem.DeliveryItemId,
+                                            ItemNumber: oItem.ItemNumber,
+                                            Approved: sApprovedToUse,
+                                            EditReason: sEditReasonToUse
+                                        };
+                                        
+                                        // Initialize counters
+                                        oMaterialDeliveryCount[sMaterial] = 1;
+                                        oMaterialApprovedCount[sMaterial] = (sApprovedToUse === "X") ? 1 : 0;
+                                    }
+                                }.bind(this));
+                            }
+                            
+                            // Aggregate totals
+                            for (var key in aTotalCounts) {
+                                aTotalCounts[key] += parseInt(oDeliveryNote[key] || "0");
                             }
                         }
-                    }.bind(this));
-                    
-                    // Store whether this panel has selected checkboxes for later L3 visibility update
-                    if (oL3Section) {
-                        oL3Section._bHasSelected = bHasSelectedInThisPanel;
                     }
                 }.bind(this));
-                
-                console.timeEnd("[PERF] Data Calculation");
-                console.time("[PERF] Data Preparation");
                 
                 // Convert map to array and set final Approved status
                 var aItemsToShow = [];
@@ -544,61 +635,78 @@ sap.ui.define([
                         oAggItem.Approved = "";
                     }
                     
-                    // IMPORTANT: If ReceivedQuantity > ExpectedQuantity, it means user previously 
-                    // approved this material with other delivery notes together, and now selected fewer.
-                    // Reset ReceivedQuantity to ExpectedQuantity for correct display
                     var fExpected = parseFloat(oAggItem.ExpectedQuantity || "0");
                     var fReceived = parseFloat(oAggItem.ReceivedQuantity || "0");
                     if (fReceived > fExpected) {
-                        console.warn("ReceivedQuantity (" + fReceived + ") > ExpectedQuantity (" + fExpected + ") for Material " + sMat);
-                        console.warn("This happens when fewer delivery notes are selected. Resetting to ExpectedQuantity.");
                         oAggItem.ReceivedQuantity = oAggItem.ExpectedQuantity;
-                        // Also clear Approved status since quantities don't match
                         oAggItem.Approved = "";
                     }
                     
                     aItemsToShow.push(oAggItem);
                 }
                 
-                console.timeEnd("[PERF] Data Preparation");
-                console.log("[PERF] Total items to render:", aItemsToShow.length);
-                console.time("[PERF] Model Update + DOM Rendering");
+                // Create or update model for THIS panel
+                var sModelName = "itemsModel_" + sLpId;
+                var oItemsModel = this.getView().getModel(sModelName);
+                if (!oItemsModel) {
+                    oItemsModel = new JSONModel();
+                    oItemsModel.setSizeLimit(9999);
+                    oItemsModel.setDefaultBindingMode("OneWay");
+                    this.getView().setModel(oItemsModel, sModelName);
+                }
                 
-                // CRITICAL FIX FOR TABLET: Force immediate UI update
-                var oItemsModel = this.getView().getModel("itemsModel");
-                oItemsModel.setSizeLimit(9999); // Ensure no truncation
-                oItemsModel.setData(aItemsToShow); // Update model with collected items
-                oItemsModel.refresh(true); // FORCE UI refresh - critical for tablet WebView rendering
+                // Update model data
+                oItemsModel.setData(aItemsToShow);
                 
-                // Update visibility for ALL L3 sections based on whether items exist
-                aL3SectionsToUpdate.forEach(function(oSectionInfo) {
-                    // Show L3 section only if this panel has selected checkboxes AND items exist
-                    var bShouldShow = oSectionInfo.section._bHasSelected && aItemsToShow.length > 0;
-                    oSectionInfo.section.setVisible(bShouldShow);
+                // Bind table to this panel's model
+                if (oTable) {
+                    var oBinding = oTable.getBinding("items");
                     
-                    // Update category filters only for visible sections
-                    if (bShouldShow && oFirstSelectedDeliveryNote && oSectionInfo.iconTabBar) {
-                        this._updateCategoryFiltersForTabBarMulti(oFirstSelectedDeliveryNote, aTotalCounts, oSectionInfo.iconTabBar);
+                    // If table is not yet bound or bound to different model, rebind
+                    if (!oBinding || oBinding.getModel().getId() !== oItemsModel.getId()) {
+                        oTable.bindItems({
+                            path: sModelName + ">/",
+                            template: this._createTableItemTemplate(sModelName),
+                            templateShareable: false
+                        });
+                    } else {
+                        // Just refresh existing binding
+                        oBinding.refresh();
                     }
-                }.bind(this));
+                }
                 
-                console.timeEnd("[PERF] Model Update + DOM Rendering");
-                
-                // MOBILE PERFORMANCE: Hide BusyIndicator after rendering completes
-                sap.ui.core.BusyIndicator.hide();
-                
-                // Note: Removed goodsReceiptModel.refresh() for better mobile performance
-                // The Mal Kabul button state is managed by binding, no full refresh needed
-            }.bind(this), 0); // setTimeout with 0ms allows UI thread to breathe
+                // Update L3 section visibility and category filters
+                if (oL3Section) {
+                    var bShouldShow = bHasSelectedInThisPanel && aItemsToShow.length > 0;
+                    
+                    if (bShouldShow && oFirstSelectedDeliveryNote && oIconTabBar) {
+                        this._updateCategoryFiltersForTabBarMulti(oFirstSelectedDeliveryNote, aTotalCounts, oIconTabBar, sLpId);
+                    }
+                    
+                    setTimeout(function() {
+                        oL3Section.setVisible(bShouldShow);
+                        if (bShouldShow) {
+                            oL3Section.invalidate();
+                        }
+                    }, 50);
+                }
+            }.bind(this));
         },
 
         /**
          * Update category filters based on aggregated totals from multiple delivery notes
+         * @param {object} oFirstDeliveryNote - First selected delivery note for text references
+         * @param {object} aTotalCounts - Aggregated totals
+         * @param {sap.m.IconTabBar} oIconTabBar - The IconTabBar to update
+         * @param {string} sLpId - License Plate ID for storing state
          */
-        _updateCategoryFiltersForTabBarMulti: function(oFirstDeliveryNote, aTotalCounts, oIconTabBar) {
+        _updateCategoryFiltersForTabBarMulti: function(oFirstDeliveryNote, aTotalCounts, oIconTabBar, sLpId) {
             if (!oIconTabBar) {
                 return;
             }
+            
+            // Store LpId on IconTabBar for category filter handler
+            oIconTabBar.data("lpId", sLpId);
             
             // Remove all existing filters
             oIconTabBar.destroyItems();
@@ -612,7 +720,7 @@ sap.ui.define([
             // Add "Tümü" filter
             oIconTabBar.addItem(new sap.m.IconTabFilter({
                 key: "all",
-                text: "Tümü (" + iTotalCount + ")",
+                text: "Tümü",
                 count: iTotalCount
             }));
             
@@ -639,9 +747,11 @@ sap.ui.define([
                 if (iCount > 0 && sText) {
                     oIconTabBar.addItem(new sap.m.IconTabFilter({
                         key: oMapping.key,
-                        text: sText + " (" + iCount + ")",
-                        count: iCount
+                        text: sText,
+                        // text: sText + " (" + iCount + ")",
+                        count: iCount 
                     }));
+                    oIconTabBar.addItem(new sap.m.IconTabSeparator());
                 }
             });
         },
@@ -721,6 +831,13 @@ sap.ui.define([
             var sSelectedKey = oEvent.getParameter("key");
             var oIconTabBar = oEvent.getSource();
             
+            // Get LpId stored on IconTabBar
+            var sLpId = oIconTabBar.data("lpId");
+            if (!sLpId) {
+                console.error("LpId not found on IconTabBar");
+                return;
+            }
+            
             // Navigate to find the Table (sibling of IconTabBar in L3 Section VBox)
             var oL3Section = oIconTabBar.getParent();
             if (!oL3Section) {
@@ -736,6 +853,7 @@ sap.ui.define([
             
             var oBinding = oTable.getBinding("items");
             if (!oBinding) {
+                console.error("Table binding not found");
                 return;
             }
             
@@ -744,15 +862,54 @@ sap.ui.define([
                 oBinding.filter([]);
             } else {
                 // Filter by category key (first 2 digits of Kategori field)
-                // Kategori format: "02201030001" -> first 2 chars = "02"
                 var oFilter = new Filter("Kategori", FilterOperator.StartsWith, sSelectedKey);
                 oBinding.filter([oFilter]);
             }
         },
 
-        onCountChange: function(oEvent) {
-            // Trigger model refresh to update button enabled state via formatter
-            this.getView().getModel("itemsModel").refresh(true);
+        _createTableItemTemplate: function(sModelName) {
+            // Create template with model-specific bindings
+            var oTemplate = new sap.m.ColumnListItem({
+                cells: [
+                    new sap.m.Text({ text: "{= parseInt(${" + sModelName + ">Material}) }" }),
+                    new sap.m.Text({ text: "{" + sModelName + ">MaterialText}" }),
+                    new sap.m.ObjectNumber({
+                        number: {
+                            path: sModelName + ">ExpectedQuantity",
+                            formatter: this.formatNumberWithSeparator.bind(this)
+                        },
+                        unit: "{" + sModelName + ">UoM}",
+                        state: "None"
+                    }),
+                    new sap.m.Text({ 
+                        text: {
+                            path: sModelName + ">ReceivedQuantity",
+                            formatter: this.formatNumberWithSeparator.bind(this)
+                        },
+                        textAlign: "Center"
+                    }),
+                    new sap.m.Text({ text: "{" + sModelName + ">SM}" }),
+                    new sap.m.Button({
+                        text: "{= ${" + sModelName + ">Approved} === 'X' ? 'Düzenle' : 'Onayla' }",
+                        type: "Emphasized",
+                        press: this.onApproveItem.bind(this),
+                        visible: "{= ${" + sModelName + ">Status} !== 'X' }",
+                        icon: "{= ${" + sModelName + ">Approved} === 'X' ? 'sap-icon://edit' : 'sap-icon://accept' }"
+                    })
+                ]
+            });
+            
+            // Bind highlight property programmatically with formatter
+            oTemplate.bindProperty("highlight", {
+                parts: [
+                    { path: sModelName + ">ReceivedQuantity" },
+                    { path: sModelName + ">ExpectedQuantity" },
+                    { path: sModelName + ">Approved" }
+                ],
+                formatter: this.formatRowHighlight.bind(this)
+            });
+            
+            return oTemplate;
         },
 
         /**
@@ -790,10 +947,19 @@ sap.ui.define([
                 oGoodsReceiptModel.refresh();
             }
             
-            // Clear itemsModel to prevent data mixing between filters
-            var oItemsModel = this.getView().getModel("itemsModel");
-            if (oItemsModel) {
-                oItemsModel.setData([]);
+            // Clear all panel-specific itemsModels to prevent data mixing between filters
+            var oGoodsReceiptModel = this.getView().getModel("goodsReceiptModel");
+            if (oGoodsReceiptModel) {
+                var aLicensePlates = oGoodsReceiptModel.getData();
+                if (aLicensePlates && aLicensePlates.length > 0) {
+                    aLicensePlates.forEach(function(oLp) {
+                        var sModelName = "itemsModel_" + oLp.LpId;
+                        var oModel = this.getView().getModel(sModelName);
+                        if (oModel) {
+                            oModel.setData([]);
+                        }
+                    }.bind(this));
+                }
             }
             
             // Hide all Level 3 sections
@@ -878,14 +1044,38 @@ sap.ui.define([
         onApproveItem: function(oEvent) {
             // Get the item context and button
             var oButton = oEvent.getSource();
-            var oContext = oButton.getBindingContext("itemsModel");
-            var sPath = oContext.getPath();
-            var oItemsModel = this.getView().getModel("itemsModel");
-            var oItem = oContext.getObject();
+            
+            // Find the correct model - button's binding context will have the model name
+            var oBindingContext = null;
+            var sModelName = null;
+            var oItemsModel = null;
+            
+            // Try to find which itemsModel this button is bound to
+            var aModelNames = Object.keys(this.getView().oModels || {});
+            for (var i = 0; i < aModelNames.length; i++) {
+                if (aModelNames[i].startsWith("itemsModel_")) {
+                    var oContext = oButton.getBindingContext(aModelNames[i]);
+                    if (oContext) {
+                        oBindingContext = oContext;
+                        sModelName = aModelNames[i];
+                        oItemsModel = this.getView().getModel(sModelName);
+                        break;
+                    }
+                }
+            }
+            
+            if (!oBindingContext || !oItemsModel) {
+                MessageBox.error("Ürün bilgisi alınamadı.");
+                return;
+            }
+            
+            var sPath = oBindingContext.getPath();
+            var oItem = oBindingContext.getObject();
             
             // Store current item path for dialog
             this._sCurrentEditPath = sPath;
             this._oCurrentEditButton = oButton;
+            this._sCurrentItemsModelName = sModelName; // Store model name for later use
             
             // Check if already approved (button text is "Düzenle")
             if (oItem.Approved === "X") {
@@ -1033,9 +1223,9 @@ sap.ui.define([
                                     liveChange: function(oEvent) {
                                         var sValue = oEvent.getParameter("value");
                                         var oInput = oEvent.getSource();
-                                        if (!sValue || sValue === "0" || parseFloat(sValue) < 0) {
+                                        if (!sValue || parseFloat(sValue) < 0) {
                                             oInput.setValueState("Error");
-                                            oInput.setValueStateText("Lütfen geçerli bir miktar girin");
+                                            oInput.setValueStateText("Lütfen geçerli bir miktar girin (0 veya pozitif)");
                                         } else {
                                             oInput.setValueState("None");
                                         }
@@ -1114,9 +1304,9 @@ sap.ui.define([
             var bValid = true;
             
             // Validation with visual feedback
-            if (!sNewQty || sNewQty === "0" || parseFloat(sNewQty) < 0) {
+            if (!sNewQty || parseFloat(sNewQty) < 0) {
                 oNewQtyInput.setValueState("Error");
-                oNewQtyInput.setValueStateText("Lütfen geçerli bir miktar girin");
+                oNewQtyInput.setValueStateText("Lütfen geçerli bir miktar girin (0 veya pozitif)");
                 bValid = false;
             } else {
                 oNewQtyInput.setValueState("None");
@@ -1134,13 +1324,20 @@ sap.ui.define([
                 return;
             }
             
+            // Use the stored model name from onApproveItem
+            var sModelName = this._sCurrentItemsModelName;
+            if (!sModelName) {
+                MessageBox.error("Model bilgisi bulunamadı.");
+                return;
+            }
+            
             // Update the item model first
-            var oItemsModel = this.getView().getModel("itemsModel");
+            var oItemsModel = this.getView().getModel(sModelName);
             oItemsModel.setProperty(this._sCurrentEditPath + "/ReceivedQuantity", sNewQty);
             oItemsModel.setProperty(this._sCurrentEditPath + "/EditReason", sReason);
             
             // Get the updated item AFTER model update to ensure we have latest data
-            var oContext = this._oCurrentEditButton.getBindingContext("itemsModel");
+            var oContext = this._oCurrentEditButton.getBindingContext(sModelName);
             var oUpdatedItem = oContext.getObject();
             
             // Get selected delivery notes for this LpId
@@ -1184,6 +1381,74 @@ sap.ui.define([
             
             // Call the sync function
             this._syncDraftsToBackend(sLpId);
+        },
+
+        onPanelExpand: function(oEvent) {
+            var oPanel = oEvent.getSource();
+            var bExpanded = oEvent.getParameter("expand");
+            var oContext = oPanel.getBindingContext("goodsReceiptModel");
+            
+            if (!oContext) {
+                return;
+            }
+            
+            // Force the delivery notes list to update when panel expands
+            if (bExpanded) {
+                // Find the delivery notes list inside this panel
+                var aContent = oPanel.getContent();
+                
+                if (aContent.length > 0) {
+                    var oVBox = aContent[0]; // The VBox containing the List
+                    
+                    // CRITICAL FIX: Set binding context on VBox to ensure inheritance
+                    oVBox.setBindingContext(oContext, "goodsReceiptModel");
+                    
+                    var aVBoxItems = oVBox.getItems();
+                    
+                    // Level 2: Delivery Notes List
+                    if (aVBoxItems.length > 0) {
+                        var oDeliveryNotesList = aVBoxItems[0]; // The delivery notes List
+                        
+                        // CRITICAL FIX: Explicitly set binding context on the List
+                        oDeliveryNotesList.setBindingContext(oContext, "goodsReceiptModel");
+                        
+                        // Force binding context update
+                        var oListBinding = oDeliveryNotesList.getBinding("items");
+                        
+                        if (oListBinding) {
+                            oListBinding.refresh();
+                            
+                            // Use setTimeout for tablet compatibility
+                            setTimeout(function() {
+                                oDeliveryNotesList.invalidate();
+                            }, 50);
+                        }
+                    }
+                    
+                    // Level 3: Items Table VBox and Table
+                    if (aVBoxItems.length > 1) {
+                        var oL3VBox = aVBoxItems[1]; // The Level 3 VBox
+                        
+                        // Set binding context on Level 3 VBox
+                        oL3VBox.setBindingContext(oContext, "goodsReceiptModel");
+                        
+                        var aL3Items = oL3VBox.getItems();
+                        
+                        // Find the Table (should be second item after IconTabBar)
+                        if (aL3Items.length > 1) {
+                            var oItemsTable = aL3Items[1]; // The items Table
+                            
+                            // Set binding context on Table (for itemsModel, but context still needed)
+                            oItemsTable.setBindingContext(oContext, "goodsReceiptModel");
+                            
+                            // Force table update
+                            setTimeout(function() {
+                                oItemsTable.invalidate();
+                            }, 50);
+                        }
+                    }
+                }
+            }
         },
 
         onPhotoPress: function(oEvent) {
@@ -1770,6 +2035,9 @@ sap.ui.define([
                 var iProportionalReceived = aDistributedAmounts[index];
                 
                 // Create the draft object with all 17 fields
+                // CRITICAL: Swap expectedquantity and receivedquantity for SAP backend
+                // Fiori UI ReceivedQuantity (user-entered) → SAP ExpectedQuantity
+                // Fiori UI ExpectedQuantity (original) → SAP ReceivedQuantity
                 var oDraft = {
                     lpid: oLicensePlate.LpId || "",
                     warehousenum: oLicensePlate.WarehouseNum || "",
@@ -1780,8 +2048,8 @@ sap.ui.define([
                     deliverynumber: oDeliveryNote.DeliveryNumber || "",
                     itemnumber: oOriginalItem.ItemNumber || "",
                     material: oOriginalItem.Material || "",
-                    expectedquantity: String(iProportionalReceived), // User-entered value (distributed as whole number)
-                    receivedquantity: oOriginalItem.ExpectedQuantity || "", // Backend original value (read-only)
+                    expectedquantity: oOriginalItem.ExpectedQuantity || "", // SAP expects original quantity here
+                    receivedquantity: String(iProportionalReceived), // SAP expects user-entered value here
                     uom: oOriginalItem.UoM || "",
                     sm: oOriginalItem.SM || "",
                     ebeln: oOriginalItem.Ebeln || "",

@@ -1,38 +1,75 @@
 <mvc:View
     controllerName="com.sut.bolgeyonetim.controller.ShipmentAssignment"
     xmlns:mvc="sap.ui.core.mvc"
-    xmlns="sap.m">
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
     <Page
         title="Yükleme Planlaması"
         showNavButton="true"
         navButtonPress="onNavBack">
         <content>
-            <VBox class="sapUiSmallMargin">
-                <SearchField
-                    placeholder="Planlayıcı veya nakliye no ile arayın..."
-                    width="100%"
-                    search="onSearch"
-                    class="sapUiSmallMarginBottom"/>
-                
-                <List
-                    items="{/shipments}"
-                    class="sapUiSmallMarginBottom">
-                    <CustomListItem>
-                        <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiSmallMargin">
-                            <VBox>
-                                <ObjectIdentifier
-                                    title="Nakliye No: 6092740"
-                                    text="14/07/2025"/>
-                                <Text text="YETİŞ YILDIRIM"/>
-                            </VBox>
-                            <HBox>
-                                <Text text="0/35 ÜRÜN" class="sapUiTinyMarginEnd"/>
-                                <Button text="Bekliyor" type="Emphasized"/>
+            <!-- Search Field -->
+            <SearchField
+                id="idSearchField"
+                placeholder="Plasiyer veya nakliye no ile ara..."
+                search="onSearch"
+                width="100%"
+                class="sapUiSmallMarginBottom sapUiSmallMarginBegin sapUiSmallMarginEnd"/>
+            
+            <!-- Shipments List -->
+            <List
+                id="idShipmentList"
+                items="{shipmentModel>/}"
+                growing="true"
+                growingThreshold="20"
+                growingScrollToLoad="true"
+                noDataText="Yükleme kaydı bulunamadı">
+                <items>
+                    <CustomListItem type="Inactive">
+                        <VBox width="100%" class="sapUiSmallMargin">
+                            <!-- Card-like container with colored border -->
+                            <HBox
+                                alignItems="Start"
+                                justifyContent="SpaceBetween"
+                                width="100%"
+                                class="sapUiSmallPadding shipmentCard">
+                                
+                                <!-- Left Side: Shipment Info -->
+                                <VBox width="40%" class="sapUiTinyMarginEnd">
+                                    <!-- Icon and Shipment ID -->
+                                    <HBox alignItems="Center" class="sapUiTinyMarginBottom">
+                                        <core:Icon
+                                            src="sap-icon://shipping-status"
+                                            size="2rem"
+                                            color="#0854A0"
+                                            class="sapUiSmallMarginEnd"/>
+                                        <VBox>
+                                            <Label text="{shipmentModel>ShipmentId}" design="Bold"/>
+                                            <Label text="{shipmentModel>ShipmentDate}" class="sapUiTinyMarginTop"/>
+                                        </VBox>
+                                    </HBox>
+                                    <Label text="{shipmentModel>CustomerName}" class="sapUiTinyMarginTop"/>
+                                </VBox>
+                                
+                                <!-- Right Side: Personnel Assignment -->
+                                <VBox width="55%">
+                                    <Label text="Atanan Personel (Max: 5)" design="Bold" class="sapUiTinyMarginBottom"/>
+                                    <MultiComboBox
+                                        items="{employeeModel>/}"
+                                        selectedKeys="{shipmentModel>SelectedEmployeeKeys}"
+                                        selectionFinish="onPersonnelSelectionChange"
+                                        width="100%"
+                                        placeholder="Personel seçin...">
+                                        <core:Item
+                                            key="{employeeModel>EmployeeId}"
+                                            text="{employeeModel>EmployeeName}"/>
+                                    </MultiComboBox>
+                                </VBox>
                             </HBox>
-                        </HBox>
+                        </VBox>
                     </CustomListItem>
-                </List>
-            </VBox>
+                </items>
+            </List>
         </content>
     </Page>
 </mvc:View>

@@ -29,7 +29,7 @@
         "deviceTypes": {
             "desktop": true,
             "tablet": true,
-            "phone": false
+            "phone": true
         },
         "supportedThemes": [
             "sap_belize"

@@ -2,6 +2,7 @@
     controllerName="com.sut.bolgeyonetim.controller.Home"
     xmlns:mvc="sap.ui.core.mvc"
     xmlns="sap.m"
+    xmlns:l="sap.ui.layout"
     xmlns:core="sap.ui.core">
     <Page title="Depo Yönetimi Uygulaması" showNavButton="false">
         <customHeader>
@@ -31,117 +32,91 @@
             </Toolbar>
         </customHeader>
         <content>
-            <FlexBox
-                alignItems="Start"
-                justifyContent="Start"
-                wrap="Wrap"
-                class="sapUiMediumMargin tileContainer"> 
-                <!-- Main Tiles -->
+            <!-- Unified Dashboard Tiles with Grid Layout for Tablet Responsiveness -->
+            <l:Grid
+                defaultSpan="XL6 L6 M6 S12"
+                hSpacing="1"
+                vSpacing="1"
+                containerQuery="true"
+                class="sapUiSmallMarginTop sapUiSmallMargin">
+                
+                <!-- Tile 1: Mal Kabul (Goods Receipt) -->
                 <GenericTile
-                    class="sapUiTinyMarginBegin sapUiTinyMarginTop mainTile"
+                    class="sapUiTinyMarginBottom"
                     frameType="TwoByOne"
                     header="Mal Kabul"
                     subheader="Gelen ürünlerin kontrolü ve onayı"
                     press="onGoodsReceiptPress">
-                    <TileContent>
-                        <ImageContent src="sap-icon://accept"/>
+                    <TileContent footer="Bekleyen Tır">
+                        <NumericContent
+                            value="{dashboardData>/pendingReceipts}"
+                            valueColor="{dashboardData>/pendingReceiptsColor}"
+                            indicator="{dashboardData>/pendingReceiptsIndicator}"
+                            icon="sap-icon://shipping-status"
+                            truncateValueTo="4"
+                            withMargin="false"
+                            animateTextChange="true"/>
                     </TileContent>
                 </GenericTile>
 
+                <!-- Tile 2: Yükleme Formu Ataması (Assignment) -->
                 <GenericTile
-                    class="sapUiTinyMarginBegin sapUiTinyMarginTop mainTile"
+                    class="sapUiTinyMarginBottom"
                     frameType="TwoByOne"
                     header="Yükleme Formu Ataması"
                     subheader="Araçlara yükleme formu atama"
                     press="onShipmentAssignmentPress">
-                    <TileContent>
-                        <ImageContent src="sap-icon://document"/>
+                    <TileContent footer="Yükleme Formu">
+                        <NumericContent
+                            value="{dashboardData>/pendingShipments}"
+                            valueColor="{dashboardData>/pendingShipmentsColor}"
+                            indicator="{dashboardData>/pendingShipmentsIndicator}"
+                            icon="sap-icon://document"
+                            truncateValueTo="4"
+                            withMargin="false"
+                            animateTextChange="true"/>
                     </TileContent>
                 </GenericTile>
 
+                <!-- Tile 3: Araç Yükleme (Loading) -->
                 <GenericTile
-                    class="sapUiTinyMarginBegin sapUiTinyMarginTop mainTile"
+                    class="sapUiTinyMarginBottom"
                     frameType="TwoByOne"
                     header="Araç Yükleme"
                     subheader="Ürünlerin araçlara yüklenmesi"
                     press="onGoodsIssuePress">
-                    <TileContent>
-                        <ImageContent src="sap-icon://shipping-status"/>
+                    <TileContent footer="Bekleyen Nakliye">
+                        <NumericContent
+                            value="{dashboardData>/pendingDeliveries}"
+                            valueColor="{dashboardData>/pendingDeliveriesColor}"
+                            indicator="{dashboardData>/pendingDeliveriesIndicator}"
+                            icon="sap-icon://cargo-train"
+                            truncateValueTo="4"
+                            withMargin="false"
+                            animateTextChange="true"/>
                     </TileContent>
                 </GenericTile>
 
-                <GenericTile visible="false"
-                    class="sapUiTinyMarginBegin sapUiTinyMarginTop mainTile"
+                <!-- Tile 4: Stok Sayım (Hidden) -->
+                <GenericTile
+                    visible="true"
+                    class="sapUiTinyMarginBottom"
                     frameType="TwoByOne"
                     header="Stok Sayım"
                     subheader="Depo stok sayımı ve takibi"
                     press="onInventoryCountPress">
-                    <TileContent>
-                        <ImageContent src="sap-icon://inventory"/>
-                    </TileContent>
-                </GenericTile>
-            </FlexBox>
-
-            <!-- Status Tiles (FlexBox with GenericTiles) -->
-            <FlexBox
-                alignItems="Start"
-                justifyContent="Start"
-                wrap="Wrap"
-                class="sapUiMediumMargin statusContainer">
-
-                <GenericTile class="sapUiTinyMarginBegin sapUiTinyMarginTop statusTile" 
-                scope="Display"
-                header="Bekleyen Tır">
-                    <TileContent>
+                    <TileContent footer="Stok Sayım">
                         <NumericContent
-                            value="{dashboardData>/pendingReceipts}" 
-                            valueColor="{dashboardData>/pendingReceiptsColor}" 
-                            indicator="{dashboardData>/pendingReceiptsIndicator}"
-                            icon="sap-icon://shipping-status"
-                            withMargin="false"
-                            animateTextChange="true"/>
-                    </TileContent>
-                </GenericTile>
-
-                <GenericTile class="sapUiTinyMarginBegin sapUiTinyMarginTop statusTile"
-                header="Yükleme Formu">
-                    <TileContent>
-                        <NumericContent
-                            value="{dashboardData>/pendingShipments}" 
-                            valueColor="{dashboardData>/pendingShipmentsColor}" 
-                            indicator="{dashboardData>/pendingShipmentsIndicator}"
-                            icon="sap-icon://document"
-                            withMargin="false"
-                            animateTextChange="true"/>
-                    </TileContent>
-                </GenericTile>
-
-                <GenericTile class="sapUiTinyMarginBegin sapUiTinyMarginTop statusTile"
-                header="Bekleyen Nakliye">
-                    <TileContent>
-                        <NumericContent
-                            value="{dashboardData>/pendingDeliveries}" 
-                            valueColor="{dashboardData>/pendingDeliveriesColor}" 
-                            indicator="{dashboardData>/pendingDeliveriesIndicator}"
-                            icon="sap-icon://cargo-train"
-                            withMargin="false"
-                            animateTextChange="true"/>
-                    </TileContent>
-                </GenericTile>
-
-                <GenericTile visible="false" class="sapUiTinyMarginBegin sapUiTinyMarginTop statusTile"
-                header="Stok Sayım">
-                    <TileContent>
-                        <NumericContent
-                            value="{dashboardData>/pendingCounts}" 
-                            valueColor="{dashboardData>/pendingCountsColor}" 
+                            value="{dashboardData>/pendingCounts}"
+                            valueColor="{dashboardData>/pendingCountsColor}"
                             indicator="{dashboardData>/pendingCountsIndicator}"
                             icon="sap-icon://inventory"
+                            truncateValueTo="4"
                             withMargin="false"
                             animateTextChange="true"/>
                     </TileContent>
                 </GenericTile>
-            </FlexBox>
+            </l:Grid>
         </content>
     </Page>
 </mvc:View>

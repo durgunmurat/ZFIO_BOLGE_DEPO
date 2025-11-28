@@ -34,18 +34,24 @@
                 id="idL1List"
                 items="{goodsReceiptModel>/}"
                 noDataText="Bekleyen mal kabul kaydı bulunamadı">
-                <items>
+                <items >
                     <!-- L1 Panel: Each License Plate -->
                     <CustomListItem>
                         <Panel
                             expandable="true"
                             expanded="{goodsReceiptModel>expanded}"
+                            expand="onPanelExpand"
                             class="sapUiSmallMarginBottom">
                             <headerToolbar>
                                 <OverflowToolbar>
                                     <core:Icon src="sap-icon://shipping-status" size="1.5rem" color="#0854A0"/>
                                     <Title text="{goodsReceiptModel>PlateNumber}" level="H3" class="sapUiTinyMarginBegin"/>
                                     <ToolbarSpacer/>
+                                    <CheckBox
+                                        text="Hepsini Seç"
+                                        select="onSelectAllDeliveryNotes"
+                                        visible="{= ${goodsReceiptModel>expanded} &amp;&amp; ${goodsReceiptModel>Status} !== 'X' }"
+                                        class="sapUiTinyMarginEnd"/>
                                     <Label text="DB: {goodsReceiptModel>Warehouse}"/>
                                     <Label text="ÜY: {goodsReceiptModel>WerksText}" class="sapUiTinyMarginBegin"/>
                                     <Button
@@ -66,14 +72,11 @@
                                 <VBox>
                                     <!-- LEVEL 2: Delivery Notes List (Red Box in Screenshot) -->
                                     <List
+                                        id="idDeliveryNotesList"
                                         items="{goodsReceiptModel>ToDeliveryNotes/results}"
                                         mode="None"
                                         noDataText="İrsaliye bulunamadı">
-                                        <!-- <headerToolbar>
-                                            <OverflowToolbar>
-                                                <Title text="İrsaliyeler" level="H4"/>
-                                            </OverflowToolbar>
-                                        </headerToolbar> -->
+                                        <items >
                                         <CustomListItem>
                                             <HBox alignItems="Center" width="100%">
                                                 <CheckBox 
@@ -86,6 +89,7 @@
                                                 </VBox>
                                             </HBox>
                                         </CustomListItem>
+                                        </items>
                                     </List>
 
                                     <!-- LEVEL 3: Category Filters + Items Table (Purple Box in Screenshot) -->
@@ -103,48 +107,21 @@
 
                                         <!-- Items Table -->
                                         <Table
-                                            items="{itemsModel>/}"
+                                            id="idItemsTable"
                                             inset="false"
                                             growing="true"
                                             growingThreshold="20"
                                             growingScrollToLoad="true"
+                                            width="auto"
                                             noDataText="Lütfen bir irsaliye seçin">
                                             <columns>
-                                                <Column width="6em"><Text text="KOD"/></Column>
-                                                <Column minScreenWidth="Tablet" demandPopin="true"><Text text="ÜRÜN ADI"/></Column>
-                                                <Column minScreenWidth="Desktop" demandPopin="true" hAlign="Center"><Text text="KATEGORİ"/></Column>
+                                                <Column width="5em"><Text text="KOD"/></Column>
+                                                <Column minScreenWidth="Phone" demandPopin="true"><Text text="ÜRÜN ADI"/></Column>
                                                 <Column width="6em" hAlign="Right"><Text text="MİKTAR"/></Column>
                                                 <Column width="5em" hAlign="Center"><Text text="SAYIM"/></Column>
-                                                <Column width="4em" hAlign="Center"><Text text="SM"/></Column>
+                                                <Column width="3em" hAlign="Center"><Text text="SM"/></Column>
                                                 <Column width="7em" hAlign="Center"><Text text="İŞLEM"/></Column>
                                             </columns>
-                                            <items>
-                                                <ColumnListItem>
-                                                    <cells>
-                                                        <Text text="{= parseInt(${itemsModel>Material}) }"/>
-                                                        <Text text="{itemsModel>MaterialText}"/>
-                                                        <Text text="{itemsModel>KategoriText}"/>
-                                                        <ObjectNumber
-                                                            number="{itemsModel>ExpectedQuantity}"
-                                                            unit="{itemsModel>UoM}"
-                                                            state="None"/>
-                                                        <Input
-                                                            value="{itemsModel>ReceivedQuantity}"
-                                                            type="Number"
-                                                            textAlign="Center"
-                                                            width="100%"
-                                                            editable="false"
-                                                            change="onCountChange"/>
-                                                        <Text text="{itemsModel>SM}"/>
-                                                        <Button
-                                                            text="{= ${itemsModel>Approved} === 'X' ? 'Düzenle' : 'Onayla' }"
-                                                            type="Emphasized"
-                                                            press="onApproveItem"
-                                                            visible="{= ${itemsModel>Status} !== 'X' }"
-                                                            icon="{= ${itemsModel>Approved} === 'X' ? 'sap-icon://edit' : 'sap-icon://accept' }"/>
-                                                    </cells>
-                                                </ColumnListItem>
-                                            </items>
                                         </Table>
                                     </VBox>
                                 </VBox>
