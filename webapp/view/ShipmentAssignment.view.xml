@@ -2,20 +2,23 @@
     controllerName="com.sut.bolgeyonetim.controller.ShipmentAssignment"
     xmlns:mvc="sap.ui.core.mvc"
     xmlns="sap.m"
-    xmlns:core="sap.ui.core">
+    xmlns:core="sap.ui.core"
+>
     <Page
         title="Yükleme Planlaması"
         showNavButton="true"
-        navButtonPress="onNavBack">
+        navButtonPress="onNavBack"
+    >
         <content>
             <!-- Search Field -->
             <SearchField
                 id="idSearchField"
                 placeholder="Plasiyer veya nakliye no ile ara..."
-                search="onSearch"
-                width="100%"
-                class="sapUiSmallMarginBottom sapUiSmallMarginBegin sapUiSmallMarginEnd"/>
-            
+                liveChange="onSearch"
+                width="75%"
+                class="sapUiSmallMarginBottom sapUiSmallMarginBegin sapUiSmallMarginEnd"
+            />
+
             <!-- Shipments List -->
             <List
                 id="idShipmentList"
@@ -23,47 +26,87 @@
                 growing="true"
                 growingThreshold="20"
                 growingScrollToLoad="true"
-                noDataText="Yükleme kaydı bulunamadı">
+                noDataText="Yükleme kaydı bulunamadı"
+            >
                 <items>
                     <CustomListItem type="Inactive">
-                        <VBox width="100%" class="sapUiSmallMargin">
+                        <VBox
+                            width="100%"
+                            class="sapUiSmallMargin"
+                        >
                             <!-- Card-like container with colored border -->
                             <HBox
                                 alignItems="Start"
                                 justifyContent="SpaceBetween"
                                 width="100%"
-                                class="sapUiSmallPadding shipmentCard">
-                                
+                                class="sapUiSmallPadding shipmentCard"
+                            >
                                 <!-- Left Side: Shipment Info -->
-                                <VBox width="40%" class="sapUiTinyMarginEnd">
+                                <VBox
+                                    width="45%"
+                                    class="sapUiTinyMarginEnd"
+                                >
                                     <!-- Icon and Shipment ID -->
-                                    <HBox alignItems="Center" class="sapUiTinyMarginBottom">
+                                    <HBox
+                                        alignItems="Center"
+                                        class="sapUiTinyMarginBottom"
+                                    >
                                         <core:Icon
                                             src="sap-icon://shipping-status"
                                             size="2rem"
                                             color="#0854A0"
-                                            class="sapUiSmallMarginEnd"/>
+                                            class="sapUiSmallMarginEnd"
+                                        />
                                         <VBox>
-                                            <Label text="{shipmentModel>ShipmentId}" design="Bold"/>
-                                            <Label text="{shipmentModel>ShipmentDate}" class="sapUiTinyMarginTop"/>
+                                            <Label
+                                                text="{
+                                                path: 'shipmentModel>ShipmentId',
+                                                formatter: '.formatShipmentId'
+                                            }"
+                                                design="Bold"
+                                            />
+                                            <Label
+                                                text="{
+                                                path: 'shipmentModel>ShipmentDate',
+                                                formatter: '.formatDate'
+                                            }"
+                                                class="sapUiTinyMarginTop"
+                                            />
                                         </VBox>
                                     </HBox>
-                                    <Label text="{shipmentModel>CustomerName}" class="sapUiTinyMarginTop"/>
+                                    <Label
+                                        text="{shipmentModel>CustomerName}"
+                                        class="sapUiTinyMarginTop"
+                                    />
                                 </VBox>
-                                
+
                                 <!-- Right Side: Personnel Assignment -->
-                                <VBox width="55%">
-                                    <Label text="Atanan Personel (Max: 5)" design="Bold" class="sapUiTinyMarginBottom"/>
-                                    <MultiComboBox
-                                        items="{employeeModel>/}"
-                                        selectedKeys="{shipmentModel>SelectedEmployeeKeys}"
-                                        selectionFinish="onPersonnelSelectionChange"
-                                        width="100%"
-                                        placeholder="Personel seçin...">
-                                        <core:Item
-                                            key="{employeeModel>EmployeeId}"
-                                            text="{employeeModel>EmployeeName}"/>
-                                    </MultiComboBox>
+                                <VBox width="50%">
+                                    <Label
+                                        text="Atanan Memur (Max: 1)"
+                                        design="Bold"
+                                        class="sapUiTinyMarginTop sapUiTinyMarginBottom"
+                                    />
+                                    <Button
+                                        text="{= ${shipmentModel>SelectedOfficerKeys}.length > 0 ? ${shipmentModel>SelectedOfficerKeys}.length + ' Memur Seçildi' : 'Memur Seç'}"
+                                        icon="sap-icon://employee"
+                                        press="onOpenOfficerDialog"
+                                        width="75%"
+                                        type="Emphasized"
+                                    />
+                                    <Label
+                                        text="Atanan Personel (Max: 5)"
+                                        design="Bold"
+                                        class="sapUiTinyMarginBottom"
+                                    />
+                                    <Button
+                                        text="{= ${shipmentModel>SelectedEmployeeKeys}.length > 0 ? ${shipmentModel>SelectedEmployeeKeys}.length + ' Personel Seçildi' : 'Personel Seç'}"
+                                        icon="sap-icon://employee"
+                                        press="onOpenPersonnelDialog"
+                                        width="75%"
+                                        type="Emphasized"
+                                        class="sapUiTinyMarginBottom"
+                                    />
                                 </VBox>
                             </HBox>
                         </VBox>
