@@ -40,6 +40,49 @@ sap.ui.define([
         },
 
         /**
+         * Logout user and clear session data
+         * Clears sessionModel and localStorage, then navigates to login
+         */
+        onLogout: function() {
+            MessageBox.confirm("Çıkış yapmak istediğinizden emin misiniz?", {
+                title: "Çıkış",
+                onClose: function(sAction) {
+                    if (sAction === MessageBox.Action.OK) {
+                        // Clear session model
+                        var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
+                        if (oSessionModel) {
+                            oSessionModel.setData({});
+                        }
+                        
+                        // Clear dashboard data
+                        var oDashboardModel = this.getOwnerComponent().getModel("dashboardData");
+                        if (oDashboardModel) {
+                            oDashboardModel.setData({
+                                pendingReceipts: 0,
+                                pendingShipments: 0,
+                                pendingDeliveries: 0,
+                                pendingCounts: 0
+                            });
+                        }
+                        
+                        // Clear localStorage (session and filter data only, preserve work drafts)
+                        try {
+                            localStorage.removeItem("sessionData");
+                            localStorage.removeItem("filterModel");
+                            console.log("Session data cleared from localStorage");
+                        } catch (e) {
+                            console.error("Failed to clear localStorage:", e);
+                        }
+                        
+                        // Navigate to login
+                        this.getRouter().navTo("login", {}, true);
+                        MessageToast.show("Çıkış yapıldı");
+                    }
+                }.bind(this)
+            });
+        },
+
+        /**
          * Helper to call an OData Function Import using the component's default model.
          * Returns a Promise which resolves with the success payload or rejects with an error message.
          * @param {string} sFunctionName

@@ -88,14 +88,16 @@ sap.ui.define([
                 oSessionModel = new JSONModel();
                 this.getOwnerComponent().setModel(oSessionModel, "sessionModel");
             }
+            
+            // Add LoginTime timestamp for session expiration check
+            if (oSessionData.Login) {
+                oSessionData.Login.LoginTime = new Date().toISOString();
+            }
+            
             oSessionModel.setData(oSessionData);
 
-            // Save session to localStorage for persistence across page refreshes
-            try {
-                localStorage.setItem("sessionData", JSON.stringify(oSessionData));
-            } catch (e) {
-                console.warn("Could not save session to localStorage:", e);
-            }
+            // Save session to localStorage using Component helper method
+            this.getOwnerComponent().saveSessionToLocalStorage();
 
             // Create/update dashboardData global model with mapped counts
             var oDashboardModel = this.getOwnerComponent().getModel("dashboardData");
