@@ -1,0 +1,38 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+    <Dialog
+        title="Düzenleme Nedeni"
+        contentWidth="400px"
+        draggable="true"
+        resizable="false"
+        class="sapUiSizeCompact">
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <Label text="Beklenen miktar ile girilen miktar arasında fark var." class="sapUiTinyMarginBottom"/>
+                <Label text="* Düzenleme Nedeni" required="true" design="Bold" class="sapUiSmallMarginTop sapUiTinyMarginBottom"/>
+                <ComboBox
+                    id="idReasonDialogCombo"
+                    selectedKey="{reasonDialogModel>/editReason}"
+                    width="100%"
+                    placeholder="Neden seçin"
+                    valueState="{= ${reasonDialogModel>/reasonErrorState} ? 'Error' : 'None' }"
+                    valueStateText="İşlemi bitirmek için neden belirtmelisiniz"
+                    items="{editReasonsModel>/}">
+                    <core:Item key="{editReasonsModel>Key}" text="{editReasonsModel>Text}"/>
+                </ComboBox>
+            </VBox>
+        </content>
+        <buttons>
+            <Button
+                text="Onayla"
+                icon="sap-icon://accept"
+                type="Emphasized"
+                press="onReasonDialogConfirm"/>
+            <Button
+                text="İptal"
+                type="Transparent"
+                press="onReasonDialogCancel"/>
+        </buttons>
+    </Dialog>
+</core:FragmentDefinition>
