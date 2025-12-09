@@ -159,8 +159,8 @@ sap.ui.define([
             // Load ShipmentSet, AssignedPersonnelSet, and AssignedOfficerSet in parallel
             Promise.all([
                 this._readOData("/ShipmentSet", aShipmentFilters),
-                this._readOData("/AssignedPersonnelSet", []),
-                this._readOData("/AssignedOfficerSet", [])
+                this._readOData("/AssignedPersonnelSet", aShipmentFilters),
+                this._readOData("/AssignedOfficerSet", aShipmentFilters)
             ]).then(function(aResults) {
                 var aShipments = aResults[0];
                 var aEmployeeAssignments = aResults[1];
@@ -508,6 +508,7 @@ sap.ui.define([
                     "AssignedEmployeeIds": sAssignedEmployeeIds
                 },
                 success: function(oData, oResponse) {
+                    MessageBox.success("Kayıt başarılı.");
                     // Silent save - no toast message
                 }.bind(this),
                 error: function(oError) {
