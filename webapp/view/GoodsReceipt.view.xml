@@ -71,6 +71,11 @@
                                         }"
                                         visible="{= ${goodsReceiptModel>Status} !== 'X' }"
                                         class="sapUiTinyMarginBegin"/>
+                                    <Button
+                                        icon="sap-icon://notes"
+                                        tooltip="Not Gir"
+                                        press="onNotePress"
+                                        class="sapUiTinyMarginBegin"/>
                                 </OverflowToolbar>
                             </headerToolbar>
                             <content>

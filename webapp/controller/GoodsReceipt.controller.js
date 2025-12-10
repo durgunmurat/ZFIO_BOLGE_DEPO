@@ -20,6 +20,10 @@ sap.ui.define(
     return BaseController.extend(
       "com.sut.bolgeyonetim.controller.GoodsReceipt",
       {
+        // --- STATE PROPERTIES ---
+        _oCurrentNoteContext: null,
+        _sCurrentNoteLpId: null,
+
         // --- FORMATTERS ---
 
         // Buton Metni: "Tamamlandı (100)" veya "Devam Et (50)"
@@ -1212,6 +1216,7 @@ sap.ui.define(
                  var aTotalCounts = {
                     Total1: 0, Total2: 0, Total3: 0, Total4: 0, Total5: 0,
                     Total6: 0, Total7: 0, Total8: 0, Total9: 0, TotalDepozito: 0,
+                    TotalPorsiyon:0,
                  };
                  var oCategoryTextMap = {};
 
@@ -1235,7 +1240,7 @@ sap.ui.define(
                         var oCtx = oChkBox.getBindingContext("goodsReceiptModel");
                         if (oCtx) {
                           var oDeliveryNote = oCtx.getObject();
-                          var aTextFields = ["Total1Text","Total2Text","Total3Text","Total4Text","Total5Text","Total6Text","Total7Text","Total8Text","Total9Text","TotalDepozitoText"];
+                          var aTextFields = ["Total1Text","Total2Text","Total3Text","Total4Text","Total5Text","Total6Text","Total7Text","Total8Text","Total9Text","TotalDepozitoText","TotalPorsiyonText"];
                           aTextFields.forEach(function (sTextField) {
                             if (oDeliveryNote[sTextField]) {
                               oCategoryTextMap[sTextField] = oDeliveryNote[sTextField];
@@ -1349,7 +1354,9 @@ sap.ui.define(
                       else if (sPrefix === "07") aTotalCounts.Total7++;
                       else if (sPrefix === "08") aTotalCounts.Total8++;
                       else if (sPrefix === "09") aTotalCounts.Total9++;
+                      else if (sPrefix === "98") aTotalCounts.TotalPorsiyon++;
                       else if (sPrefix === "99") aTotalCounts.TotalDepozito++;
+
                  });
 
                  var sModelName = "itemsModel_" + sLpId;
@@ -1423,6 +1430,7 @@ sap.ui.define(
             { key: "07", totalField: "Total7", textField: "Total7Text" },
             { key: "08", totalField: "Total8", textField: "Total8Text" },
             { key: "09", totalField: "Total9", textField: "Total9Text" },
+            { key: "98", totalField: "TotalPorsiyon", textField: "TotalPorsiyonText" },
             { key: "99", totalField: "TotalDepozito", textField: "TotalDepozitoText" },
           ];
           aCategoryMapping.forEach(function (oMapping) {
@@ -1870,6 +1878,140 @@ sap.ui.define(
         _getUserId: function () {
           var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
           return oSessionModel ? oSessionModel.getProperty("/Login/Username") : null;
+        },
+
+        // --- NOTE MANAGEMENT ---
+
+        onNotePress: function (oEvent) {
+          var oButton = oEvent.getSource();
+          var oPanel = oButton.getParent();
+          while (oPanel && oPanel.getMetadata().getName() !== "sap.m.Panel") {
+            oPanel = oPanel.getParent();
+          }
+          if (!oPanel) {
+            MessageBox.error("Panel bulunamadı.");
+            return;
+          }
+          var oContext = oPanel.getBindingContext("goodsReceiptModel");
+          if (!oContext) {
+            MessageBox.error("License Plate bilgisi bulunamadı.");
+            return;
+          }
+          var oLicensePlate = oContext.getObject();
+          var sLpId = oLicensePlate.LpId;
+          
+          this._oCurrentNoteContext = oContext;
+          this._sCurrentNoteLpId = sLpId;
+
+          // Initialize note dialog model
+          var oNoteDialogModel = new JSONModel({
+            newNote: "",
+            notes: []
+          });
+          this.getView().setModel(oNoteDialogModel, "noteDialogModel");
+
+          if (!this._oNoteDialog) {
+            this._oNoteDialog = sap.ui.xmlfragment(
+              "noteDialog",
+              "com.sut.bolgeyonetim.view.NoteDialog",
+              this
+            );
+            this.getView().addDependent(this._oNoteDialog);
+          }
+
+          // Load existing notes
+          this._loadNotes(sLpId);
+          this._oNoteDialog.open();
+        },
+
+        _loadNotes: function (sLpId) {
+          var oModel = this.getOwnerComponent().getModel();
+          var oNoteDialogModel = this.getView().getModel("noteDialogModel");
+          
+          if (!sLpId) {
+            console.error("LpId is missing");
+            return;
+          }
+
+          sap.ui.core.BusyIndicator.show(0);
+          
+          var aFilters = [new Filter("LpId", FilterOperator.EQ, sLpId)];
+          
+          oModel.read("/NoteGRSet", {
+            filters: aFilters,
+            success: function (oData) {
+              sap.ui.core.BusyIndicator.hide();
+              // var aNotes = oData.results || [];
+              // oNoteDialogModel.setProperty("/notes", aNotes);
+              var aNotes="";
+              aNotes = oData.results[0].Note || "";
+              oNoteDialogModel.setProperty("/newNote", aNotes);
+              // console.log("Notes loaded for LpId", sLpId, ":", aNotes.length);
+            }.bind(this),
+            error: function (oError) {
+              sap.ui.core.BusyIndicator.hide();
+              console.error("Failed to load notes:", oError);
+              MessageBox.error("Notlar yüklenirken hata oluştu.");
+            }.bind(this),
+          });
+        },
+
+        onSaveNote: function () {
+          var oNoteDialogModel = this.getView().getModel("noteDialogModel");
+          var sNewNote = oNoteDialogModel.getProperty("/newNote");
+          // var sNewNote = oNoteDialogModel.getProperty("/Note");
+          if (!sNewNote || sNewNote.trim().length === 0) {
+            MessageBox.warning("Lütfen bir not girin.");
+            return;
+          }
+
+          if (sNewNote.length > 255) {
+            MessageBox.error("Not en fazla 255 karakter olabilir.");
+            return;
+          }
+
+          var oModel = this.getOwnerComponent().getModel();
+
+          sap.ui.core.BusyIndicator.show(0);
+
+          oModel.callFunction("/SaveNoteGR", {
+            method: "POST",
+            urlParameters: {
+              LpId: this._sCurrentNoteLpId,
+              Note: sNewNote.trim()
+            },
+            success: function (oData, oResponse) {
+              sap.ui.core.BusyIndicator.hide();
+              MessageToast.show("Not başarıyla kaydedildi.");
+              
+              // Clear input
+              oNoteDialogModel.setProperty("/newNote", "");
+              
+              // Reload notes
+              this._loadNotes(this._sCurrentNoteLpId);
+            }.bind(this),
+            error: function (oError) {
+              sap.ui.core.BusyIndicator.hide();
+              var sErrorMsg = "Not kaydedilemedi.";
+              
+              if (oError && oError.responseText) {
+                try {
+                  var oErrorResponse = JSON.parse(oError.responseText);
+                  if (oErrorResponse.error && oErrorResponse.error.message && oErrorResponse.error.message.value) {
+                    sErrorMsg = oErrorResponse.error.message.value;
+                  }
+                } catch (e) {}
+              }
+              
+              MessageBox.error(sErrorMsg);
+            }.bind(this),
+          });
+        },
+
+        onCloseNoteDialog: function () {
+          if (this._oNoteDialog) {
+            this._oNoteDialog.close();
+          }
         },
 
         // --- REMOVED Deprecated onSavePress ---

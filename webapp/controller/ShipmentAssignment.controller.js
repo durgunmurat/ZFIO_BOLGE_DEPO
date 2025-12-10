@@ -252,17 +252,7 @@ sap.ui.define([
                                 path: "employeeModel>/",
                                 template: new sap.m.StandardListItem({
                                     title: "{employeeModel>EmployeeName}",
-                                    type: "Active",
-                                    selected: {
-                                        path: "employeeModel>EmployeeId",
-                                        formatter: function(sEmployeeId) {
-                                            if (!this._currentShipment) {
-                                                return false;
-                                            }
-                                            var aSelectedKeys = this._currentShipment.SelectedEmployeeKeys || [];
-                                            return aSelectedKeys.indexOf(sEmployeeId) !== -1;
-                                        }.bind(this)
-                                    }
+                                    type: "Active"
                                 })
                             },
                             selectionChange: this._onDialogSelectionChange.bind(this)
@@ -283,11 +273,32 @@ sap.ui.define([
                 this.getView().addDependent(this._oPersonnelDialog);
             }
             
-            // Refresh list bindings to show current selection
+            // Set selection AFTER dialog opens and items are rendered
             var oList = this._oPersonnelDialog.getContent()[0];
             oList.getBinding("items").refresh();
             
+            // Set selected items based on SelectedEmployeeKeys
+            this._oPersonnelDialog.attachAfterOpen(function() {
+                this._updateDialogSelection(oList, this._currentShipment.SelectedEmployeeKeys || []);
+            }.bind(this));
+            
             this._oPersonnelDialog.open();
+        },
+        
+        /**
+         * Update dialog selection based on selected keys
+         */
+        _updateDialogSelection: function(oList, aSelectedKeys) {
+            var aItems = oList.getItems();
+            
+            aItems.forEach(function(oItem) {
+                var oContext = oItem.getBindingContext("employeeModel");
+                if (oContext) {
+                    var sEmployeeId = oContext.getProperty("EmployeeId");
+                    var bSelected = aSelectedKeys.indexOf(sEmployeeId) !== -1;
+                    oList.setSelectedItem(oItem, bSelected);
+                }
+            });
         },
 
         /**
@@ -368,17 +379,7 @@ sap.ui.define([
                                 path: "officerModel>/",
                                 template: new sap.m.StandardListItem({
                                     title: "{officerModel>OfficerName}",
-                                    type: "Active",
-                                    selected: {
-                                        path: "officerModel>OfficerId",
-                                        formatter: function(sOfficerId) {
-                                            if (!this._currentShipment) {
-                                                return false;
-                                            }
-                                            var aSelectedKeys = this._currentShipment.SelectedOfficerKeys || [];
-                                            return aSelectedKeys.indexOf(sOfficerId) !== -1;
-                                        }.bind(this)
-                                    }
+                                    type: "Active"
                                 })
                             },
                             selectionChange: this._onOfficerDialogSelectionChange.bind(this)
@@ -399,11 +400,32 @@ sap.ui.define([
                 this.getView().addDependent(this._oOfficerDialog);
             }
             
-            // Refresh list bindings to show current selection
+            // Set selection AFTER dialog opens and items are rendered
             var oList = this._oOfficerDialog.getContent()[0];
             oList.getBinding("items").refresh();
             
+            // Set selected items based on SelectedOfficerKeys
+            this._oOfficerDialog.attachAfterOpen(function() {
+                this._updateOfficerDialogSelection(oList, this._currentShipment.SelectedOfficerKeys || []);
+            }.bind(this));
+            
             this._oOfficerDialog.open();
+        },
+        
+        /**
+         * Update officer dialog selection based on selected keys
+         */
+        _updateOfficerDialogSelection: function(oList, aSelectedKeys) {
+            var aItems = oList.getItems();
+            
+            aItems.forEach(function(oItem) {
+                var oContext = oItem.getBindingContext("officerModel");
+                if (oContext) {
+                    var sOfficerId = oContext.getProperty("OfficerId");
+                    var bSelected = aSelectedKeys.indexOf(sOfficerId) !== -1;
+                    oList.setSelectedItem(oItem, bSelected);
+                }
+            });
         },
 
         /**

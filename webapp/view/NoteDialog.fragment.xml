@@ -1,0 +1,66 @@
+<core:FragmentDefinition
+  xmlns="sap.m"
+  xmlns:core="sap.ui.core">
+  <Dialog
+    title="Not Yönetimi"
+    contentWidth="500px"
+    contentHeight="200px">
+    <content>
+      <VBox class="sapUiSmallMargin">
+        <Label text="Yeni Not Ekle" labelFor="idNoteInput" class="sapUiTinyMarginBottom"/>
+        <!-- <TextArea
+          id="idNoteInput"
+          value="{noteDialogModel>/newNote}"
+          rows="3"
+          maxLength="255"
+          placeholder="Max 255 karakter..."
+          width="100%"/>
+        <HBox justifyContent="End" class="sapUiTinyMarginTop">
+          <Button
+            text="Kaydet"
+            type="Emphasized"
+            press="onSaveNote"
+            enabled="{= ${noteDialogModel>/newNote}.length > 0}"/>
+        </HBox> -->
+        
+        <TextArea
+          id="idNoteInput"
+          value="{noteDialogModel>/newNote}"
+          rows="3"
+          maxLength="255"
+          placeholder="Max 255 karakter..."
+          width="100%"/>
+        <!-- <HBox justifyContent="End" class="sapUiTinyMarginTop">  -->
+          <!-- <Button
+            text="Kaydet"
+            type="Emphasized"
+            press="onSaveNote"
+            enabled="true"/>
+            <Button text="Çıkış" press="onCloseNoteDialog"/> -->
+        <!-- </HBox> -->
+
+        <!-- <Title text="Mevcut Notlar" class="sapUiMediumMarginTop"/>
+        <List
+          id="idNotesList"
+          items="{noteDialogModel>/notes}"
+          noDataText="Henüz not eklenmemiş">
+          <StandardListItem
+            title="{noteDialogModel>Note}"
+            description="{noteDialogModel>CreatedBy} - {path: 'noteDialogModel>CreatedAt', type: 'sap.ui.model.type.DateTime', formatOptions: {pattern: 'dd.MM.yyyy HH:mm'}}"
+            icon="sap-icon://notes"/>
+        </List> -->
+      </VBox>
+    </content>
+    <buttons>
+                  <Button
+            text="Kaydet"
+            type="Emphasized"
+            press="onSaveNote"
+            enabled="true"/>
+            <Button text="Çıkış" press="onCloseNoteDialog"/>
+    </buttons>
+    <!-- <beginButton>
+      <Button text="Çıkış" press="onCloseNoteDialog"/>
+    </beginButton> -->
+  </Dialog>
+</core:FragmentDefinition>
