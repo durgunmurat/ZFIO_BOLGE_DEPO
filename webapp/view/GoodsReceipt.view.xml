@@ -3,37 +3,43 @@
     xmlns:mvc="sap.ui.core.mvc"
     xmlns="sap.m"
     xmlns:f="sap.f"
-    xmlns:core="sap.ui.core">
+    xmlns:core="sap.ui.core"
+>
     <Page
         title="Mal Kabul"
         showNavButton="true"
-        navButtonPress="onNavBack">
+        navButtonPress="onNavBack"
+    >
         <content>
             <!-- Status Filter IconTabBar -->
             <IconTabBar
                 id="idStatusFilterBar"
                 select="onStatusFilterSelect"
                 class="sapUiResponsiveContentPadding"
-                upperCase="false">
+                upperCase="false"
+            >
                 <items>
                     <IconTabFilter
                         id="idPendingTab"
                         key="pending"
                         text="Bekleyenler"
-                        count="0"/>
+                        count="0"
+                    />
                     <IconTabFilter
                         id="idCompletedTab"
                         key="completed"
                         text="Tamamlananlar"
-                        count="0"/>
+                        count="0"
+                    />
                 </items>
             </IconTabBar>
-            
+
             <!-- LEVEL 1: License Plates List -->
             <List
                 id="idL1List"
                 items="{goodsReceiptModel>/}"
-                noDataText="Bekleyen mal kabul kaydı bulunamadı">
+                noDataText="Bekleyen mal kabul kaydı bulunamadı"
+            >
                 <items>
                     <!-- L1 Panel: Each License Plate -->
                     <CustomListItem>
@@ -41,23 +47,45 @@
                             expandable="true"
                             expanded="{goodsReceiptModel>expanded}"
                             expand="onPanelExpand"
-                            class="sapUiSmallMarginBottom">
+                            class="sapUiSmallMarginBottom"
+                        >
                             <headerToolbar>
                                 <OverflowToolbar>
-                                    <core:Icon src="sap-icon://shipping-status" size="1.5rem" color="#0854A0"/>
-                                    <Title text="{goodsReceiptModel>PlateNumber}" level="H3" class="sapUiTinyMarginBegin"/>
-                                    <ToolbarSpacer/>
+                                    <core:Icon
+                                        src="sap-icon://shipping-status"
+                                        size="1.5rem"
+                                        color="#0854A0"
+                                    />
+                                    <Title
+                                        text="{goodsReceiptModel>PlateNumber}"
+                                        level="H3"
+                                        class="sapUiTinyMarginBegin"
+                                    />
+                                    <ToolbarSpacer />
                                     <CheckBox
                                         text="Hepsini Seç"
                                         select="onSelectAllDeliveryNotes"
                                         visible="{= ${goodsReceiptModel>expanded} &amp;&amp; ${goodsReceiptModel>Status} !== 'X' }"
-                                        class="sapUiTinyMarginEnd"/>
-                                    <Label text="DB: {goodsReceiptModel>Warehouse}"/>
-                                    <Label text="ÜY: {goodsReceiptModel>WerksText}" class="sapUiTinyMarginBegin"/>
+                                        class="sapUiTinyMarginEnd"
+                                    />
+                                    <Label
+                                        text="DB: {goodsReceiptModel>Warehouse}"
+                                    />
+                                    <Label
+                                        text="ÜY: {goodsReceiptModel>WerksText}"
+                                        class="sapUiTinyMarginBegin"
+                                    />
+                                    <Button
+                                        icon="sap-icon://notes"
+                                        tooltip="Not Gir"
+                                        press="onNotePress"
+                                        class="sapUiTinyMarginBegin"
+                                    />
                                     <Button
                                         text="Foto ({= ${goodsReceiptModel>PhotoCount} || '0' } / 5)"
                                         press="onPhotoPress"
-                                        class="sapUiTinyMarginBegin"/>
+                                        class="sapUiTinyMarginBegin"
+                                    />
                                     <Button
                                         text="Mal Kabul"
                                         type="Emphasized"
@@ -70,12 +98,8 @@
                                             formatter: '.isMalKabulEnabled'
                                         }"
                                         visible="{= ${goodsReceiptModel>Status} !== 'X' }"
-                                        class="sapUiTinyMarginBegin"/>
-                                    <Button
-                                        icon="sap-icon://notes"
-                                        tooltip="Not Gir"
-                                        press="onNotePress"
-                                        class="sapUiTinyMarginBegin"/>
+                                        class="sapUiTinyMarginBegin"
+                                    />
                                 </OverflowToolbar>
                             </headerToolbar>
                             <content>
@@ -85,33 +109,53 @@
                                         id="idDeliveryNotesList"
                                         items="{goodsReceiptModel>ToDeliveryNotes/results}"
                                         mode="None"
-                                        noDataText="İrsaliye bulunamadı">
+                                        noDataText="İrsaliye bulunamadı"
+                                    >
                                         <items>
-                                        <CustomListItem>
-                                            <HBox alignItems="Center" width="100%">
-                                                <CheckBox 
-                                                    selected="{goodsReceiptModel>selected}"
-                                                    select="onDeliveryNoteSelect"
-                                                    visible="{= ${goodsReceiptModel>Status} !== 'X' }" />
-                                                <VBox class="sapUiTinyMarginBegin">
-                                                    <Text text="İrsaliye No: {goodsReceiptModel>DeliveryNumber}"/>
-                                                    <Text text="{= parseInt(${goodsReceiptModel>TotalMaterialNo}) } farklı ürün" class="sapUiTinyMarginTop"/>
-                                                </VBox>
-                                            </HBox>
-                                        </CustomListItem>
+                                            <CustomListItem>
+                                                <HBox
+                                                    alignItems="Center"
+                                                    width="100%"
+                                                >
+                                                    <CheckBox
+                                                        selected="{goodsReceiptModel>selected}"
+                                                        select="onDeliveryNoteSelect"
+                                                        visible="{= ${goodsReceiptModel>Status} !== 'X' }"
+                                                    />
+                                                    <VBox
+                                                        class="sapUiTinyMarginBegin"
+                                                    >
+                                                        <Text
+                                                            text="İrsaliye No: {goodsReceiptModel>DeliveryNumber}"
+                                                        />
+                                                        <Text
+                                                            text="{= parseInt(${goodsReceiptModel>TotalMaterialNo}) } farklı ürün"
+                                                            class="sapUiTinyMarginTop"
+                                                        />
+                                                    </VBox>
+                                                </HBox>
+                                            </CustomListItem>
                                         </items>
                                     </List>
 
                                     <!-- LEVEL 3: Category Filters + Items Table -->
-                                    <VBox class="sapUiSmallMarginTop" visible="false">
+                                    <VBox
+                                        class="sapUiSmallMarginTop"
+                                        visible="false"
+                                    >
                                         <!-- Category Filters -->
                                         <IconTabBar
                                             select="onCategoryFilterSelect"
                                             class="sapUiSmallMarginBottom"
-                                            upperCase="false">
+                                            upperCase="false"
+                                        >
                                             <items>
-                                                <IconTabFilter key="all" text="Tümü" count="0"/>
-                                                <IconTabSeparator/>
+                                                <IconTabFilter
+                                                    key="all"
+                                                    text="Tümü"
+                                                    count="0"
+                                                />
+                                                <IconTabSeparator />
                                             </items>
                                         </IconTabBar>
 
@@ -120,17 +164,45 @@
                                             id="idItemsTable"
                                             inset="false"
                                             growing="true"
-                                            growingThreshold="20"
+                                            growingThreshold="50"
                                             growingScrollToLoad="true"
                                             width="auto"
-                                            noDataText="Lütfen bir irsaliye seçin">
+                                            noDataText="Lütfen bir irsaliye seçin"
+                                        >
                                             <columns>
-                                                <Column width="5em"><Text text="KOD"/></Column>
-                                                <Column minScreenWidth="Phone" demandPopin="true"><Text text="ÜRÜN ADI"/></Column>
-                                                <Column width="6em" hAlign="Right"><Text text="MİKTAR"/></Column>
-                                                <Column width="5em" hAlign="Center"><Text text="SAYIM"/></Column>
-                                                <Column width="3em" hAlign="Center"><Text text="SM"/></Column>
-                                                <Column width="7rem" hAlign="Center"><Text text="İŞLEM"/></Column>
+                                                <Column width="5em">
+                                                    <Text text="KOD" />
+                                                </Column>
+                                                <Column
+                                                    minScreenWidth="Phone"
+                                                    demandPopin="true"
+                                                >
+                                                    <Text text="ÜRÜN ADI" />
+                                                </Column>
+                                                <Column
+                                                    width="6em"
+                                                    hAlign="Right"
+                                                >
+                                                    <Text text="MİKTAR" />
+                                                </Column>
+                                                <Column
+                                                    width="5em"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text text="SAYIM" />
+                                                </Column>
+                                                <Column
+                                                    width="3em"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text text="SM" />
+                                                </Column>
+                                                <Column
+                                                    width="7rem"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text text="İŞLEM" />
+                                                </Column>
                                             </columns>
                                             <!-- NOTE: Item template is generated dynamically in Controller _createTableItemTemplate -->
                                         </Table>

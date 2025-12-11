@@ -28,14 +28,23 @@
                     <!-- 1. Ana Miktar (Manuel Giriş) -->
                     <VBox width="30%">
                         <Label text="Miktar" design="Bold" required="true" class="sapUiTinyMarginBottom"/>
-                        <Input
+                        <!-- <Input
                             value="{smartCountModel>/totalCalculated}"
                             type="Number"
                             liveChange="onTotalManualChange"
                             textAlign="Center"
                             description="{smartCountModel>/uom}"
                             valueState="{= ${smartCountModel>/quantityErrorState} ? 'Error' : 'None' }"
-                            valueStateText="Beklenen miktardan fazla giremezsiniz"/>
+                            valueStateText="Beklenen miktardan fazla giremezsiniz"/> -->
+                      <StepInput
+                            value="{smartCountModel>/totalCalculated}"
+                            min="0"
+                            step="1"
+                            displayValuePrecision="2"
+                            textAlign="Center"
+                            change="onTotalManualChange"
+                            valueState="{= ${smartCountModel>/quantityErrorState} ? 'Error' : 'None' }"
+                            valueStateText="Beklenen miktardan fazla giremezsiniz"/> 
                     </VBox>
 
                     <!-- 2. Palet -->
