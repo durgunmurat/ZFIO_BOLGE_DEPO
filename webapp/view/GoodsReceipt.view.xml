@@ -63,27 +63,16 @@
                                     />
                                     <ToolbarSpacer />
                                     <CheckBox
-                                        text="Hepsini Seç"
+                                        text="Tümü"
                                         select="onSelectAllDeliveryNotes"
-                                        visible="{= ${goodsReceiptModel>expanded} &amp;&amp; ${goodsReceiptModel>Status} !== 'X' }"
+                                        
                                         class="sapUiTinyMarginEnd"
                                     />
-                                    <Label
-                                        text="DB: {goodsReceiptModel>Warehouse}"
-                                    />
+                                    <!-- <Label
+                                        text="{goodsReceiptModel>Warehouse}"
+                                    /> -->
                                     <Label
                                         text="ÜY: {goodsReceiptModel>WerksText}"
-                                        class="sapUiTinyMarginBegin"
-                                    />
-                                    <Button
-                                        icon="sap-icon://notes"
-                                        tooltip="Not Gir"
-                                        press="onNotePress"
-                                        class="sapUiTinyMarginBegin"
-                                    />
-                                    <Button
-                                        text="Foto ({= ${goodsReceiptModel>PhotoCount} || '0' } / 5)"
-                                        press="onPhotoPress"
                                         class="sapUiTinyMarginBegin"
                                     />
                                     <Button
@@ -100,6 +89,18 @@
                                         visible="{= ${goodsReceiptModel>Status} !== 'X' }"
                                         class="sapUiTinyMarginBegin"
                                     />
+                                    <Button
+                                        icon="sap-icon://notes"
+                                        tooltip="Not Gir"
+                                        press="onNotePress"
+                                        class="sapUiTinyMarginBegin"
+                                    />
+                                    <Button
+                                        text="Foto ({= ${goodsReceiptModel>PhotoCount} || '0' } / 5)"
+                                        press="onPhotoPress"
+                                        class="sapUiTinyMarginBegin"
+                                    />
+                                    
                                 </OverflowToolbar>
                             </headerToolbar>
                             <content>

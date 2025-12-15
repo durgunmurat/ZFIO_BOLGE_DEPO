@@ -8,6 +8,6 @@
  "abap_package":"ZFIO",
  "abap_bsp":"ZFIO_BOLGE_DEPO",
  "abap_bsp_text":"Bölge Depo Yönetim Sistemi",
- "abap_transport":"FRDK901167",
+ "abap_transport":"FRDK901169",
  "abap_language": "EN" 
 }

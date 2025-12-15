@@ -1691,7 +1691,7 @@ sap.ui.define(
           var oBinding = oTable.getBinding("items");
           if (!oBinding) return;
 
-          var oSorter = new sap.ui.model.Sorter("Kategori", false);
+          var oSorter = new sap.ui.model.Sorter("Kategori", false, false);
           oBinding.sort(oSorter);
 
           if (sSelectedKey === "all") {
