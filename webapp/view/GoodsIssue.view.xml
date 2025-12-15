@@ -1,67 +1,172 @@
 <mvc:View
     controllerName="com.sut.bolgeyonetim.controller.GoodsIssue"
     xmlns:mvc="sap.ui.core.mvc"
-    xmlns="sap.m">
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+>
     <Page
-        title="Araç Yükleme"
+        title="Mal Çıkış"
         showNavButton="true"
-        navButtonPress="onNavBack">
+        navButtonPress="onNavBack"
+    >
         <content>
-            <VBox class="sapUiSmallMargin">
-                <SegmentedButton
-                    selectedKey="pending"
-                    class="sapUiSmallMarginBottom">
-                    <items>
-                        <SegmentedButtonItem text="Bekleyenler (3)" key="pending"/>
-                        <SegmentedButtonItem text="Tamamlananlar (0)" key="completed"/>
-                    </items>
-                </SegmentedButton>
-                
-                <List
-                    items="{/deliveries}"
-                    class="sapUiSmallMarginBottom">
-                    <CustomListItem type="Active">
-                        <VBox class="sapUiSmallMargin">
-                            <HBox alignItems="Center" justifyContent="SpaceBetween">
-                                <ObjectIdentifier
-                                    title="Nakliye #6092740"
-                                    text="YETİŞ YILDIRIM • 14/07/2025"/>
-                                <HBox>
-                                    <Text text="0/35" class="sapUiTinyMarginEnd"/>
-                                    <ObjectStatus
-                                        text="% Tamamlandı"
-                                        state="Warning"/>
-                                </HBox>
-                            </HBox>
-                            <ProgressIndicator
-                                percentValue="0"
-                                displayValue="0/35"
-                                state="Warning"
-                                class="sapUiTinyMarginTop"/>
-                        </VBox>
+            <!-- Status Filter IconTabBar -->
+            <IconTabBar
+                id="idGIStatusFilterBar"
+                select="onStatusFilterSelect"
+                class="sapUiResponsiveContentPadding"
+                upperCase="false"
+            >
+                <items>
+                    <IconTabFilter
+                        id="idGIPendingTab"
+                        key="pending"
+                        text="Bekleyenler"
+                        count="0"
+                    />
+                    <IconTabFilter
+                        id="idGICompletedTab"
+                        key="completed"
+                        text="Tamamlananlar"
+                        count="0"
+                    />
+                </items>
+            </IconTabBar>
+
+            <!-- LEVEL 1: Packages List -->
+            <List
+                id="idGIPackagesList"
+                items="{issuePackagesModel>/}"
+                noDataText="Bekleyen mal çıkış kaydı bulunamadı"
+            >
+                <items>
+                    <!-- L1 Panel: Each Package -->
+                    <CustomListItem>
+                        <Panel
+                            expandable="true"
+                            expanded="{issuePackagesModel>expanded}"
+                            expand="onPackageExpand"
+                            class="sapUiSmallMarginBottom"
+                        >
+                            <headerToolbar>
+                                <OverflowToolbar>
+                                    <core:Icon
+                                        src="sap-icon://shipping-status"
+                                        size="1.5rem"
+                                        color="#0854A0"
+                                    />
+                                    <Title
+                                        text="{issuePackagesModel>PackingNumber}"
+                                        level="H3"
+                                        class="sapUiTinyMarginBegin"
+                                    />
+                                    <ToolbarSpacer />
+                                    <Label
+                                        text="{issuePackagesModel>ShipToName}"
+                                        class="sapUiTinyMarginBegin"
+                                    />
+                                    <Label
+                                        text="{
+                                            path: 'issuePackagesModel>PlanDate',
+                                            type: 'sap.ui.model.type.Date',
+                                            formatOptions: { pattern: 'dd.MM.yyyy' }
+                                        }"
+                                        class="sapUiTinyMarginBegin"
+                                    />
+                                    <Button
+                                        text="Mal Çıkış"
+                                        type="Emphasized"
+                                        press="onMalCikisPress"
+                                        enabled="{
+                                            parts: [
+                                                {path: 'issuePackagesModel>PackingNumber'},
+                                                {path: 'issuePackagesModel>_refreshTrigger'}
+                                            ],
+                                            formatter: '.isMalCikisEnabled'
+                                        }"
+                                        visible="{= ${issuePackagesModel>Status} !== 'X' }"
+                                        class="sapUiTinyMarginBegin"
+                                    />
+                                </OverflowToolbar>
+                            </headerToolbar>
+                            <content>
+                                <VBox>
+                                    <!-- LEVEL 2: Category Filters + Items Table -->
+                                    <VBox
+                                        class="sapUiSmallMarginTop"
+                                        visible="false"
+                                    >
+                                        <!-- Category Filters -->
+                                        <IconTabBar
+                                            id="idGICategoryFilterBar"
+                                            select="onCategoryFilterSelect"
+                                            class="sapUiSmallMarginBottom"
+                                            upperCase="false"
+                                        >
+                                            <items>
+                                                <IconTabFilter
+                                                    key="all"
+                                                    text="Tümü"
+                                                    count="0"
+                                                />
+                                                <IconTabSeparator />
+                                            </items>
+                                        </IconTabBar>
+
+                                        <!-- Items Table -->
+                                        <Table
+                                            id="idGIItemsTable"
+                                            inset="false"
+                                            growing="true"
+                                            growingThreshold="50"
+                                            growingScrollToLoad="true"
+                                            width="auto"
+                                            noDataText="Ürün bulunamadı"
+                                        >
+                                            <columns>
+                                                <Column width="5em">
+                                                    <Text text="KOD" />
+                                                </Column>
+                                                <Column
+                                                    minScreenWidth="Phone"
+                                                    demandPopin="true"
+                                                >
+                                                    <Text text="ÜRÜN ADI" />
+                                                </Column>
+                                                <Column
+                                                    width="6em"
+                                                    hAlign="Right"
+                                                >
+                                                    <Text text="MİKTAR" />
+                                                </Column>
+                                                <Column
+                                                    width="5em"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text text="SAYIM" />
+                                                </Column>
+                                                <Column
+                                                    width="3em"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text text="SM" />
+                                                </Column>
+                                                <Column
+                                                    width="7rem"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text text="İŞLEM" />
+                                                </Column>
+                                            </columns>
+                                            <!-- NOTE: Item template is generated dynamically in Controller _createTableItemTemplate -->
+                                        </Table>
+                                    </VBox>
+                                </VBox>
+                            </content>
+                        </Panel>
                     </CustomListItem>
-                    <CustomListItem type="Active">
-                        <VBox class="sapUiSmallMargin">
-                            <HBox alignItems="Center" justifyContent="SpaceBetween">
-                                <ObjectIdentifier
-                                    title="Nakliye #6092743"
-                                    text="CELİL ÖKTEN_TSL.MT_SQE #DS • 14/07/2025"/>
-                                <HBox>
-                                    <Text text="0/21" class="sapUiTinyMarginEnd"/>
-                                    <ObjectStatus
-                                        text="% Tamamlandı"
-                                        state="Warning"/>
-                                </HBox>
-                            </HBox>
-                            <ProgressIndicator
-                                percentValue="0"
-                                displayValue="0/21"
-                                state="Warning"
-                                class="sapUiTinyMarginTop"/>
-                        </VBox>
-                    </CustomListItem>
-                </List>
-            </VBox>
+                </items>
+            </List>
         </content>
     </Page>
 </mvc:View>

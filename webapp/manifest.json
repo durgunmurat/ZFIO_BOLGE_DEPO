@@ -116,7 +116,7 @@
                     "target": "shipmentAssignment"
                 },
                 {
-                    "pattern": "goodsIssue",
+                    "pattern": "goodsIssue/:packingNumber:",
                     "name": "goodsIssue",
                     "target": "goodsIssue"
                 },

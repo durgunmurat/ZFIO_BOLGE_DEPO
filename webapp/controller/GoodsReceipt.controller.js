@@ -290,10 +290,10 @@ sap.ui.define(
 
         /**
          * Smart Count Dialog - Open with initialization
-         * Online-First Architecture:
-         * - New items: Start fresh (qty=0)
-         * - Existing drafts: Restore from localStorage backup
-         * - Backend ReceivedQuantity > 0: Load from backend (backup ignored)
+         * Real-Time Backend Architecture:
+         * - All data loaded directly from backend
+         * - Changes saved immediately to backend with Status="0"
+         * - No localStorage caching
          */
         onSmartCountPress: function (oEvent) {
           var oButton = oEvent.getSource();
@@ -334,68 +334,12 @@ sap.ui.define(
           var fCrateFactor = parseFloat(oItem.Sepet);
           if (isNaN(fCrateFactor) || fCrateFactor <= 0) fCrateFactor = 1;
 
-          // 2. INITIALIZATION LOGIC - ACCUMULATION MODE
-          // BUG FIX: Implement baseQuantity concept to prevent overwriting existing quantities
-          // Formula: Total = BaseQuantity + (Pallet * Factor) + (Crate * Factor)
-          var aSelectedDeliveryNotes = this._getSelectedDeliveryNotesForLpId(
-            oItem.LpId
-          );
-          var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
-          var sSicilNo = oSessionModel
-            ? oSessionModel.getProperty("/Login/Username")
-            : null;
-
-          var fBaseQuantity = 0;
-          var fInitialPallet = 0;
-          var fInitialCrate = 0;
-          var sInitialReason = "";
-          var bDraftFound = false;
-
-          if (sSicilNo && aSelectedDeliveryNotes.length > 0) {
-            // Check if ANY draft exists for this material
-            for (var i = 0; i < aSelectedDeliveryNotes.length; i++) {
-              var oDeliveryNote = aSelectedDeliveryNotes[i];
-              if (oDeliveryNote.ToItems && oDeliveryNote.ToItems.results) {
-                oDeliveryNote.ToItems.results.forEach(function (oOriginalItem) {
-                  if (oOriginalItem.Material === oItem.Material) {
-                    var sKey = sSicilNo + "_" + oOriginalItem.DeliveryItemId;
-                    var sDraftStr = localStorage.getItem(sKey);
-                    if (sDraftStr) {
-                      try {
-                        var oDraft = JSON.parse(sDraftStr);
-                        // CRITICAL FIX: receivedquantity is the FINAL calculated value (base + increments)
-                        // We show this as baseQuantity in dialog, and reset pallet/crate to 0
-                        fBaseQuantity += parseFloat(
-                          oDraft.receivedquantity || "0"
-                        );
-                        // Don't load pallet/crate from draft - user starts fresh increments
-                        // fInitialPallet = 0, fInitialCrate = 0 (already initialized)
-                        if (!sInitialReason && oDraft.editreason) {
-                          sInitialReason = oDraft.editreason;
-                        }
-                        bDraftFound = true;
-                      } catch (e) {
-                        console.error(
-                          "Failed to parse draft for key:",
-                          sKey,
-                          e
-                        );
-                      }
-                    }
-                  }
-                });
-              }
-            }
-          }
-
-          // If NO draft found, initialize baseQuantity from ReceivedQuantity
-          // Pallet/Crate start at 0 (user will ADD to existing quantity)
-          if (!bDraftFound) {
-            fBaseQuantity = parseFloat(oItem.ReceivedQuantity || "0");
-            fInitialPallet = 0;
-            fInitialCrate = 0;
-            sInitialReason = oItem.EditReason || "";
-          }
+          // 2. INITIALIZATION LOGIC - Real-Time Backend Mode
+          // Initialize from goodsReceiptModel (backend state)
+          var fBaseQuantity = parseFloat(oItem.ReceivedQuantity || "0");
+          var fInitialPallet = parseFloat(oItem.PalletCount || "0");
+          var fInitialCrate = parseFloat(oItem.CrateCount || "0");
+          var sInitialReason = oItem.EditReason || "";
 
           // Load edit reasons if not already loaded
           if (
@@ -651,172 +595,100 @@ sap.ui.define(
           var sPath = this._oCurrentBitirContext.getPath();
           var oItem = this._oCurrentBitirContext.getObject();
 
-          // Update itemsModel
-          oItemsModel.setProperty(sPath + "/EditReason", sEditReason);
-          oItemsModel.setProperty(sPath + "/LocalStatus", "COMPLETED");
-          oItemsModel.setProperty(sPath + "/Approved", "X");
-
-          // CRITICAL FIX: Also update goodsReceiptModel's original ToItems
-          var oGoodsReceiptModel = this.getView().getModel("goodsReceiptModel");
-          var aLicensePlates = oGoodsReceiptModel.getData();
-
-          for (var i = 0; i < aLicensePlates.length; i++) {
-            if (aLicensePlates[i].LpId === oItem.LpId) {
-              if (
-                aLicensePlates[i].ToDeliveryNotes &&
-                aLicensePlates[i].ToDeliveryNotes.results
-              ) {
-                aLicensePlates[i].ToDeliveryNotes.results.forEach(function (
-                  oDN
-                ) {
-                  if (oDN.ToItems && oDN.ToItems.results) {
-                    oDN.ToItems.results.forEach(function (oOriginalItem) {
-                      if (oOriginalItem.Material === oItem.Material) {
-                        oOriginalItem.EditReason = sEditReason;
-                        oOriginalItem.LocalStatus = "COMPLETED";
-                        oOriginalItem.Approved = "X";
-                      }
-                    });
-                  }
-                });
-              }
-
-              // Update refresh trigger
-              aLicensePlates[i]._refreshTrigger = new Date().getTime();
-              oGoodsReceiptModel.setProperty(
-                "/" + i + "/_refreshTrigger",
-                aLicensePlates[i]._refreshTrigger
-              );
-              break;
-            }
-          }
-
-          // Backup to localStorage
+          // Get selected delivery notes for distribution
           var aSelectedDeliveryNotes = this._getSelectedDeliveryNotesForLpId(
             oItem.LpId
           );
-          this._backupItemToStorage(
-            oItem.LpId,
-            {
-              ...oItem,
-              receivedquantity: oItem.ReceivedQuantity,
-              baseQuantity: parseFloat(oItem.ReceivedQuantity || "0"),
-              palletCount: parseFloat(oItem.PalletCount || "0"),
-              crateCount: parseFloat(oItem.CrateCount || "0"),
-              unitCount: 0,
-              editreason: sEditReason,
-              status: "COMPLETED",
-              approved: "X",
-            },
+
+          // Build distributed payload
+          var aPayloadItems = this._buildDistributedPayload(
+            oItem,
+            oItem.ReceivedQuantity,
+            sEditReason,
+            "X",
             aSelectedDeliveryNotes
           );
 
-          oItemsModel.refresh(true);
-          oGoodsReceiptModel.refresh(true);
+          // OPTIMISTIC UPDATE: Update local model first for immediate UI feedback
+          var oGoodsReceiptModel = this.getView().getModel("goodsReceiptModel");
+          var aLicensePlates = oGoodsReceiptModel.getData();
+          var oLicensePlate = aLicensePlates.find(function(lp) {
+            return lp.LpId === oItem.LpId;
+          });
 
-          MessageToast.show("Ürün onaylandı.");
+          if (oLicensePlate && oLicensePlate.ToDeliveryNotes) {
+            aSelectedDeliveryNotes.forEach(function(oSelectedDN) {
+              var oDN = oLicensePlate.ToDeliveryNotes.results.find(function(dn) {
+                return dn.DeliveryNumber === oSelectedDN.DeliveryNumber;
+              });
+              if (oDN && oDN.ToItems && oDN.ToItems.results) {
+                oDN.ToItems.results.forEach(function(oBackendItem) {
+                  if (oBackendItem.Material === oItem.Material) {
+                    oBackendItem.Approved = "X";
+                    oBackendItem.EditReason = sEditReason;
+                    oBackendItem.LocalStatus = "COMPLETED";
+                  }
+                });
+              }
+            });
+            oGoodsReceiptModel.refresh();
+            // Recalculate and render to show updated status immediately
+            this._calculateAndRenderItems();
+          }
+
+          // Save to backend with Status="0" (intermediate save)
+          this._saveToBackend(oItem.LpId, aPayloadItems, "0")
+            .then(function() {
+              MessageToast.show("Ürün onaylandı.");
+            }.bind(this))
+            .catch(function() {
+              // Error already shown by _saveToBackend
+              // Revert optimistic update on failure
+              this._refreshSingleLicensePlate(oItem.LpId);
+            }.bind(this));
         },
 
         _performSmartSave: function (sLocalStatus, sApproved) {
           var oSmartModel = this.getView().getModel("smartCountModel");
           var oSmartData = oSmartModel.getData();
 
-          var oItemsModel = this.getView().getModel(
-            this._sCurrentItemsModelName
-          );
-          var sPath = this._oCurrentSmartContext.getPath();
           var oItem = this._oCurrentSmartContext.getObject();
-
-          // 1. UI Modelini Güncelle (itemsModel - görünen tablo)
           var sTotalStr = oSmartData.totalCalculated.toString();
 
-          oItemsModel.setProperty(sPath + "/ReceivedQuantity", sTotalStr);
-          oItemsModel.setProperty(
-            sPath + "/PalletCount",
-            oSmartData.palletCount
-          );
-          oItemsModel.setProperty(sPath + "/CrateCount", oSmartData.crateCount);
-          oItemsModel.setProperty(sPath + "/EditReason", oSmartData.editReason);
-          oItemsModel.setProperty(sPath + "/LocalStatus", sLocalStatus); // IP / COMPLETED
-          oItemsModel.setProperty(sPath + "/Approved", sApproved); // '' veya 'X'
-
-          // CRITICAL FIX: Also update goodsReceiptModel's original ToItems
-          // This is needed for isMalKabulEnabled formatter to see the Approved status
-          var oGoodsReceiptModel = this.getView().getModel("goodsReceiptModel");
-          var aLicensePlates = oGoodsReceiptModel.getData();
+          // Get selected delivery notes for distribution
           var aSelectedDeliveryNotes = this._getSelectedDeliveryNotesForLpId(
             oItem.LpId
           );
 
-          for (var i = 0; i < aLicensePlates.length; i++) {
-            if (aLicensePlates[i].LpId === oItem.LpId) {
-              if (
-                aLicensePlates[i].ToDeliveryNotes &&
-                aLicensePlates[i].ToDeliveryNotes.results
-              ) {
-                aLicensePlates[i].ToDeliveryNotes.results.forEach(function (
-                  oDN
-                ) {
-                  if (oDN.ToItems && oDN.ToItems.results) {
-                    oDN.ToItems.results.forEach(function (oOriginalItem) {
-                      if (oOriginalItem.Material === oItem.Material) {
-                        // Update the original item in goodsReceiptModel
-                        oOriginalItem.ReceivedQuantity = sTotalStr;
-                        oOriginalItem.PalletCount = oSmartData.palletCount;
-                        oOriginalItem.CrateCount = oSmartData.crateCount;
-                        oOriginalItem.EditReason = oSmartData.editReason;
-                        oOriginalItem.LocalStatus = sLocalStatus;
-                        oOriginalItem.Approved = sApproved;
-                      }
-                    });
-                  }
-                });
-              }
-              break;
-            }
-          }
+          // Update item object with new data for payload building
+          var oUpdatedItem = {
+            ...oItem,
+            ReceivedQuantity: sTotalStr,
+            PalletCount: oSmartData.palletCount,
+            CrateCount: oSmartData.crateCount,
+            EditReason: oSmartData.editReason
+          };
 
-          // 2. LocalStorage Kaydı (BUG FIX: Include baseQuantity)
-          this._backupItemToStorage(
-            oItem.LpId,
-            {
-              ...oItem,
-              receivedquantity: sTotalStr,
-              baseQuantity: oSmartData.baseQuantity,
-              palletCount: oSmartData.palletCount,
-              crateCount: oSmartData.crateCount,
-              unitCount: 0,
-              editreason: oSmartData.editReason,
-              status: sLocalStatus,
-              approved: sApproved,
-            },
+          // Build distributed payload
+          var aPayloadItems = this._buildDistributedPayload(
+            oUpdatedItem,
+            sTotalStr,
+            oSmartData.editReason,
+            sApproved,
             aSelectedDeliveryNotes
           );
 
-          // Refresh
-          oItemsModel.refresh(true);
-
-          // BUG FIX: Force re-evaluation of isMalKabulEnabled
-          // Update the specific license plate's _refreshTrigger to trigger binding refresh
-          for (var i = 0; i < aLicensePlates.length; i++) {
-            if (aLicensePlates[i].LpId === oItem.LpId) {
-              // Update the property directly and notify binding
-              aLicensePlates[i]._refreshTrigger = new Date().getTime();
-              oGoodsReceiptModel.setProperty(
-                "/" + i + "/_refreshTrigger",
-                aLicensePlates[i]._refreshTrigger
-              );
-              break;
-            }
-          }
-          oGoodsReceiptModel.refresh(true);
-
+          // Close dialog immediately for better UX
           this._oSmartDialog.close();
-          MessageToast.show(
-            sLocalStatus === "COMPLETED"
-              ? "Sayım tamamlandı."
-              : "Ara kayıt alındı."
-          );
+
+          // Save to backend with Status="0" (intermediate save)
+          this._saveToBackend(oItem.LpId, aPayloadItems, "0")
+            .then(function() {
+              // Success message already shown by _saveToBackend
+            })
+            .catch(function() {
+              // Error already shown by _saveToBackend
+            });
         },
 
         onSmartDialogCancel: function () {
@@ -837,14 +709,33 @@ sap.ui.define(
           var aPendingItems = [];
           var fAggregatedReceivedQty = parseFloat(sTotalQty || "0");
 
-          // Find all original items for this material
+          // Get LicensePlate data for required fields (ArrivalDate, WarehouseNum, etc.)
+          var oGoodsReceiptModel = this.getView().getModel("goodsReceiptModel");
+          var aLicensePlates = oGoodsReceiptModel.getData();
+          var oLicensePlate = null;
+          for (var i = 0; i < aLicensePlates.length; i++) {
+            if (aLicensePlates[i].LpId === oAggregatedItem.LpId) {
+              oLicensePlate = aLicensePlates[i];
+              break;
+            }
+          }
+
+          if (!oLicensePlate) {
+            console.error("LicensePlate not found for LpId:", oAggregatedItem.LpId);
+            return [];
+          }
+
+          // Find all original items for this material with delivery note reference
           var aOriginalItemsForMaterial = [];
           for (var i = 0; i < aSelectedDeliveryNotes.length; i++) {
             var oDeliveryNote = aSelectedDeliveryNotes[i];
             if (oDeliveryNote.ToItems && oDeliveryNote.ToItems.results) {
               oDeliveryNote.ToItems.results.forEach(function (oOriginalItem) {
                 if (oOriginalItem.Material === oAggregatedItem.Material) {
-                  aOriginalItemsForMaterial.push(oOriginalItem);
+                  aOriginalItemsForMaterial.push({
+                    item: oOriginalItem,
+                    deliveryNote: oDeliveryNote
+                  });
                 }
               });
             }
@@ -854,17 +745,17 @@ sap.ui.define(
 
           // Calculate total expected
           var fTotalOriginalExpected = 0;
-          aOriginalItemsForMaterial.forEach(function (oItem) {
-            fTotalOriginalExpected += parseFloat(oItem.ExpectedQuantity || "0");
+          aOriginalItemsForMaterial.forEach(function (oItemData) {
+            fTotalOriginalExpected += parseFloat(oItemData.item.ExpectedQuantity || "0");
           });
 
           // Distribute proportionally
           var aDistributedAmounts = [];
           var iTotalDistributed = 0;
 
-          aOriginalItemsForMaterial.forEach(function (oOriginalItem) {
+          aOriginalItemsForMaterial.forEach(function (oItemData) {
             var fOriginalExpected = parseFloat(
-              oOriginalItem.ExpectedQuantity || "0"
+              oItemData.item.ExpectedQuantity || "0"
             );
             var fProportionalReceived;
 
@@ -889,12 +780,61 @@ sap.ui.define(
             aDistributedAmounts[aDistributedAmounts.length - 1] += iRemainder;
           }
 
-          // Build payload items
-          aOriginalItemsForMaterial.forEach(function (oOriginalItem, index) {
+          // Distribute PalletCount and CrateCount proportionally
+          var fTotalPalletCount = parseFloat(oAggregatedItem.PalletCount || "0");
+          var fTotalCrateCount = parseFloat(oAggregatedItem.CrateCount || "0");
+
+          // Build payload items with ALL required backend fields
+          aOriginalItemsForMaterial.forEach(function (oItemData, index) {
+            var oOriginalItem = oItemData.item;
+            var oDeliveryNote = oItemData.deliveryNote;
+            var iProportionalReceived = aDistributedAmounts[index];
+
+            // Calculate proportional pallet/crate counts
+            var fProportionalPallet = 0;
+            var fProportionalCrate = 0;
+            if (fTotalOriginalExpected > 0) {
+              var fOriginalExpected = parseFloat(oOriginalItem.ExpectedQuantity || "0");
+              var fRatio = fOriginalExpected / fTotalOriginalExpected;
+              fProportionalPallet = fTotalPalletCount * fRatio;
+              fProportionalCrate = fTotalCrateCount * fRatio;
+            } else {
+              fProportionalPallet = fTotalPalletCount / aOriginalItemsForMaterial.length;
+              fProportionalCrate = fTotalCrateCount / aOriginalItemsForMaterial.length;
+            }
+
             aPendingItems.push({
-              lpid: oAggregatedItem.LpId,
-              deliveryitemid: oOriginalItem.DeliveryItemId,
-              receivedquantity: String(aDistributedAmounts[index]),
+              // License Plate fields
+              lpid: oLicensePlate.LpId || "",
+              warehousenum: oLicensePlate.WarehouseNum || "",
+              platenumber: oLicensePlate.PlateNumber || "",
+              arrivaldate: oLicensePlate.ArrivalDate || "",
+              werks: oLicensePlate.Werks || "",
+              
+              // Delivery Note fields
+              deliverynumber: oDeliveryNote.DeliveryNumber || "",
+              
+              // Item fields
+              deliveryitemid: oOriginalItem.DeliveryItemId || "",
+              itemnumber: oOriginalItem.ItemNumber || "",
+              material: oOriginalItem.Material || "",
+              expectedquantity: oOriginalItem.ExpectedQuantity || "",
+              receivedquantity: String(iProportionalReceived),
+              
+              // Extended quantity fields
+              baseQuantity: iProportionalReceived, // Base quantity same as received
+              palletCount: fProportionalPallet,
+              crateCount: fProportionalCrate,
+              
+              // Unit fields
+              uom: oOriginalItem.UoM || "",
+              sm: oOriginalItem.SM || "",
+              
+              // Purchase order fields
+              ebeln: oOriginalItem.Ebeln || "",
+              ebelp: oOriginalItem.Ebelp || "",
+              
+              // Status fields
               approved: sApproved,
               editreason: sEditReason,
             });
@@ -903,295 +843,10 @@ sap.ui.define(
           return aPendingItems;
         },
 
-        /**
-         * Backup item to localStorage (Safety Buffer)
-         * Simplified backup - stores minimal data for crash recovery
-         */
-        _backupItemToStorage: function (
-          oItem,
-          sTotalQty,
-          sEditReason,
-          sLocalStatus,
-          sApproved,
-          iPalletCount,
-          iCrateCount
-        ) {
-          var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
-          var sSicilNo = oSessionModel
-            ? oSessionModel.getProperty("/Login/Username")
-            : null;
-
-          if (!sSicilNo) return;
-
-          var sKey = sSicilNo + "_" + oItem.DeliveryItemId;
-          var oBackup = {
-            timestamp: new Date().toISOString(),
-            lpid: oItem.LpId,
-            deliveryitemid: oItem.DeliveryItemId,
-            material: oItem.Material,
-            receivedquantity: sTotalQty,
-            palletCount: iPalletCount,
-            crateCount: iCrateCount,
-            editreason: sEditReason,
-            localStatus: sLocalStatus,
-            approved: sApproved,
-          };
-
-          try {
-            localStorage.setItem(sKey, JSON.stringify(oBackup));
-          } catch (e) {
-            console.error("Backup failed:", e);
-            if (e.name === "QuotaExceededError") {
-              this.getOwnerComponent().cleanOldLocalStorageData();
-            }
-          }
-        },
-
-        /**
-         * Clear backup from localStorage after successful backend save
-         */
-        _clearBackupForItem: function (oItem, aSelectedDeliveryNotes) {
-          var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
-          var sSicilNo = oSessionModel
-            ? oSessionModel.getProperty("/Login/Username")
-            : null;
-
-          if (!sSicilNo) return;
-
-          // Find all delivery item IDs for this material
-          var aKeysToRemove = [];
-          for (var i = 0; i < aSelectedDeliveryNotes.length; i++) {
-            var oDeliveryNote = aSelectedDeliveryNotes[i];
-            if (oDeliveryNote.ToItems && oDeliveryNote.ToItems.results) {
-              oDeliveryNote.ToItems.results.forEach(function (oOriginalItem) {
-                if (oOriginalItem.Material === oItem.Material) {
-                  aKeysToRemove.push(
-                    sSicilNo + "_" + oOriginalItem.DeliveryItemId
-                  );
-                }
-              });
-            }
-          }
-
-          // Remove backups
-          aKeysToRemove.forEach(function (sKey) {
-            localStorage.removeItem(sKey);
-            console.log("Backup cleared:", sKey);
-          });
-        },
-
-        // --- LEGACY STORAGE METHOD (KEPT FOR COMPATIBILITY) ---
-
-        _saveSmartDraftToStorage: function (
-          sLpId,
-          oDraftData,
-          aSelectedDeliveryNotes
-        ) {
-          var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
-          var sSicilNo = oSessionModel
-            ? oSessionModel.getProperty("/Login/Username")
-            : null;
-
-          // Eğer seçili teslimat notu yoksa (Fallback), ana listeden bul
-          if (!aSelectedDeliveryNotes || aSelectedDeliveryNotes.length === 0) {
-            // Fallback logic already in _getSelectedDeliveryNotesForLpId but safety check
-            console.warn(
-              "No delivery notes selected for distribution. Check logic."
-            );
-          }
-
-          // *** DAĞITIM MANTIĞI (MEVCUT MANTIĞIN AYNISI, SADECE YENİ ALANLAR EKLENDİ) ***
-          // Burada oDraftData.receivedquantity (Toplam) değeri seçili irsaliyelere dağıtılır.
-
-          // Önce ilgili malzemeye ait orijinal kalemleri bul
-          var aOriginalItemsForMaterial = [];
-          for (var i = 0; i < aSelectedDeliveryNotes.length; i++) {
-            var oDeliveryNote = aSelectedDeliveryNotes[i];
-            if (oDeliveryNote.ToItems && oDeliveryNote.ToItems.results) {
-              var aL3Items = oDeliveryNote.ToItems.results;
-              aL3Items.forEach(function (oOriginalItem) {
-                if (oOriginalItem.Material === oDraftData.Material) {
-                  aOriginalItemsForMaterial.push({
-                    item: oOriginalItem,
-                    deliveryNote: oDeliveryNote,
-                  });
-                }
-              });
-            }
-          }
-
-          if (aOriginalItemsForMaterial.length === 0) return;
-
-          // Toplam Beklenen
-          var fTotalOriginalExpected = 0;
-          aOriginalItemsForMaterial.forEach(function (oItemData) {
-            fTotalOriginalExpected += parseFloat(
-              oItemData.item.ExpectedQuantity || "0"
-            );
-          });
-
-          var fAggregatedReceivedQty = parseFloat(
-            oDraftData.receivedquantity || "0"
-          );
-
-          // Dağıtım Hesapla
-          var aDistributedAmounts = [];
-          var iTotalDistributed = 0;
-
-          // BUG FIX: Use Math.round instead of Math.floor for better distribution accuracy
-          var iLargestIndex = 0;
-          var fLargestExpected = 0;
-
-          aOriginalItemsForMaterial.forEach(function (oItemData, index) {
-            var fOriginalExpected = parseFloat(
-              oItemData.item.ExpectedQuantity || "0"
-            );
-            var fProportionalReceived;
-
-            if (fTotalOriginalExpected > 0) {
-              fProportionalReceived =
-                (fOriginalExpected / fTotalOriginalExpected) *
-                fAggregatedReceivedQty;
-            } else {
-              fProportionalReceived =
-                fAggregatedReceivedQty / aOriginalItemsForMaterial.length;
-            }
-
-            // Rounded amount for better accuracy
-            var iRoundedAmount = Math.round(fProportionalReceived);
-            aDistributedAmounts.push(iRoundedAmount);
-            iTotalDistributed += iRoundedAmount;
-
-            // Track item with largest expected quantity
-            if (fOriginalExpected > fLargestExpected) {
-              fLargestExpected = fOriginalExpected;
-              iLargestIndex = index;
-            }
-          });
-
-          // Add remainder to item with largest expected quantity to ensure exact match
-          var iRemainder =
-            Math.round(fAggregatedReceivedQty) - iTotalDistributed;
-          if (aDistributedAmounts.length > 0) {
-            aDistributedAmounts[iLargestIndex] += iRemainder;
-          }
-
-          // Draftları Kaydet (YENİ ALANLARLA)
-          aOriginalItemsForMaterial.forEach(function (oItemData, index) {
-            var oOriginalItem = oItemData.item;
-            var iProportionalReceived = aDistributedAmounts[index];
-
-            var oDraft = {
-              // Temel Alanlar
-              lpid: sLpId,
-              deliveryitemid: oOriginalItem.DeliveryItemId,
-              receivedquantity: String(iProportionalReceived),
-
-              // YENİ DETAY ALANLARI (Her parçaya aynısını yazıyoruz ki geri yüklerken biri okunsun)
-              palletCount: oDraftData.palletCount,
-              crateCount: oDraftData.crateCount,
-              unitCount: oDraftData.unitCount,
-              localStatus: oDraftData.localStatus,
-              approved: oDraftData.approved,
-              editreason: oDraftData.editreason,
-
-              timestamp: new Date().toISOString(),
-            };
-
-            var sKey = sSicilNo + "_" + oDraft.deliveryitemid;
-            try {
-              localStorage.setItem(sKey, JSON.stringify(oDraft));
-            } catch (e) {
-              console.error(e);
-            }
-          });
-        },
-
-        _restoreBackupsIfNeeded: function () {
-          var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
-          var sSicilNo = oSessionModel
-            ? oSessionModel.getProperty("/Login/Username")
-            : null;
-          if (!sSicilNo) return;
-
-          var sPrefix = sSicilNo + "_";
-          var oGoodsReceiptModel = this.getView().getModel("goodsReceiptModel");
-          var aLicensePlates = oGoodsReceiptModel.getData();
-
-          // BUG FIX: Iterate backwards to avoid index shift during removeItem
-          for (var i = localStorage.length - 1; i >= 0; i--) {
-            var sKey = localStorage.key(i);
-            if (!sKey || sKey.indexOf(sPrefix) !== 0) continue;
-
-            try {
-              var oDraft = JSON.parse(localStorage.getItem(sKey));
-              if (!oDraft || !oDraft.deliveryitemid) {
-                localStorage.removeItem(sKey);
-                console.log("Invalid backup deleted:", sKey);
-                continue;
-              }
-
-              // Modeli gez ve eşleşeni bul
-              var bFound = false;
-              for (var j = 0; j < aLicensePlates.length && !bFound; j++) {
-                var oLP = aLicensePlates[j];
-                if (oLP.ToDeliveryNotes && oLP.ToDeliveryNotes.results) {
-                  for (
-                    var k = 0;
-                    k < oLP.ToDeliveryNotes.results.length && !bFound;
-                    k++
-                  ) {
-                    var oDN = oLP.ToDeliveryNotes.results[k];
-                    if (oDN.ToItems && oDN.ToItems.results) {
-                      for (var l = 0; l < oDN.ToItems.results.length; l++) {
-                        var oItem = oDN.ToItems.results[l];
-                        if (oItem.DeliveryItemId === oDraft.deliveryitemid) {
-                          // ONLINE-FIRST LOGIC: Backend wins if has data
-                          var fBackendQty = parseFloat(
-                            oItem.ReceivedQuantity || "0"
-                          );
-
-                          if (fBackendQty > 0) {
-                            // Backend has data - Backend WINS, delete backup
-                            localStorage.removeItem(sKey);
-                            console.log("Backend wins, backup deleted:", sKey);
-                          } else {
-                            // Backend has no data - Restore from BACKUP
-                            oItem.ReceivedQuantity = oDraft.receivedquantity;
-                            oItem.PalletCount = parseFloat(
-                              oDraft.palletCount || "0"
-                            );
-                            oItem.CrateCount = parseFloat(
-                              oDraft.crateCount || "0"
-                            );
-                            oItem.EditReason = oDraft.editreason;
-                            oItem.LocalStatus = oDraft.localStatus || "";
-                            oItem.Approved = oDraft.approved || "";
-                            console.log("Backup restored:", sKey);
-                          }
-
-                          bFound = true;
-                          break;
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-
-              // If not found in model, item may have been removed - delete backup
-              if (!bFound) {
-                localStorage.removeItem(sKey);
-                console.log("Orphaned backup deleted:", sKey);
-              }
-            } catch (e) {
-              console.error("Failed to parse backup:", sKey, e);
-              // Invalid backup - delete it
-              localStorage.removeItem(sKey);
-            }
-          }
-          oGoodsReceiptModel.refresh(true);
-        },
+        // --- LOCALSTORAGE FUNCTIONS REMOVED (Real-Time Backend Mode) ---
+        // All localStorage backup/restore logic removed.
+        // Data now saved directly to backend with Status parameter:
+        // Status="0" for intermediate saves, Status="1" for final goods receipt posting
 
         _loadEditReasons: function () {
           var oModel = this.getOwnerComponent().getModel();
@@ -1281,7 +936,6 @@ sap.ui.define(
 
               var oGoodsReceiptModel = new JSONModel(aResults);
               this.getView().setModel(oGoodsReceiptModel, "goodsReceiptModel");
-              this._loadDraftsFromLocalStorage(); // Load drafts
               this._updateStatusFilterCounts();
               var oStatusFilterBar = this.byId("idStatusFilterBar");
               if (oStatusFilterBar) {
@@ -1423,37 +1077,20 @@ sap.ui.define(
                         aL3Items.forEach(
                           function (oItem) {
                             var sMaterial = oItem.Material;
-                            var sKey = sSicilNo + "_" + oItem.DeliveryItemId;
-                            var oDraft = null;
+                            // Real-Time Backend Mode: Use backend data directly
                             var sReceivedQtyToUse = oItem.ReceivedQuantity;
                             var sApprovedToUse = oItem.Approved || "";
                             var sEditReasonToUse = oItem.EditReason || "";
                             var sLocalStatus = oItem.LocalStatus || "";
 
-                            if (sSicilNo) {
-                              try {
-                                var sDraftStr = localStorage.getItem(sKey);
-                                if (sDraftStr) {
-                                  oDraft = JSON.parse(sDraftStr);
-                                  sReceivedQtyToUse =
-                                    oDraft.receivedquantity || "0";
-                                  sApprovedToUse = oDraft.approved || "";
-                                  sEditReasonToUse = oDraft.editreason || "";
-
-                                  if (oDraft.localStatus) {
-                                    sLocalStatus = oDraft.localStatus;
-                                  } else {
-                                    sLocalStatus =
-                                      sApprovedToUse === "X"
-                                        ? "COMPLETED"
-                                        : parseFloat(sReceivedQtyToUse) > 0
-                                        ? "IP"
-                                        : "";
-                                  }
-                                }
-                              } catch (e) {
-                                console.error(e);
-                              }
+                            // Set LocalStatus based on backend data
+                            if (!sLocalStatus) {
+                              sLocalStatus =
+                                sApprovedToUse === "X"
+                                  ? "COMPLETED"
+                                  : parseFloat(sReceivedQtyToUse) > 0
+                                  ? "IP"
+                                  : "";
                             }
 
                             if (oMaterialMap[sMaterial]) {
@@ -1841,7 +1478,10 @@ sap.ui.define(
           }
           var oLicensePlate = oL1Context.getObject();
           var sLpId = oLicensePlate.LpId;
-          this._syncDraftsToBackend(sLpId);
+          
+          // Call backend with Status="1" to finalize/post goods receipt
+          // Pass empty array - backend uses Status flag to finalize previously saved items
+          this._saveToBackend(sLpId, [], "1");
         },
 
         onPanelExpand: function (oEvent) {
@@ -2350,276 +1990,96 @@ sap.ui.define(
           }
         },
 
-        // --- REMOVED Deprecated onSavePress ---
+        /**
+         * Refresh single License Plate data from backend without full screen refresh
+         * Used after Status="0" saves to update ReceivedQuantity on screen
+         */
+        _refreshSingleLicensePlate: function (sLpId) {
+          var oModel = this.getOwnerComponent().getModel();
+          var oGoodsReceiptModel = this.getView().getModel("goodsReceiptModel");
+          
+          if (!oGoodsReceiptModel || !sLpId) return;
 
-        _backupItemToStorage: function (
+          // Find the License Plate in current model to get ArrivalDate and WarehouseNum
+          var aLicensePlates = oGoodsReceiptModel.getData();
+          var oCurrentLP = null;
+          var iLpIndex = -1;
+          
+          for (var i = 0; i < aLicensePlates.length; i++) {
+            if (aLicensePlates[i].LpId === sLpId) {
+              oCurrentLP = aLicensePlates[i];
+              iLpIndex = i;
+              break;
+            }
+          }
+
+          if (!oCurrentLP) return;
+
+          // Read updated data for this specific LpId
+          var aFilters = [
+            new Filter("LpId", FilterOperator.EQ, sLpId),
+            new Filter("WarehouseNum", FilterOperator.EQ, oCurrentLP.WarehouseNum),
+            new Filter("ArrivalDate", FilterOperator.EQ, oCurrentLP.ArrivalDate)
+          ];
+
+          oModel.read("/LicensePlateSet", {
+            filters: aFilters,
+            urlParameters: { $expand: "ToDeliveryNotes/ToItems" },
+            success: function (oData) {
+              if (oData.results && oData.results.length > 0) {
+                var oUpdatedLP = oData.results[0];
+                
+                // Preserve UI state (expanded, selected)
+                oUpdatedLP.expanded = oCurrentLP.expanded;
+                // Increment refresh trigger to force Mal Kabul button re-evaluation
+                oUpdatedLP._refreshTrigger = (oCurrentLP._refreshTrigger || 0) + 1;
+                
+                if (oUpdatedLP.ToDeliveryNotes && oUpdatedLP.ToDeliveryNotes.results) {
+                  oUpdatedLP.ToDeliveryNotes.results.forEach(function (oNewDN) {
+                    // Find matching delivery note in old data to preserve selection state
+                    if (oCurrentLP.ToDeliveryNotes && oCurrentLP.ToDeliveryNotes.results) {
+                      var oOldDN = oCurrentLP.ToDeliveryNotes.results.find(function (oDN) {
+                        return oDN.DeliveryNumber === oNewDN.DeliveryNumber;
+                      });
+                      if (oOldDN) {
+                        oNewDN.selected = oOldDN.selected;
+                      }
+                    }
+                  });
+                }
+
+                // Replace the License Plate in model
+                aLicensePlates[iLpIndex] = oUpdatedLP;
+                oGoodsReceiptModel.refresh();
+
+                // Recalculate and re-render items for this panel to update table
+                this._calculateAndRenderItems();
+              }
+            }.bind(this),
+            error: function (oError) {
+              console.error("Failed to refresh License Plate:", oError);
+            }
+          });
+        },
+
+        // --- REMOVED Deprecated onSavePress and All LocalStorage Functions ---
+
+        _backupItemToStorage_REMOVED: function (
           sLpId,
           oItem,
           sExpectedQuantity,
           sEditReason,
           aSelectedDeliveryNotes
         ) {
-          var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
-          var sSicilNo = oSessionModel
-            ? oSessionModel.getProperty("/Login/Username")
-            : null;
-          if (!sSicilNo) {
-            console.error("Username not found");
-            return;
-          }
-          if (!sLpId) {
-            console.error("LpId not provided");
-            return;
-          }
-
-          var oGoodsReceiptModel = this.getView().getModel("goodsReceiptModel");
-          var aLicensePlates = oGoodsReceiptModel.getData();
-          var oLicensePlate = null;
-          for (var i = 0; i < aLicensePlates.length; i++) {
-            if (aLicensePlates[i].LpId === sLpId) {
-              oLicensePlate = aLicensePlates[i];
-              break;
-            }
-          }
-          if (!oLicensePlate) {
-            console.error("LicensePlate not found");
-            return;
-          }
-
-          var aDeliveryNotesToUse = aSelectedDeliveryNotes;
-          if (!aDeliveryNotesToUse || aDeliveryNotesToUse.length === 0) {
-            if (
-              oLicensePlate.ToDeliveryNotes &&
-              oLicensePlate.ToDeliveryNotes.results
-            ) {
-              aDeliveryNotesToUse = oLicensePlate.ToDeliveryNotes.results;
-            } else {
-              aDeliveryNotesToUse = [];
-            }
-          }
-
-          var aOriginalItemsForMaterial = [];
-          for (var i = 0; i < aDeliveryNotesToUse.length; i++) {
-            var oDeliveryNote = aDeliveryNotesToUse[i];
-            if (oDeliveryNote.ToItems && oDeliveryNote.ToItems.results) {
-              var aL3Items = oDeliveryNote.ToItems.results;
-              aL3Items.forEach(function (oOriginalItem) {
-                if (oOriginalItem.Material === oItem.Material) {
-                  aOriginalItemsForMaterial.push({
-                    item: oOriginalItem,
-                    deliveryNote: oDeliveryNote,
-                  });
-                }
-              });
-            }
-          }
-
-          if (aOriginalItemsForMaterial.length === 0) {
-            console.error("No original items found");
-            return;
-          }
-
-          var fTotalOriginalExpected = 0;
-          aOriginalItemsForMaterial.forEach(function (oItemData) {
-            fTotalOriginalExpected += parseFloat(
-              oItemData.item.ExpectedQuantity || "0"
-            );
-          });
-
-          var fAggregatedReceivedQty = parseFloat(
-            oItem.ReceivedQuantity || "0"
-          ); // Use the aggregated value passed in oItem
-
-          var aDistributedAmounts = [];
-          var iTotalDistributed = 0;
-          var iLargestIndex = 0;
-          var fLargestExpected = 0;
-
-          // BUG FIX: Use Math.round instead of Math.floor for better accuracy
-          aOriginalItemsForMaterial.forEach(function (oItemData, index) {
-            var fOriginalExpected = parseFloat(
-              oItemData.item.ExpectedQuantity || "0"
-            );
-            var fProportionalReceived;
-            if (fTotalOriginalExpected > 0) {
-              fProportionalReceived =
-                (fOriginalExpected / fTotalOriginalExpected) *
-                fAggregatedReceivedQty;
-            } else {
-              fProportionalReceived =
-                fAggregatedReceivedQty / aOriginalItemsForMaterial.length;
-            }
-            var iRoundedAmount = Math.round(fProportionalReceived);
-            aDistributedAmounts.push(iRoundedAmount);
-            iTotalDistributed += iRoundedAmount;
-
-            // Track item with largest expected quantity
-            if (fOriginalExpected > fLargestExpected) {
-              fLargestExpected = fOriginalExpected;
-              iLargestIndex = index;
-            }
-          });
-
-          // BUG FIX: Add remainder to item with largest ExpectedQuantity to hide rounding noise
-          var iRemainder =
-            Math.round(fAggregatedReceivedQty) - iTotalDistributed;
-          if (aDistributedAmounts.length > 0) {
-            aDistributedAmounts[iLargestIndex] += iRemainder;
-          }
-
-          // BUG FIX: Distribute baseQuantity proportionally to avoid multiplication
-          // Each item gets its proportional share of baseQuantity based on ExpectedQuantity
-          var fTotalBaseQuantity = parseFloat(oItem.baseQuantity || "0");
-          var fTotalPalletCount = parseFloat(oItem.palletCount || "0");
-          var fTotalCrateCount = parseFloat(oItem.crateCount || "0");
-
-          aOriginalItemsForMaterial.forEach(
-            function (oItemData, index) {
-              var oOriginalItem = oItemData.item;
-              var oDeliveryNote = oItemData.deliveryNote;
-              var iProportionalReceived = aDistributedAmounts[index];
-
-              // Distribute baseQuantity proportionally
-              var fProportionalBase = 0;
-              var fProportionalPallet = 0;
-              var fProportionalCrate = 0;
-
-              if (fTotalOriginalExpected > 0) {
-                var fOriginalExpected = parseFloat(
-                  oOriginalItem.ExpectedQuantity || "0"
-                );
-                var fRatio = fOriginalExpected / fTotalOriginalExpected;
-                fProportionalBase = fTotalBaseQuantity * fRatio;
-                fProportionalPallet = fTotalPalletCount * fRatio;
-                fProportionalCrate = fTotalCrateCount * fRatio;
-              } else {
-                // Equal distribution if no expected quantity
-                fProportionalBase =
-                  fTotalBaseQuantity / aOriginalItemsForMaterial.length;
-                fProportionalPallet =
-                  fTotalPalletCount / aOriginalItemsForMaterial.length;
-                fProportionalCrate =
-                  fTotalCrateCount / aOriginalItemsForMaterial.length;
-              }
-
-              var oDraft = {
-                timestamp: new Date().toISOString(),
-                lpid: oLicensePlate.LpId || "",
-                warehousenum: oLicensePlate.WarehouseNum || "",
-                platenumber: oLicensePlate.PlateNumber || "",
-                arrivaldate: oLicensePlate.ArrivalDate || "",
-                werks: oLicensePlate.Werks || "",
-                deliveryitemid: oOriginalItem.DeliveryItemId || "",
-                deliverynumber: oDeliveryNote.DeliveryNumber || "",
-                itemnumber: oOriginalItem.ItemNumber || "",
-                material: oOriginalItem.Material || "",
-                expectedquantity: oOriginalItem.ExpectedQuantity || "",
-                receivedquantity: String(iProportionalReceived),
-                baseQuantity: fProportionalBase,
-                palletCount: fProportionalPallet,
-                crateCount: fProportionalCrate,
-                uom: oOriginalItem.UoM || "",
-                sm: oOriginalItem.SM || "",
-                ebeln: oOriginalItem.Ebeln || "",
-                ebelp: oOriginalItem.Ebelp || "",
-                approved: oItem.Approved || "",
-                editreason: sEditReason || oItem.EditReason || "",
-              };
-
-              var sKey = sSicilNo + "_" + oDraft.deliveryitemid;
-              try {
-                localStorage.setItem(sKey, JSON.stringify(oDraft));
-              } catch (e) {
-                console.error("Failed to save draft:", e);
-                if (e.name === "QuotaExceededError") {
-                  this.getOwnerComponent().cleanOldLocalStorageData();
-                  try {
-                    localStorage.setItem(sKey, JSON.stringify(oDraft));
-                  } catch (e2) {
-                    MessageBox.error("Draft kaydedilemedi.");
-                  }
-                } else {
-                  MessageBox.error("Draft kaydedilemedi.");
-                }
-              }
-            }.bind(this)
-          ); // Bind needed for getOwnerComponent call inside loop if any
+          // REMOVED - Real-Time Backend Mode
+          // All localStorage backup logic removed - now using direct backend saves
+          return;
         },
 
-        _loadDraftsFromLocalStorage: function () {
-          var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
-          var sSicilNo = oSessionModel
-            ? oSessionModel.getProperty("/Login/Username")
-            : null;
-          if (!sSicilNo) {
-            console.error("Username not found");
-            return;
-          }
-
-          var sPrefix = sSicilNo + "_";
-          var oGoodsReceiptModel = this.getView().getModel("goodsReceiptModel");
-          var aLicensePlates = oGoodsReceiptModel.getData();
-
-          for (var i = 0; i < localStorage.length; i++) {
-            var sKey = localStorage.key(i);
-            if (sKey.indexOf(sPrefix) === 0) {
-              try {
-                var oDraft = JSON.parse(localStorage.getItem(sKey));
-                var bFound = false;
-                for (var j = 0; j < aLicensePlates.length && !bFound; j++) {
-                  var oLP = aLicensePlates[j];
-                  if (oLP.ToDeliveryNotes && oLP.ToDeliveryNotes.results) {
-                    for (
-                      var k = 0;
-                      k < oLP.ToDeliveryNotes.results.length && !bFound;
-                      k++
-                    ) {
-                      var oDN = oLP.ToDeliveryNotes.results[k];
-                      if (oDN.ToItems && oDN.ToItems.results) {
-                        for (var l = 0; l < oDN.ToItems.results.length; l++) {
-                          var oItem = oDN.ToItems.results[l];
-                          if (oItem.DeliveryItemId === oDraft.deliveryitemid) {
-                            oItem.ReceivedQuantity = oDraft.receivedquantity;
-                            oItem.Approved = oDraft.approved;
-                            oItem.EditReason = oDraft.editreason;
-
-                            // Retrieve extended fields if available
-                            oItem.PalletCount = parseFloat(
-                              oDraft.palletCount || "0"
-                            );
-                            oItem.CrateCount = parseFloat(
-                              oDraft.crateCount || "0"
-                            );
-                            oItem.UnitCount = parseFloat(
-                              oDraft.unitCount || "0"
-                            );
-
-                            if (oDraft.localStatus) {
-                              oItem.LocalStatus = oDraft.localStatus;
-                            } else {
-                              oItem.LocalStatus =
-                                oDraft.approved === "X"
-                                  ? "COMPLETED"
-                                  : parseFloat(oDraft.receivedquantity) > 0
-                                  ? "IP"
-                                  : "";
-                            }
-
-                            bFound = true;
-                            console.log("Draft loaded:", oDraft.deliveryitemid);
-                            break;
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              } catch (e) {
-                console.error("Failed to parse draft:", sKey, e);
-              }
-            }
-          }
-          oGoodsReceiptModel.refresh(true);
+        _loadDraftsFromLocalStorage_REMOVED: function () {
+          // REMOVED - Real-Time Backend Mode
+          // Data is now loaded directly from backend
+          return;
         },
 
         _refreshHomeDashboard: function () {
@@ -2699,113 +2159,100 @@ sap.ui.define(
             });
         },
 
-        _syncDraftsToBackend: function (sLpId) {
+        /**
+         * Real-Time Backend Save Helper
+         * @param {string} sLpId - License Plate ID
+         * @param {array} aItems - Array of items to save
+         * @param {string} sStatus - "0" for intermediate save, "1" for final post
+         */
+        _saveToBackend: function (sLpId, aItems, sStatus) {
           var oModel = this.getOwnerComponent().getModel();
           var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
-          var sSicilNo = oSessionModel
+          var sUserId = oSessionModel
             ? oSessionModel.getProperty("/Login/Username")
             : null;
-          if (!sSicilNo) {
+
+          if (!sUserId) {
             MessageBox.error("Kullanıcı bilgisi bulunamadı.");
-            return;
+            return Promise.reject("No user ID");
           }
+
           if (!sLpId) {
             MessageBox.error("License Plate ID bulunamadı.");
-            return;
+            return Promise.reject("No LP ID");
           }
 
-          console.log("=== _syncDraftsToBackend Debug ===");
-          var sPrefix = sSicilNo + "_";
-          var aPendingDrafts = [];
-          var aKeysToRemove = [];
-
-          for (var i = 0; i < localStorage.length; i++) {
-            var sKey = localStorage.key(i);
-            if (sKey.indexOf(sPrefix) === 0) {
-              try {
-                var oDraft = JSON.parse(localStorage.getItem(sKey));
-                if (oDraft.lpid === sLpId) {
-                  aPendingDrafts.push(oDraft);
-                  aKeysToRemove.push(sKey);
-                }
-              } catch (e) {
-                console.error("Failed to parse draft:", sKey, e);
-              }
-            }
-          }
-
-          console.log("Total pending drafts found:", aPendingDrafts.length);
-          if (aPendingDrafts.length === 0) {
-            MessageBox.information("Kaydedilecek değişiklik bulunmamaktadır.");
-            return;
-          }
-
-          var sJsonPayload = JSON.stringify(aPendingDrafts);
+          var sJsonPayload = JSON.stringify(aItems);
+          var sMessage = sStatus === "1" ? "Mal kabul işlemi tamamlanıyor..." : "Veriler kaydediliyor...";
+          
           sap.ui.core.BusyIndicator.show(0);
 
-          oModel.callFunction("/PostGoodsReceipt", {
-            method: "POST",
-            urlParameters: {
-              LpId: sLpId,
-              PendingItemsJson: sJsonPayload,
-              UserID: sSicilNo,
-            },
-            success: function (oData, oResponse) {
-              sap.ui.core.BusyIndicator.hide();
-              aKeysToRemove.forEach(function (sKey) {
-                localStorage.removeItem(sKey);
-                console.log("Draft removed from localStorage:", sKey);
-              });
+          return new Promise(function(resolve, reject) {
+            oModel.callFunction("/PostGoodsReceipt", {
+              method: "POST",
+              urlParameters: {
+                LpId: sLpId,
+                PendingItemsJson: sJsonPayload,
+                UserID: sUserId,
+                Status: sStatus
+              },
+              success: function (oData, oResponse) {
+                sap.ui.core.BusyIndicator.hide();
 
-              // Refresh the goods receipt data to get updated status
-              this._loadGoodsReceiptData();
+                // ONLY refresh screen on Status="1" (final goods receipt)
+                // Status="0" (intermediate save) should NOT refresh to preserve user input
+                if (sStatus === "1") {
+                  // Refresh the goods receipt data
+                  this._loadGoodsReceiptData();
 
-              // CRITICAL FIX: Update status filter counts after reload
-              // Wait for data to be loaded, then update counts
-              setTimeout(
-                function () {
-                  this._updateStatusFilterCounts();
+                  // Update status filter counts after reload
+                  setTimeout(
+                    function () {
+                      this._updateStatusFilterCounts();
+                      var oStatusFilterBar = this.byId("idStatusFilterBar");
+                      if (oStatusFilterBar) {
+                        var sSelectedKey = oStatusFilterBar.getSelectedKey();
+                        this._applyStatusFilter(sSelectedKey || "pending");
+                      }
+                    }.bind(this),
+                    100
+                  );
 
-                  // Re-apply current filter to show/hide license plates correctly
-                  var oStatusFilterBar = this.byId("idStatusFilterBar");
-                  if (oStatusFilterBar) {
-                    var sSelectedKey = oStatusFilterBar.getSelectedKey();
-                    this._applyStatusFilter(sSelectedKey || "pending");
-                  }
-                }.bind(this),
-                100
-              );
-
-              // Refresh Home dashboard counts
-              this._refreshHomeDashboard();
-
-              MessageBox.success("Mal kabul işlemi başarıyla tamamlandı!");
-            }.bind(this),
-            error: function (oError) {
-              sap.ui.core.BusyIndicator.hide();
-
-              // Do NOT remove drafts on error
-              var sErrorMsg =
-                "Senkronizasyon başarısız. Verileriniz cihazınızda güvende. İnternet bağlantınızı kontrol edip tekrar deneyin.";
-
-              if (oError && oError.responseText) {
-                try {
-                  var oErrorResponse = JSON.parse(oError.responseText);
-                  if (
-                    oErrorResponse.error &&
-                    oErrorResponse.error.message &&
-                    oErrorResponse.error.message.value
-                  ) {
-                    sErrorMsg = oErrorResponse.error.message.value;
-                  }
-                } catch (e) {
-                  // ignore parse error
+                  // Refresh Home dashboard
+                  this._refreshHomeDashboard();
+                  MessageBox.success("Mal kabul işlemi başarıyla tamamlandı!");
+                } else {
+                  // Status="0": Intermediate save - refresh ONLY this LpId's data to update ReceivedQuantity
+                  this._refreshSingleLicensePlate(sLpId);
+                  MessageToast.show("Veriler başarıyla kaydedildi.");
                 }
-              }
 
-              MessageBox.error(sErrorMsg);
-            }.bind(this),
-          });
+                resolve(oData);
+              }.bind(this),
+              error: function (oError) {
+                sap.ui.core.BusyIndicator.hide();
+
+                var sErrorMsg = "İşlem başarısız. Lütfen tekrar deneyin.";
+                if (oError && oError.responseText) {
+                  try {
+                    var oErrorResponse = JSON.parse(oError.responseText);
+                    if (
+                      oErrorResponse.error &&
+                      oErrorResponse.error.message &&
+                      oErrorResponse.error.message.value
+                    ) {
+                      sErrorMsg = oErrorResponse.error.message.value;
+                    }
+                  } catch (e) {
+                    // ignore parse error
+                  }
+                }
+
+                MessageBox.error(sErrorMsg);
+                reject(oError);
+              }.bind(this),
+            });
+          }.bind(this));
         },
       }
     );
