@@ -743,29 +743,59 @@ sap.ui.define(
 
           if (aOriginalItemsForMaterial.length === 0) return [];
 
-          // Calculate total expected
-          var fTotalOriginalExpected = 0;
+          // GROUP by LpId + DeliveryNumber + Material + Ebeln + Ebelp
+          // This prevents duplicate records in backend
+          var oGroupedItems = {};
           aOriginalItemsForMaterial.forEach(function (oItemData) {
-            fTotalOriginalExpected += parseFloat(oItemData.item.ExpectedQuantity || "0");
+            var oOriginalItem = oItemData.item;
+            var oDeliveryNote = oItemData.deliveryNote;
+            
+            // Create unique key for grouping
+            var sGroupKey = [
+              oLicensePlate.LpId || "",
+              oDeliveryNote.DeliveryNumber || "",
+              oOriginalItem.Material || "",
+              oOriginalItem.Ebeln || "",
+              oOriginalItem.Ebelp || ""
+            ].join("|");
+            
+            if (!oGroupedItems[sGroupKey]) {
+              oGroupedItems[sGroupKey] = {
+                licensePlate: oLicensePlate,
+                deliveryNote: oDeliveryNote,
+                material: oOriginalItem.Material,
+                ebeln: oOriginalItem.Ebeln || "",
+                ebelp: oOriginalItem.Ebelp || "",
+                uom: oOriginalItem.UoM || "",
+                sm: oOriginalItem.SM || "",
+                totalExpectedQuantity: 0,
+                items: []
+              };
+            }
+            
+            oGroupedItems[sGroupKey].totalExpectedQuantity += parseFloat(oOriginalItem.ExpectedQuantity || "0");
+            oGroupedItems[sGroupKey].items.push(oItemData);
           });
 
-          // Distribute proportionally
+          // Calculate total expected across all groups
+          var fTotalOriginalExpected = 0;
+          for (var sKey in oGroupedItems) {
+            fTotalOriginalExpected += oGroupedItems[sKey].totalExpectedQuantity;
+          }
+
+          // Distribute received quantity proportionally to each GROUP (not each item)
+          var aGroupKeys = Object.keys(oGroupedItems);
           var aDistributedAmounts = [];
           var iTotalDistributed = 0;
 
-          aOriginalItemsForMaterial.forEach(function (oItemData) {
-            var fOriginalExpected = parseFloat(
-              oItemData.item.ExpectedQuantity || "0"
-            );
+          aGroupKeys.forEach(function (sKey) {
+            var oGroup = oGroupedItems[sKey];
             var fProportionalReceived;
 
             if (fTotalOriginalExpected > 0) {
-              fProportionalReceived =
-                (fOriginalExpected / fTotalOriginalExpected) *
-                fAggregatedReceivedQty;
+              fProportionalReceived = (oGroup.totalExpectedQuantity / fTotalOriginalExpected) * fAggregatedReceivedQty;
             } else {
-              fProportionalReceived =
-                fAggregatedReceivedQty / aOriginalItemsForMaterial.length;
+              fProportionalReceived = fAggregatedReceivedQty / aGroupKeys.length;
             }
 
             var iFlooredAmount = Math.floor(fProportionalReceived);
@@ -773,66 +803,66 @@ sap.ui.define(
             iTotalDistributed += iFlooredAmount;
           });
 
-          // Add remainder to last item
-          var iRemainder =
-            Math.floor(fAggregatedReceivedQty) - iTotalDistributed;
+          // Add remainder to last group
+          var iRemainder = Math.floor(fAggregatedReceivedQty) - iTotalDistributed;
           if (aDistributedAmounts.length > 0) {
             aDistributedAmounts[aDistributedAmounts.length - 1] += iRemainder;
           }
 
-          // Distribute PalletCount and CrateCount proportionally
+          // Distribute PalletCount and CrateCount proportionally per group
           var fTotalPalletCount = parseFloat(oAggregatedItem.PalletCount || "0");
           var fTotalCrateCount = parseFloat(oAggregatedItem.CrateCount || "0");
 
-          // Build payload items with ALL required backend fields
-          aOriginalItemsForMaterial.forEach(function (oItemData, index) {
-            var oOriginalItem = oItemData.item;
-            var oDeliveryNote = oItemData.deliveryNote;
+          // Build ONE payload item per GROUP
+          aGroupKeys.forEach(function (sKey, index) {
+            var oGroup = oGroupedItems[sKey];
             var iProportionalReceived = aDistributedAmounts[index];
 
-            // Calculate proportional pallet/crate counts
+            // Calculate proportional pallet/crate counts for this group
             var fProportionalPallet = 0;
             var fProportionalCrate = 0;
             if (fTotalOriginalExpected > 0) {
-              var fOriginalExpected = parseFloat(oOriginalItem.ExpectedQuantity || "0");
-              var fRatio = fOriginalExpected / fTotalOriginalExpected;
+              var fRatio = oGroup.totalExpectedQuantity / fTotalOriginalExpected;
               fProportionalPallet = fTotalPalletCount * fRatio;
               fProportionalCrate = fTotalCrateCount * fRatio;
             } else {
-              fProportionalPallet = fTotalPalletCount / aOriginalItemsForMaterial.length;
-              fProportionalCrate = fTotalCrateCount / aOriginalItemsForMaterial.length;
+              fProportionalPallet = fTotalPalletCount / aGroupKeys.length;
+              fProportionalCrate = fTotalCrateCount / aGroupKeys.length;
             }
+
+            // Use the first item's DeliveryItemId and ItemNumber (representative)
+            var oFirstItem = oGroup.items[0].item;
 
             aPendingItems.push({
               // License Plate fields
-              lpid: oLicensePlate.LpId || "",
-              warehousenum: oLicensePlate.WarehouseNum || "",
-              platenumber: oLicensePlate.PlateNumber || "",
-              arrivaldate: oLicensePlate.ArrivalDate || "",
-              werks: oLicensePlate.Werks || "",
+              lpid: oGroup.licensePlate.LpId || "",
+              warehousenum: oGroup.licensePlate.WarehouseNum || "",
+              platenumber: oGroup.licensePlate.PlateNumber || "",
+              arrivaldate: oGroup.licensePlate.ArrivalDate || "",
+              werks: oGroup.licensePlate.Werks || "",
               
               // Delivery Note fields
-              deliverynumber: oDeliveryNote.DeliveryNumber || "",
+              deliverynumber: oGroup.deliveryNote.DeliveryNumber || "",
               
-              // Item fields
-              deliveryitemid: oOriginalItem.DeliveryItemId || "",
-              itemnumber: oOriginalItem.ItemNumber || "",
-              material: oOriginalItem.Material || "",
-              expectedquantity: oOriginalItem.ExpectedQuantity || "",
+              // Item fields - use first item as representative
+              deliveryitemid: oFirstItem.DeliveryItemId || "",
+              itemnumber: oFirstItem.ItemNumber || "",
+              material: oGroup.material || "",
+              expectedquantity: String(oGroup.totalExpectedQuantity),
               receivedquantity: String(iProportionalReceived),
               
               // Extended quantity fields
-              baseQuantity: iProportionalReceived, // Base quantity same as received
+              baseQuantity: iProportionalReceived,
               palletCount: fProportionalPallet,
               crateCount: fProportionalCrate,
               
               // Unit fields
-              uom: oOriginalItem.UoM || "",
-              sm: oOriginalItem.SM || "",
+              uom: oGroup.uom || "",
+              sm: oGroup.sm || "",
               
               // Purchase order fields
-              ebeln: oOriginalItem.Ebeln || "",
-              ebelp: oOriginalItem.Ebelp || "",
+              ebeln: oGroup.ebeln || "",
+              ebelp: oGroup.ebelp || "",
               
               // Status fields
               approved: sApproved,

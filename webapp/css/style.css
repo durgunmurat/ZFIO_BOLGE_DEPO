@@ -170,3 +170,49 @@
 .sapMSampleTileContainer {
 	width: 100%;
 }
+
+/* GoodsIssue Product Panel (Green) */
+.giProductPanel > .sapMPanelHdr,
+.giProductPanel > .sapMPanelWrappingDiv > .sapMPanelHdr,
+.giProductPanel .sapMPanelExpandableIcon,
+.giProductPanel > .sapMPanelWrappingDivTb {
+    background-color: #107E3E !important;
+}
+
+.giProductPanel > .sapMPanelWrappingDivTb .sapMIBar {
+    background-color: #107E3E !important;
+}
+
+.giProductPanel > .sapMPanelWrappingDivTb .sapMTitle,
+.giProductPanel > .sapMPanelWrappingDivTb .sapMLabel,
+.giProductPanel > .sapMPanelWrappingDivTb .sapUiIcon {
+    color: #FFFFFF !important;
+}
+
+.giProductPanel > .sapMPanelWrappingDivTb .sapMObjNNumber,
+.giProductPanel > .sapMPanelWrappingDivTb .sapMObjectNumberText {
+    color: #FFFFFF !important;
+}
+
+/* GoodsIssue Deposit Panel (Blue) */
+.giDepositPanel > .sapMPanelHdr,
+.giDepositPanel > .sapMPanelWrappingDiv > .sapMPanelHdr,
+.giDepositPanel .sapMPanelExpandableIcon,
+.giDepositPanel > .sapMPanelWrappingDivTb {
+    background-color: #0854A0 !important;
+}
+
+.giDepositPanel > .sapMPanelWrappingDivTb .sapMIBar {
+    background-color: #0854A0 !important;
+}
+
+.giDepositPanel > .sapMPanelWrappingDivTb .sapMTitle,
+.giDepositPanel > .sapMPanelWrappingDivTb .sapMLabel,
+.giDepositPanel > .sapMPanelWrappingDivTb .sapUiIcon {
+    color: #FFFFFF !important;
+}
+
+.giDepositPanel > .sapMPanelWrappingDivTb .sapMObjNNumber,
+.giDepositPanel > .sapMPanelWrappingDivTb .sapMObjectNumberText {
+    color: #FFFFFF !important;
+}

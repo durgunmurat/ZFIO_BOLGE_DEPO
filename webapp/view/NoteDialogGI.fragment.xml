@@ -1,0 +1,31 @@
+<core:FragmentDefinition
+  xmlns="sap.m"
+  xmlns:core="sap.ui.core">
+  <Dialog
+    title="Not Yönetimi"
+    contentWidth="500px"
+    contentHeight="200px">
+    <content>
+      <VBox class="sapUiSmallMargin">
+        <Label text="Yeni Not Ekle" labelFor="idNoteInputGI" class="sapUiTinyMarginBottom"/> 
+        
+        <TextArea
+          id="idNoteInputGI"
+          value="{noteDialogModelGI>/newNote}"
+          rows="3"
+          maxLength="255"
+          placeholder="Max 255 karakter..."
+          width="100%"/>
+  
+      </VBox>
+    </content>
+    <buttons>
+      <Button
+        text="Kaydet"
+        type="Emphasized"
+        press="onSaveNoteGI"
+        enabled="true"/>
+      <Button text="Çıkış" press="onCloseNoteDialogGI"/>
+    </buttons> 
+  </Dialog>
+</core:FragmentDefinition>

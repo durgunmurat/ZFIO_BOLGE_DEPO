@@ -1,0 +1,79 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+>
+    <Dialog
+        id="idDepositAddDialog"
+        title="Harici Depozito Ekle"
+        contentWidth="600px"
+        contentHeight="400px"
+        stretch="{device>/isPhone}"
+    >
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <MessageStrip
+                    text="Aşağıdaki listeden harici depozito malzemelerinin miktarlarını giriniz."
+                    type="Information"
+                    showIcon="true"
+                    class="sapUiSmallMarginBottom"
+                />
+                <Table
+                    id="idDepositAddTable"
+                    items="{depositAddModel>/items}"
+                    growing="true"
+                    growingThreshold="50"
+                    noDataText="Harici depozito malzemesi bulunamadı"
+                >
+                    <columns>
+                        <Column width="6em">
+                            <Text text="Malzeme No" />
+                        </Column>
+                        <Column>
+                            <Text text="Malzeme Adı" />
+                        </Column>
+                        <Column width="5em" hAlign="Center">
+                            <Text text="Birim" />
+                        </Column>
+                        <Column width="8em" hAlign="Center">
+                            <Text text="Miktar" />
+                        </Column>
+                    </columns>
+                    <items>
+                        <ColumnListItem>
+                            <cells>
+                                <Text text="{= parseInt(${depositAddModel>Matnr}) }" />
+                                <Text text="{depositAddModel>Maktx}" />
+                                <Text text="{depositAddModel>Uom}" />
+                                <StepInput
+                                    value="{depositAddModel>Quantity}"
+                                    min="0"
+                                    step="1"
+                                    displayValuePrecision="0"
+                                    textAlign="Center"
+                                    change="onDepositQuantityChange"
+                                />
+                            </cells>
+                        </ColumnListItem>
+                    </items>
+                </Table>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button
+                text="Kaydet ve Mal Çıkış"
+                type="Emphasized"
+                press="onDepositAddSave"
+            />
+        </beginButton>
+        <endButton>
+            <!-- <Button
+                text="Atla"
+                press="onDepositAddSkip"
+            /> -->
+                <Button
+                text="İptal"
+                type="Transparent"
+                press="onDepositAddCancel"/>
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>
