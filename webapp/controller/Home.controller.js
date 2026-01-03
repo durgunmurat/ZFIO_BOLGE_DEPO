@@ -8,6 +8,10 @@ sap.ui.define([
 
     return BaseController.extend("com.sut.bolgeyonetim.controller.Home", {
         onInit: function() {
+            // Attach route matched event to refresh dashboard when navigating back to Home
+            var oRouter = this.getRouter();
+            oRouter.getRoute("home").attachPatternMatched(this._onRouteMatched, this);
+            
             // Initialize or retrieve filter model
             var oFilterModel = this.getOwnerComponent().getModel("filterModel");
             
@@ -96,58 +100,25 @@ sap.ui.define([
                     this._refreshDashboardData(oArrivalDate);
                 }
             }
-        }
-        ,
+        },
+
+        /**
+         * Called when navigating back to Home page
+         * Refreshes dashboard data to show updated counts
+         */
+        _onRouteMatched: function() {
+            // Refresh dashboard data when returning to Home page
+            this.refreshDashboardData();
+        },
 
         /**
          * Refresh dashboard data by calling Login function import with selected date
          * @param {Date} oArrivalDate Date object (OData DateTime)
          */
         _refreshDashboardData: function(oArrivalDate) {
-            var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
-            if (!oSessionModel) {
-                return;
-            }
-            
-            var oLoginData = oSessionModel.getProperty("/Login");
-            if (!oLoginData || !oLoginData.Username || !oLoginData.AuthToken) {
-                return;
-            }
-            
-            // Show busy indicator
-            sap.ui.core.BusyIndicator.show(0);
-            
-            // Call Login function import with current credentials and new date
-            this.callFunctionImport("Login", {
-                urlParameters: {
-                    Username: oLoginData.Username,
-                    Password: oLoginData.AuthToken,
-                    ArrivalDate: oArrivalDate
-                }
-            }).then(function(oData) {
-                sap.ui.core.BusyIndicator.hide();
-                
-                if (!oData || !oData.Login) {
-                    return;
-                }
-                
-                // Update dashboard counts
-                var oDashboardModel = this.getOwnerComponent().getModel("dashboardData");
-                var oLoginPayload = oData.Login;
-                var oDashboardPayload = {
-                    pendingReceipts: oLoginPayload.PendingGRCount || 0,
-                    pendingShipments: oLoginPayload.PendingShipAssignCount || 0,
-                    pendingDeliveries: oLoginPayload.PendingGICount || 0,
-                    pendingCounts: oLoginPayload.PendingInvCount || 0
-                };
-                
-                if (oDashboardModel) {
-                    oDashboardModel.setData(Object.assign({}, oDashboardModel.getData() || {}, oDashboardPayload));
-                }
-            }.bind(this)).catch(function(sError) {
-                sap.ui.core.BusyIndicator.hide();
-                // Error already shown by callFunctionImport
-            });
+            // Use the base controller's refreshDashboardData method
+            // Note: callFunctionImport already handles busy indicator
+            this.refreshDashboardData();
         },
 
         /**

@@ -12,7 +12,7 @@
         <content>
             <VBox class="sapUiSmallMargin">
                 <MessageStrip
-                    text="Aşağıdaki listeden harici depozito malzemelerinin miktarlarını giriniz."
+                    text="Aşağıdaki listeden harici depozito malzemelerinin miktarlarını giriniz. Teslimatın içinde olan malzemeler pasiftir."
                     type="Information"
                     showIcon="true"
                     class="sapUiSmallMarginBottom"
@@ -50,6 +50,7 @@
                                     step="1"
                                     displayValuePrecision="0"
                                     textAlign="Center"
+                                    enabled="{= !${depositAddModel>IsExisting} }"
                                     change="onDepositQuantityChange"
                                 />
                             </cells>

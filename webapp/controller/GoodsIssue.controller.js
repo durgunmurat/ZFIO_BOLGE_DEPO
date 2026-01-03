@@ -491,7 +491,8 @@ sap.ui.define(
             if (oBackendItem.Material === oItem.Material) {
               oBackendItem.CountedQuantity = String(fTotal);
               oBackendItem.EditReason = oSmartData.editReason || "";
-              oBackendItem.LocalStatus = fTotal > 0 ? "IP" : "";
+              oBackendItem.LocalStatus = "IP";
+              oBackendItem._hasBeenCounted = true;
             }
           });
           oPackage._refreshTrigger = (oPackage._refreshTrigger || 0) + 1;
@@ -510,6 +511,7 @@ sap.ui.define(
             PackingNumber: sPackingNumber,
             Matnr: oItem.Material,
             Quantity: fTotal,
+            OriginalQty: parseFloat(oItem.TargetQuantity) || 0,
             EditReason: oSmartData.editReason || "",
             Harici: false,
             Status: "0",
@@ -589,6 +591,12 @@ sap.ui.define(
 
         var fExpected = parseFloat(oItem.TargetQuantity || "0");
         var fCounted = parseFloat(oItem.CountedQuantity || "0");
+
+        // 0 miktar kontrolü - önce sayım yapılmalı
+        if (fCounted <= 0) {
+          MessageToast.show("Onaylamak için önce miktar girişi yapmalısınız.");
+          return;
+        }
 
         if (fCounted !== fExpected) {
           this._showReasonDialog(oItem.EditReason || "");
@@ -723,10 +731,11 @@ sap.ui.define(
                   var sLocalStatus = oItem.LocalStatus || "";
 
                   if (!sLocalStatus) {
+                    var bHasBeenCounted = oItem._hasBeenCounted === true;
                     sLocalStatus =
                       sApprovedToUse === "X"
                         ? "COMPLETED"
-                        : parseFloat(sCountedQtyToUse) > 0
+                        : (parseFloat(sCountedQtyToUse) > 0 || bHasBeenCounted)
                         ? "IP"
                         : "";
                   }
@@ -757,6 +766,8 @@ sap.ui.define(
                       Sepet: oItem.Sepet,
                       PalletCount: oItem.PalletCount,
                       CrateCount: oItem.CrateCount,
+                      PaletSepet: oItem.PaletSepet || "",
+                      _hasBeenCounted: oItem._hasBeenCounted || false,
                     };
                   }
                 }.bind(this)
@@ -876,7 +887,18 @@ sap.ui.define(
               );
               oDepositPanel.setVisible(aDepositItems.length > 0);
 
-              // Update deposit count
+              // Calculate total Palet and Sepet counts from PaletSepet field
+              var iTotalPalet = 0;
+              var iTotalSepet = 0;
+              aDepositItems.forEach(function (oDepItem) {
+                if (oDepItem.PaletSepet === "P") {
+                  iTotalPalet++;
+                } else if (oDepItem.PaletSepet === "S") {
+                  iTotalSepet++;
+                }
+              });
+
+              // Update deposit count and Palet/Sepet totals
               var oDepositToolbar = oDepositPanel.getHeaderToolbar();
               if (oDepositToolbar) {
                 var aToolbarItems = oDepositToolbar.getContent();
@@ -886,6 +908,18 @@ sap.ui.define(
                     oToolbarItem.hasStyleClass("giDepositCount")
                   ) {
                     oToolbarItem.setNumber(aDepositItems.length);
+                  }
+                  if (
+                    oToolbarItem.hasStyleClass &&
+                    oToolbarItem.hasStyleClass("giTotalPalet")
+                  ) {
+                    oToolbarItem.setNumber(iTotalPalet);
+                  }
+                  if (
+                    oToolbarItem.hasStyleClass &&
+                    oToolbarItem.hasStyleClass("giTotalSepet")
+                  ) {
+                    oToolbarItem.setNumber(iTotalSepet);
                   }
                 });
               }
@@ -1175,9 +1209,22 @@ sap.ui.define(
         var oModel = this.getOwnerComponent().getModel();
         sap.ui.core.BusyIndicator.show(0);
 
-        // var aFilters = [
-        //     new Filter("PackingNumber", FilterOperator.EQ, sPackingNumber)
-        // ];
+        // Get existing deposit materials from the current package
+        var oIssuePackagesModel = this.getView().getModel("issuePackagesModel");
+        var aPackages = oIssuePackagesModel.getData();
+        var oCurrentPackage = aPackages.find(function (pkg) {
+          return pkg.PackingNumber === sPackingNumber;
+        });
+
+        // Collect existing deposit material codes (DeliveryType = D)
+        var aExistingDepositMatnrs = [];
+        if (oCurrentPackage && oCurrentPackage.ToItems && oCurrentPackage.ToItems.results) {
+          oCurrentPackage.ToItems.results.forEach(function (oItem) {
+            if (oItem.DeliveryType === "D") {
+              aExistingDepositMatnrs.push(oItem.Material);
+            }
+          });
+        }
 
         oModel.read("/DepositGISet", {
           // filters: aFilters,
@@ -1185,18 +1232,15 @@ sap.ui.define(
             sap.ui.core.BusyIndicator.hide();
             var aItems = oData.results || [];
 
-            // Add Quantity field to each item for user input
+            // Mark items that already exist in the delivery - their quantity input will be disabled
             aItems.forEach(function (oItem) {
+              var bExists = aExistingDepositMatnrs.indexOf(oItem.Matnr) !== -1;
               oItem.Quantity = "";
+              oItem.IsExisting = bExists; // Flag to disable input for existing deposits
             });
 
-            if (aItems.length === 0) {
-              // No external deposits, proceed directly to goods issue
-              this._executePostGoodsIssue(sPackingNumber);
-            } else {
-              // Show deposit add dialog
-              this._showDepositAddDialog(aItems);
-            }
+            // Always show the dialog so user can cancel if needed
+            this._showDepositAddDialog(aItems);
           }.bind(this),
           error: function (oError) {
             sap.ui.core.BusyIndicator.hide();
@@ -1278,6 +1322,7 @@ sap.ui.define(
               PackingNumber: sPackingNumber,
               Matnr: oItem.Matnr,
               Quantity: parseFloat(oItem.Quantity),
+              OriginalQty: parseFloat(oItem.TargetQuantity) || 0,
               EditReason: "",
               Harici: true,
               Status: "0",
@@ -1383,6 +1428,8 @@ sap.ui.define(
             sap.ui.core.BusyIndicator.hide();
             MessageBox.success("Mal çıkış işlemi başarıyla tamamlandı!", {
               onClose: function () {
+                // Refresh dashboard data to update pending counts after user closes dialog
+                this.refreshDashboardData();
                 this._loadGoodsIssueData();
               }.bind(this),
             });

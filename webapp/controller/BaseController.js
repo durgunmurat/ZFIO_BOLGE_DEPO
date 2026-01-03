@@ -218,6 +218,69 @@ sap.ui.define([
                     reject(s);
                 });
             });
+        },
+
+        /**
+         * Refresh dashboard data by calling Login function import with selected date
+         * Can be called from any controller after data-changing operations
+         * @param {boolean} bShowBusy - Whether to show busy indicator (default: false)
+         */
+        refreshDashboardData: function(bShowBusy) {
+            var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
+            if (!oSessionModel) {
+                return Promise.resolve();
+            }
+            
+            var oLoginData = oSessionModel.getProperty("/Login");
+            if (!oLoginData || !oLoginData.Username || !oLoginData.AuthToken) {
+                return Promise.resolve();
+            }
+            
+            // Get date from filterModel or use today
+            var oFilterModel = this.getOwnerComponent().getModel("filterModel");
+            var sSelectedDate = oFilterModel ? oFilterModel.getProperty("/selectedDate") : null;
+            var oArrivalDate;
+            
+            if (sSelectedDate) {
+                var aParts = sSelectedDate.split("-");
+                oArrivalDate = new Date(Date.UTC(parseInt(aParts[0]), parseInt(aParts[1]) - 1, parseInt(aParts[2]), 0, 0, 0));
+            } else {
+                var oToday = new Date();
+                oArrivalDate = new Date(Date.UTC(oToday.getFullYear(), oToday.getMonth(), oToday.getDate(), 0, 0, 0));
+            }
+            
+            var that = this;
+            
+            // Use callFunctionImport which handles metadata loading and error handling
+            // Note: callFunctionImport already shows/hides busy indicator
+            return this.callFunctionImport("Login", {
+                urlParameters: {
+                    Username: oLoginData.Username,
+                    Password: oLoginData.AuthToken,
+                    ArrivalDate: oArrivalDate
+                }
+            }).then(function(oData) {
+                if (!oData || !oData.Login) {
+                    return;
+                }
+                
+                // Update dashboard counts
+                var oDashboardModel = that.getOwnerComponent().getModel("dashboardData");
+                var oLoginPayload = oData.Login;
+                var oDashboardPayload = {
+                    pendingReceipts: oLoginPayload.PendingGRCount || 0,
+                    pendingShipments: oLoginPayload.PendingShipAssignCount || 0,
+                    pendingDeliveries: oLoginPayload.PendingGICount || 0,
+                    pendingCounts: oLoginPayload.PendingInvCount || 0
+                };
+                
+                if (oDashboardModel) {
+                    oDashboardModel.setData(Object.assign({}, oDashboardModel.getData() || {}, oDashboardPayload));
+                }
+            }).catch(function(oError) {
+                console.error("Dashboard refresh failed:", oError);
+                // Don't re-throw, just log the error - callFunctionImport already shows error message
+            });
         }
     });
 });

@@ -531,7 +531,8 @@ sap.ui.define([
                 },
                 success: function(oData, oResponse) {
                     MessageBox.success("Kayıt başarılı.");
-                    // Silent save - no toast message
+                    // Refresh dashboard data to update pending counts
+                    this.refreshDashboardData();
                 }.bind(this),
                 error: function(oError) {
                     MessageBox.error("Kayıt başarısız. Lütfen tekrar deneyin.");

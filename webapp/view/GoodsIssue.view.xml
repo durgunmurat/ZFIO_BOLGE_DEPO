@@ -55,6 +55,11 @@
                                         size="1.5rem"
                                         color="#0854A0"
                                     />
+                                    <ObjectStatus
+                                        text="{issuePackagesModel>Inco2}"
+                                        class="sapUiTinyMarginBegin"
+                                        visible="{= !!${issuePackagesModel>Inco2} }"
+                                    />
                                     <Title
                                         text="{= parseInt(${issuePackagesModel>PackingNumber}) }"
                                         level="H3"
@@ -170,7 +175,7 @@
                                                     class="giProductTable"
                                                 >
                                                     <columns>
-                                                        <Column width="5em">
+                                                        <Column width="5em" visible="false">
                                                             <Text text="KOD" />
                                                         </Column>
                                                         <Column
@@ -186,7 +191,7 @@
                                                             hAlign="Right"
                                                         >
                                                             <Text
-                                                                text="MİKTAR"
+                                                                text="TM"
                                                             />
                                                         </Column>
                                                         <Column
@@ -194,7 +199,7 @@
                                                             hAlign="Center"
                                                         >
                                                             <Text
-                                                                text="SAYIM"
+                                                                text="SYM"
                                                             />
                                                         </Column>
                                                         <Column
@@ -207,7 +212,7 @@
                                                             width="3em"
                                                             hAlign="Center"
                                                         >
-                                                            <Text text="FYT" />
+                                                            <Text text="F" />
                                                         </Column>
                                                         <Column
                                                             width="5rem"
@@ -248,6 +253,22 @@
                                                     number="0"
                                                     class="sapUiTinyMarginBegin giDepositCount"
                                                 />
+                                                <Label
+                                                    text="Toplam Palet:"
+                                                    class="sapUiSmallMarginBegin"
+                                                />
+                                                <ObjectNumber
+                                                    number="0"
+                                                    class="sapUiTinyMarginBegin giTotalPalet"
+                                                />
+                                                <Label
+                                                    text="Toplam Sepet:"
+                                                    class="sapUiSmallMarginBegin"
+                                                />
+                                                <ObjectNumber
+                                                    number="0"
+                                                    class="sapUiTinyMarginBegin giTotalSepet"
+                                                />
                                                 <ToolbarSpacer />
                                             </OverflowToolbar>
                                         </headerToolbar>
@@ -264,7 +285,7 @@
                                                     class="giDepositTable"
                                                 >
                                                     <columns>
-                                                        <Column width="5em">
+                                                        <Column width="5em" visible="false">
                                                             <Text text="KOD" />
                                                         </Column>
                                                         <Column
