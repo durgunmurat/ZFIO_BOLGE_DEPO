@@ -201,12 +201,18 @@ sap.ui.define(
                       { path: sModelName + ">CountedQuantity" },
                       { path: sModelName + ">Approved" },
                       { path: sModelName + ">Status" },
+                      { path: sModelName + ">LocalStatus" },
                     ],
-                    formatter: function (sCountedQty, sApproved, sStatus) {
+                    formatter: function (sCountedQty, sApproved, sStatus, sLocalStatus) {
+                      // Show button if:
+                      // - Status is not completed (X)
+                      // - Not already approved
+                      // - Either has positive quantity OR has been counted via dialog (LocalStatus is IP)
+                      var bHasBeenCounted = sLocalStatus === "IP";
                       return (
                         sStatus !== "X" &&
-                        parseFloat(sCountedQty || "0") > 0 &&
-                        sApproved !== "X"
+                        sApproved !== "X" &&
+                        (parseFloat(sCountedQty || "0") > 0 || bHasBeenCounted)
                       );
                     },
                   },
@@ -232,7 +238,7 @@ sap.ui.define(
         var oModel = this.getOwnerComponent().getModel();
         var oEditReasonsModel = this.getView().getModel("editReasonsModel");
         if (oEditReasonsModel.getData().length > 0) return;
-        oModel.read("/EditReasonSet", {
+        oModel.read("/EditReasonGISet", {
           success: function (oData) {
             oEditReasonsModel.setData(oData.results || []);
           },
@@ -592,8 +598,8 @@ sap.ui.define(
         var fExpected = parseFloat(oItem.TargetQuantity || "0");
         var fCounted = parseFloat(oItem.CountedQuantity || "0");
 
-        // 0 miktar kontrolü - önce sayım yapılmalı
-        if (fCounted <= 0) {
+        // Check if item has been counted (via dialog) - allows 0 quantity if explicitly entered
+        if (!oItem._hasBeenCounted && fCounted <= 0) {
           MessageToast.show("Onaylamak için önce miktar girişi yapmalısınız.");
           return;
         }
@@ -608,6 +614,7 @@ sap.ui.define(
       _showReasonDialog: function (sCurrentReason) {
         if (!this._oReasonDialog) {
           this._oReasonDialog = sap.ui.xmlfragment(
+            "reasonDialog",
             "com.sut.bolgeyonetim.view.ReasonDialog",
             this
           );
@@ -622,9 +629,12 @@ sap.ui.define(
       },
 
       onReasonDialogConfirm: function () {
-        var oReasonDialogModel = this.getView().getModel("reasonDialogModel");
-        var sEditReason = oReasonDialogModel.getProperty("/editReason");
+        // Get value directly from ComboBox to ensure we have the selected value
+        var oComboBox = sap.ui.core.Fragment.byId("reasonDialog", "idReasonDialogCombo");
+        var sEditReason = oComboBox ? oComboBox.getSelectedKey() : "";
+        
         if (!sEditReason) {
+          var oReasonDialogModel = this.getView().getModel("reasonDialogModel");
           oReasonDialogModel.setProperty("/reasonErrorState", true);
           MessageToast.show("Lütfen bir neden seçiniz.");
           return;

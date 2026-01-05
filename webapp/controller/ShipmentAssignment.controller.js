@@ -478,6 +478,7 @@ sap.ui.define([
 
         /**
          * Search handler - client-side filtering (live search)
+         * Case-insensitive search with Turkish locale support
          */
         onSearch: function(oEvent) {
             var sQuery = oEvent.getParameter("newValue");
@@ -491,13 +492,17 @@ sap.ui.define([
             var aFilters = [];
             
             if (sQuery && sQuery.length > 0) {
-                // Search in ShipmentId OR CustomerName
+                // Use Turkish locale for proper İ/i and I/ı handling
+                var sQueryLower = sQuery.toLocaleLowerCase('tr-TR');
+                // Custom filter function for case-insensitive search
                 aFilters.push(new Filter({
-                    filters: [
-                        new Filter("ShipmentId", FilterOperator.Contains, sQuery),
-                        new Filter("CustomerName", FilterOperator.Contains, sQuery)
-                    ],
-                    and: false
+                    path: "",
+                    test: function(oItem) {
+                        var sShipmentId = (oItem.ShipmentId || "").toLocaleLowerCase('tr-TR');
+                        var sCustomerName = (oItem.CustomerName || "").toLocaleLowerCase('tr-TR');
+                        return sShipmentId.indexOf(sQueryLower) !== -1 || 
+                               sCustomerName.indexOf(sQueryLower) !== -1;
+                    }
                 }));
             }
             
