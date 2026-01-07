@@ -110,9 +110,10 @@ sap.ui.define([
                 // After employees and officers loaded, load shipment data
                 this._loadShipmentData();
             }.bind(this)).catch(function(oError) {
-                MessageBox.error("Personel verileri yüklenirken hata oluştu.");
+                var sErrorMessage = this._extractErrorMessage(oError);
+                MessageBox.error(sErrorMessage || "Personel verileri yüklenirken hata oluştu.");
                 console.error("Employee/Officer load error:", oError);
-            });
+            }.bind(this));
         },
 
         /**
@@ -198,9 +199,10 @@ sap.ui.define([
                 this.getView().getModel("shipmentModel").setData(aShipments);
                 
             }.bind(this)).catch(function(oError) {
-                MessageBox.error("Yükleme verileri yüklenirken hata oluştu.");
+                var sErrorMessage = this._extractErrorMessage(oError);
+                MessageBox.error(sErrorMessage || "Yükleme verileri yüklenirken hata oluştu.");
                 console.error("Data load error:", oError);
-            });
+            }.bind(this));
         },
 
         /**
@@ -220,6 +222,53 @@ sap.ui.define([
                     }
                 });
             });
+        },
+
+        /**
+         * Helper function to extract error message from OData error response
+         * @param {object} oError - OData error object
+         * @returns {string} Extracted error message or empty string
+         */
+        _extractErrorMessage: function(oError) {
+            var sMessage = "";
+            try {
+                if (oError && oError.responseText) {
+                    var o = JSON.parse(oError.responseText);
+
+                    // Standard OData v2 error shape: o.error.message.value
+                    if (o && o.error && o.error.message && o.error.message.value) {
+                        sMessage = o.error.message.value;
+                    }
+
+                    // SAP Gateway specific: look for innererror.errordetails (message container)
+                    var aDetails = null;
+                    if (o && o.error && o.error.innererror && o.error.innererror.errordetails) {
+                        aDetails = o.error.innererror.errordetails;
+                    } else if (o && o.error && o.error.errordetails) {
+                        aDetails = o.error.errordetails;
+                    }
+
+                    if (aDetails && Array.isArray(aDetails) && aDetails.length) {
+                        // Build a combined message from errordetails
+                        var aMsgs = aDetails.map(function(d) {
+                            return d.message || d.Message || "";
+                        }).filter(Boolean);
+                        if (aMsgs.length) {
+                            sMessage = aMsgs.join('\n');
+                        }
+                    }
+                } else if (oError && oError.message) {
+                    sMessage = oError.message;
+                } else if (oError && oError.statusText) {
+                    sMessage = oError.statusText;
+                }
+            } catch (e) {
+                console.error("Error parsing error response:", e);
+                if (oError && oError.statusText) {
+                    sMessage = oError.statusText;
+                }
+            }
+            return sMessage;
         },
 
         /**
