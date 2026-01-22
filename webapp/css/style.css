@@ -216,3 +216,142 @@
 .giDepositPanel > .sapMPanelWrappingDivTb .sapMObjectNumberText {
     color: #FFFFFF !important;
 }
+
+/* GoodsIssue Table Growing - Tablet Optimizations */
+.giProductTable,
+.giDepositTable {
+    width: 100% !important;
+}
+
+/* Growing trigger button styling for better visibility */
+.giProductTable .sapMGrowingListTrigger,
+.giDepositTable .sapMGrowingListTrigger {
+    background-color: #f5f5f5 !important;
+    border-top: 1px solid #e0e0e0 !important;
+    padding: 0.75rem !important;
+}
+
+.giProductTable .sapMGrowingListTrigger .sapMSLITitle,
+.giDepositTable .sapMGrowingListTrigger .sapMSLITitle {
+    color: #0854A0 !important;
+    font-weight: 600 !important;
+}
+
+/* Ensure Panel content doesn't restrict table height */
+.giProductPanel > .sapMPanelContent,
+.giDepositPanel > .sapMPanelContent {
+    overflow: visible !important;
+    max-height: none !important;
+}
+
+.giProductPanel .sapMPanelContent > .sapMVBox,
+.giDepositPanel .sapMPanelContent > .sapMVBox {
+    overflow: visible !important;
+}
+
+/* Deposit Add Button - visible on dark toolbar */
+.giDepositAddBtn.sapMBtn {
+    margin-left: 0.5rem;
+}
+.giDepositAddBtn .sapMBtnContent,
+.giDepositAddBtn .sapMBtnIcon {
+    color: #ffffff !important;
+}
+
+/* Deposit Add Button in Overflow Popover - needs dark text on white background */
+.sapMOTAPopover .giDepositAddBtn .sapMBtnContent,
+.sapMOTAPopover .giDepositAddBtn .sapMBtnIcon,
+.sapMOTAPopover .giDepositAddBtn .sapMBtnInner,
+.sapMPopover .giDepositAddBtn .sapMBtnContent,
+.sapMPopover .giDepositAddBtn .sapMBtnIcon {
+    color: #0854A0 !important;
+}
+
+/* Ensure text is visible in overflow menu */
+.sapMOTAPopover .sapMBtn .sapMBtnContent,
+.sapMOTAPopover .sapMBtn .sapMBtnIcon {
+    color: #0854A0 !important;
+}
+
+/* Teslimat Miktari - Large and colored for better visibility */
+.giTargetQty .sapMObjectNumberText {
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+    color: #0854A0 !important;
+}
+
+.giTargetQty .sapMObjectNumberUnit {
+    font-size: 0.875rem !important;
+    color: #6a6d70 !important;
+}
+
+/* Row Highlighting for GoodsIssue Tables - More visible colors */
+/* Warning state - pending items (yellow/orange) */
+.giProductTable .sapMListTblRow.sapMLIBTypeActive.sapMLIBHighlight .sapMLIBHighlight,
+.giDepositTable .sapMListTblRow.sapMLIBTypeActive.sapMLIBHighlight .sapMLIBHighlight,
+.giProductTable .sapMListTblRow .sapMLIBHighlight[data-sap-ui-icon-content]:before,
+.giDepositTable .sapMListTblRow .sapMLIBHighlight[data-sap-ui-icon-content]:before {
+    background-color: inherit !important;
+}
+
+/* Highlight bar colors - these target the left border indicator */
+.giProductTable .sapMLIBHighlightWarning .sapMLIBHighlight,
+.giDepositTable .sapMLIBHighlightWarning .sapMLIBHighlight {
+    background-color: #e9730c !important;
+}
+
+.giProductTable .sapMLIBHighlightError .sapMLIBHighlight,
+.giDepositTable .sapMLIBHighlightError .sapMLIBHighlight {
+    background-color: #bb0000 !important;
+}
+
+.giProductTable .sapMLIBHighlightSuccess .sapMLIBHighlight,
+.giDepositTable .sapMLIBHighlightSuccess .sapMLIBHighlight {
+    background-color: #107e3e !important;
+}
+
+/* Row background colors for better visibility */
+.giProductTable .sapMListTblRow.sapMLIBHighlightWarning,
+.giDepositTable .sapMListTblRow.sapMLIBHighlightWarning {
+    background-color: rgba(233, 115, 12, 0.08) !important;
+}
+
+.giProductTable .sapMListTblRow.sapMLIBHighlightError,
+.giDepositTable .sapMListTblRow.sapMLIBHighlightError {
+    background-color: rgba(187, 0, 0, 0.06) !important;
+}
+
+.giProductTable .sapMListTblRow.sapMLIBHighlightSuccess,
+.giDepositTable .sapMListTblRow.sapMLIBHighlightSuccess {
+    background-color: rgba(16, 126, 62, 0.06) !important;
+}
+
+/* Highlight indicator bar - make it wider for better visibility */
+.giProductTable .sapMLIBHighlight,
+.giDepositTable .sapMLIBHighlight {
+    width: 5px !important;
+}
+/* Shipment Assignment - Card Styling */
+.shipmentCard {
+    border-radius: 8px;
+    border: 2px solid #e0e0e0;
+    transition: border-color 0.2s ease;
+}
+
+.shipmentCardPending {
+    border-color: #e9730c !important;
+    background-color: rgba(233, 115, 12, 0.04) !important;
+}
+
+.shipmentCardPending:hover {
+    border-color: #d4670a !important;
+}
+
+.shipmentCardAssigned {
+    border-color: #107e3e !important;
+    background-color: rgba(16, 126, 62, 0.04) !important;
+}
+
+.shipmentCardAssigned:hover {
+    border-color: #0d6630 !important;
+}

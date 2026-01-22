@@ -19,6 +19,64 @@
                 class="sapUiSmallMarginBottom sapUiSmallMarginBegin sapUiSmallMarginEnd"
             />
 
+            <!-- Type Filter - Main IconTabBar -->
+            <IconTabBar
+                id="idTypeFilterBar"
+                select="onTypeFilterSelect"
+                class="sapUiResponsiveContentPadding"
+                upperCase="false"
+                stretchContentHeight="false"
+                expandable="false"
+            >
+                <items>
+                    <IconTabFilter
+                        id="idMonoTab"
+                        key="MONO"
+                        text="Monodistribütör"
+                        count="{shipmentStatsModel>/monoCount}"
+                        icon="sap-icon://supplier"
+                    />
+                    <IconTabFilter
+                        id="idOrganizeTab"
+                        key="ORGANIZE"
+                        text="Organize Dağıtım"
+                        count="{shipmentStatsModel>/organizeCount}"
+                        icon="sap-icon://tree"
+                    />
+                </items>
+            </IconTabBar>
+
+            <!-- Assignment Status Filter - Sub IconTabBar -->
+            <IconTabBar
+                id="idAssignmentFilterBar"
+                select="onAssignmentFilterSelect"
+                class="sapUiTinyMarginTop"
+                upperCase="false"
+                stretchContentHeight="false"
+                expandable="false"
+            >
+                <items>
+                    <IconTabFilter
+                        id="idAllTab"
+                        key="all"
+                        text="Tümü"
+                        count="{shipmentStatsModel>/currentTypeAllCount}"
+                    />
+                    <IconTabFilter
+                        id="idPendingAssignTab"
+                        key="pending"
+                        text="Bekleyen"
+                        count="{shipmentStatsModel>/currentTypePendingCount}"
+                    />
+                    <IconTabFilter
+                        id="idAssignedTab"
+                        key="assigned"
+                        text="Atanan"
+                        count="{shipmentStatsModel>/currentTypeAssignedCount}"
+                    />
+                </items>
+            </IconTabBar>
+
             <!-- Shipments List -->
             <List
                 id="idShipmentList"
@@ -39,7 +97,7 @@
                                 alignItems="Start"
                                 justifyContent="SpaceBetween"
                                 width="100%"
-                                class="sapUiSmallPadding shipmentCard"
+                                class="{= (${shipmentModel>SelectedOfficerKeys}.length === 0 &amp;&amp; ${shipmentModel>SelectedEmployeeKeys}.length === 0) ? 'sapUiSmallPadding shipmentCard shipmentCardPending' : 'sapUiSmallPadding shipmentCard shipmentCardAssigned' }"
                             >
                                 <!-- Left Side: Shipment Info -->
                                 <VBox
@@ -54,7 +112,7 @@
                                         <core:Icon
                                             src="sap-icon://shipping-status"
                                             size="2rem"
-                                            color="#0854A0"
+                                            color="{= (${shipmentModel>SelectedOfficerKeys}.length === 0 &amp;&amp; ${shipmentModel>SelectedEmployeeKeys}.length === 0) ? '#e9730c' : '#0854A0' }"
                                             class="sapUiSmallMarginEnd"
                                         />
                                         <VBox>
@@ -92,7 +150,7 @@
                                         icon="sap-icon://employee"
                                         press="onOpenOfficerDialog"
                                         width="75%"
-                                        type="Emphasized"
+                                        type="{= ${shipmentModel>SelectedOfficerKeys}.length > 0 ? 'Accept' : 'Emphasized' }"
                                     />
                                     <Label
                                         text="Atanan Personel (Max: 5)"
@@ -104,7 +162,7 @@
                                         icon="sap-icon://employee"
                                         press="onOpenPersonnelDialog"
                                         width="75%"
-                                        type="Emphasized"
+                                        type="{= ${shipmentModel>SelectedEmployeeKeys}.length > 0 ? 'Accept' : 'Emphasized' }"
                                         class="sapUiTinyMarginBottom"
                                     />
                                 </VBox>

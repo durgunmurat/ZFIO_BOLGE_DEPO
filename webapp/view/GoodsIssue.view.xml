@@ -168,9 +168,10 @@
                                                 <Table
                                                     inset="false"
                                                     growing="true"
-                                                    growingThreshold="50"
-                                                    growingScrollToLoad="true"
-                                                    width="auto"
+                                                    growingThreshold="30"
+                                                    growingScrollToLoad="false"
+                                                    growingTriggerText="Daha Fazla Göster"
+                                                    width="100%"
                                                     noDataText="Ürün bulunamadı"
                                                     class="giProductTable"
                                                 >
@@ -270,6 +271,13 @@
                                                     class="sapUiTinyMarginBegin giTotalSepet"
                                                 />
                                                 <ToolbarSpacer />
+                                                <Button
+                                                    text="Depozito Ekle"
+                                                    icon="sap-icon://add"
+                                                    type="Transparent"
+                                                    press="onDepositAddPress"
+                                                    class="giDepositAddBtn"
+                                                />
                                             </OverflowToolbar>
                                         </headerToolbar>
                                         <content>
@@ -278,9 +286,10 @@
                                                 <Table
                                                     inset="false"
                                                     growing="true"
-                                                    growingThreshold="50"
-                                                    growingScrollToLoad="true"
-                                                    width="auto"
+                                                    growingThreshold="30"
+                                                    growingScrollToLoad="false"
+                                                    growingTriggerText="Daha Fazla Göster"
+                                                    width="100%"
                                                     noDataText="Depozito bulunamadı"
                                                     class="giDepositTable"
                                                 >

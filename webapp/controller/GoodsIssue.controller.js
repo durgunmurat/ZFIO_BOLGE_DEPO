@@ -26,6 +26,13 @@ sap.ui.define(
       _sCurrentPackingNumber: null,
       _oCurrentNoteContext: null,
       _sCurrentNotePackingNumber: null,
+      _mTableGrowingState: {}, // Map to store growing state per table
+      
+      // --- FEATURE FLAGS ---
+      // Mal Çıkış öncesi Depozito Ekleme dialogunu göster/gizle
+      // true: Dialog gösterilir, false: Dialog atlanır ve direkt Mal Çıkış yapılır
+      // İleride tekrar açmak için bu değeri true yapmanız yeterlidir
+      _bShowDepositDialogBeforeMalCikis: false,
 
       // --- FORMATTERS ---
 
@@ -139,6 +146,14 @@ sap.ui.define(
 
       _createTableItemTemplate: function (sModelName) {
         var oTemplate = new sap.m.ColumnListItem({
+          highlight: {
+            parts: [
+              { path: sModelName + ">CountedQuantity" },
+              { path: sModelName + ">TargetQuantity" },
+              { path: sModelName + ">Approved" }
+            ],
+            formatter: this.formatRowHighlight.bind(this)
+          },
           cells: [
             new sap.m.Text({
               text: "{= parseInt(${" + sModelName + ">Material}) }",
@@ -151,7 +166,7 @@ sap.ui.define(
               },
               unit: "{" + sModelName + ">UoM}",
               state: "None",
-            }),
+            }).addStyleClass("giTargetQty"),
             new sap.m.Text({
               text: {
                 path: sModelName + ">CountedQuantity",
@@ -374,7 +389,8 @@ sap.ui.define(
         }
 
         var oSmartData = {
-          MaterialDesc: oItem.MaterialDesc,
+          materialText: oItem.MaterialDesc,
+          materialNumber: parseInt(oItem.Material, 10),
           expectedQuantity: parseFloat(oItem.TargetQuantity),
           uom: oItem.UoM,
           palletFactor: fPalletFactor,
@@ -477,7 +493,8 @@ sap.ui.define(
         var sPackingNumber = oItem.PackingNumber;
 
         // Beklenen miktardan fazla giriş kontrolü
-        if (fTotal > fExpected) {
+        // Beklenen miktardan fazla giriş kontrolü (sadece ürünler için, depozitolarda atlanır)
+        if (oItem.DeliveryType !== "D" && fTotal > fExpected) {
           oSmartModel.setProperty("/quantityErrorState", true);
           MessageToast.show("Beklenen miktardan fazla giriş yapamazsınız.");
           return;
@@ -897,14 +914,15 @@ sap.ui.define(
               );
               oDepositPanel.setVisible(aDepositItems.length > 0);
 
-              // Calculate total Palet and Sepet counts from PaletSepet field
+              // Calculate total Palet and Sepet quantities from PaletSepet field
               var iTotalPalet = 0;
               var iTotalSepet = 0;
               aDepositItems.forEach(function (oDepItem) {
+                var fQuantity = parseFloat(oDepItem.TargetQuantity) || 0;
                 if (oDepItem.PaletSepet === "P") {
-                  iTotalPalet++;
+                  iTotalPalet += fQuantity;
                 } else if (oDepItem.PaletSepet === "S") {
-                  iTotalSepet++;
+                  iTotalSepet += fQuantity;
                 }
               });
 
@@ -979,16 +997,33 @@ sap.ui.define(
             oIconTabBar,
             sPackingNumber,
             sType,
-            aItems.length
+            aItems.length,
+            aItems
           );
-          // Reapply filter based on current selected key
-          this._reapplyCategoryFilter(oIconTabBar, oTable);
         }
 
         // Bind table
         if (oTable) {
           var oSorter = new sap.ui.model.Sorter("Kategori", false, false);
           var oBinding = oTable.getBinding("items");
+          
+          // Generate a unique key for this table to track growing state
+          var sTableKey = sPackingNumber + "_" + sType;
+          
+          // Save current growing state before refresh/rebind
+          if (oTable.getGrowingInfo && oTable.getGrowingInfo()) {
+            var oGrowingInfo = oTable.getGrowingInfo();
+            if (oGrowingInfo.actual > 30) { // Default threshold is 30
+              this._mTableGrowingState[sTableKey] = oGrowingInfo.actual;
+            }
+          }
+          
+          // If user has previously expanded this table, set threshold to show all
+          var iSavedCount = this._mTableGrowingState[sTableKey];
+          if (iSavedCount && iSavedCount > 30) {
+            oTable.setGrowingThreshold(Math.max(iSavedCount, aItems.length));
+          }
+          
           if (!oBinding || oBinding.getPath() !== sModelName + ">/") {
             oTable.bindItems({
               path: sModelName + ">/",
@@ -1003,6 +1038,11 @@ sap.ui.define(
             oBinding.sort(oSorter);
             oBinding.refresh();
           }
+
+          // Reapply category filter AFTER table binding is ready (only for products)
+          if (oIconTabBar && oCategoryMap && sType === "product") {
+            this._reapplyCategoryFilter(oIconTabBar, oTable);
+          }
         }
       },
 
@@ -1011,12 +1051,22 @@ sap.ui.define(
         oIconTabBar,
         sPackingNumber,
         sType,
-        iTotalCount
+        iTotalCount,
+        aItems
       ) {
         if (!oIconTabBar) return;
 
         // Save current selected key before destroying items
         var sCurrentSelectedKey = oIconTabBar.getSelectedKey() || "all";
+
+        // Calculate pending items count (CountedQuantity = 0 and Approved != 'X')
+        var iPendingCount = 0;
+        if (aItems && aItems.length > 0) {
+          iPendingCount = aItems.filter(function (oItem) {
+            var fCounted = parseFloat(oItem.CountedQuantity || "0");
+            return fCounted === 0 && oItem.Approved !== "X";
+          }).length;
+        }
 
         oIconTabBar.data("packingNumber", sPackingNumber);
         oIconTabBar.data("itemType", sType);
@@ -1030,11 +1080,22 @@ sap.ui.define(
             count: String(iTotalCount),
           })
         );
+
+        // Add "Bekleyen" (Pending) tab
+        var bPendingKeyExists = sCurrentSelectedKey === "pending";
+        oIconTabBar.addItem(
+          new sap.m.IconTabFilter({
+            key: "pending",
+            text: "Bekleyen",
+            count: String(iPendingCount),
+          })
+        );
+
         oIconTabBar.addItem(new sap.m.IconTabSeparator());
 
         // Add category tabs from the map
         var aCategories = Object.keys(oCategoryMap).sort();
-        var bSelectedKeyExists = sCurrentSelectedKey === "all";
+        var bSelectedKeyExists = sCurrentSelectedKey === "all" || bPendingKeyExists;
         aCategories.forEach(function (sKey) {
           var oCategory = oCategoryMap[sKey];
           oIconTabBar.addItem(
@@ -1069,6 +1130,16 @@ sap.ui.define(
 
         if (sSelectedKey === "all") {
           oBinding.filter([]);
+        } else if (sSelectedKey === "pending") {
+          // Filter for pending items: CountedQuantity = 0 AND Approved != 'X'
+          var oPendingFilter = new Filter({
+            filters: [
+              new Filter("CountedQuantity", FilterOperator.EQ, "0"),
+              new Filter("Approved", FilterOperator.NE, "X")
+            ],
+            and: true
+          });
+          oBinding.filter([oPendingFilter]);
         } else {
           var oFilter = new Filter("Kategori", FilterOperator.EQ, sSelectedKey);
           oBinding.filter([oFilter]);
@@ -1102,6 +1173,16 @@ sap.ui.define(
 
         if (sSelectedKey === "all") {
           oBinding.filter([]);
+        } else if (sSelectedKey === "pending") {
+          // Filter for pending items: CountedQuantity = 0 AND Approved != 'X'
+          var oPendingFilter = new Filter({
+            filters: [
+              new Filter("CountedQuantity", FilterOperator.EQ, "0"),
+              new Filter("Approved", FilterOperator.NE, "X")
+            ],
+            and: true
+          });
+          oBinding.filter([oPendingFilter]);
         } else {
           var oFilter = new Filter("Kategori", FilterOperator.EQ, sSelectedKey);
           oBinding.filter([oFilter]);
@@ -1193,6 +1274,33 @@ sap.ui.define(
         if (oCompletedTab) oCompletedTab.setCount(iCompletedCount.toString());
       },
 
+      /**
+       * Open deposit add dialog from Deposit panel header button (without Mal Çıkış)
+       */
+      onDepositAddPress: function (oEvent) {
+        var oButton = oEvent.getSource();
+        // Navigate up to find the main Package Panel to get PackingNumber
+        var oPanel = oButton.getParent();
+        while (oPanel && !oPanel.getBindingContext("issuePackagesModel")) {
+          oPanel = oPanel.getParent();
+        }
+        if (!oPanel) {
+          MessageBox.error("Panel bulunamadı.");
+          return;
+        }
+        var oL1Context = oPanel.getBindingContext("issuePackagesModel");
+        if (!oL1Context) {
+          MessageBox.error("Package context bulunamadı.");
+          return;
+        }
+        var oPackage = oL1Context.getObject();
+        this._sCurrentPackingNumber = oPackage.PackingNumber;
+        this._bDepositOnlyMode = true; // Flag to indicate deposit-only mode (no Mal Çıkış after)
+
+        // Load deposit items for adding
+        this._loadDepositAddItems(oPackage.PackingNumber);
+      },
+
       onMalCikisPress: function (oEvent) {
         var oButton = oEvent.getSource();
         var oPanel = oButton.getParent();
@@ -1210,9 +1318,17 @@ sap.ui.define(
         }
         var oPackage = oL1Context.getObject();
         this._sCurrentPackingNumber = oPackage.PackingNumber;
+        this._bDepositOnlyMode = false; // Flag to indicate Mal Çıkış mode
 
-        // Load external deposit items and show dialog
-        this._loadDepositAddItems(oPackage.PackingNumber);
+        // Depozito Ekleme dialogu gösterilsin mi kontrolü
+        // _bShowDepositDialogBeforeMalCikis = false ise dialog atlanır, direkt Mal Çıkış yapılır
+        if (this._bShowDepositDialogBeforeMalCikis) {
+          // Load external deposit items and show dialog
+          this._loadDepositAddItems(oPackage.PackingNumber);
+        } else {
+          // Depozito dialogu atla, direkt Mal Çıkış yap
+          this._executePostGoodsIssue(oPackage.PackingNumber);
+        }
       },
 
       _loadDepositAddItems: function (sPackingNumber) {
@@ -1227,14 +1343,31 @@ sap.ui.define(
         });
 
         // Collect existing deposit material codes (DeliveryType = D)
+        // Also collect externally added deposits (Harici = 'X' or true)
         var aExistingDepositMatnrs = [];
+        var oExternalDepositMap = {}; // Map of Matnr -> CountedQuantity for externally added
+        console.log("=== DEBUG: ToItems ===");
         if (oCurrentPackage && oCurrentPackage.ToItems && oCurrentPackage.ToItems.results) {
           oCurrentPackage.ToItems.results.forEach(function (oItem) {
+            console.log("Item:", oItem.Material, "DeliveryType:", oItem.DeliveryType, "Harici:", oItem.Harici, "CountedQty:", oItem.CountedQuantity, "TargetQty:", oItem.TargetQuantity);
             if (oItem.DeliveryType === "D") {
-              aExistingDepositMatnrs.push(oItem.Material);
+              // Normalize material number (remove leading zeros for comparison)
+              var sNormalizedMat = oItem.Material ? oItem.Material.replace(/^0+/, '') : '';
+              aExistingDepositMatnrs.push(sNormalizedMat);
+              // If Harici = 'X' or true, it was added by user externally
+              if (oItem.Harici === "X" || oItem.Harici === true) {
+                // Use TargetQuantity since CountedQuantity might be 0 for externally added
+                var fCountedQty = parseFloat(oItem.CountedQuantity) || 0;
+                var fTargetQty = parseFloat(oItem.TargetQuantity) || 0;
+                var sQty = fCountedQty > 0 ? String(fCountedQty) : (fTargetQty > 0 ? String(fTargetQty) : "0");
+                oExternalDepositMap[sNormalizedMat] = sQty;
+                console.log("External deposit found:", sNormalizedMat, "CountedQty:", fCountedQty, "TargetQty:", fTargetQty, "Using:", sQty);
+              }
             }
           });
         }
+        console.log("aExistingDepositMatnrs:", aExistingDepositMatnrs);
+        console.log("oExternalDepositMap:", oExternalDepositMap);
 
         oModel.read("/DepositGISet", {
           // filters: aFilters,
@@ -1242,11 +1375,29 @@ sap.ui.define(
             sap.ui.core.BusyIndicator.hide();
             var aItems = oData.results || [];
 
-            // Mark items that already exist in the delivery - their quantity input will be disabled
+            // Mark items status:
+            // - IsExisting: exists in delivery (from backend, not editable)
+            // - IsExternal: added by user externally (Harici = 'X', show current quantity, editable)
+            console.log("=== DEBUG: DepositGISet items ===");
             aItems.forEach(function (oItem) {
-              var bExists = aExistingDepositMatnrs.indexOf(oItem.Matnr) !== -1;
-              oItem.Quantity = "";
-              oItem.IsExisting = bExists; // Flag to disable input for existing deposits
+              // Normalize material number for comparison
+              var sNormalizedMatnr = oItem.Matnr ? oItem.Matnr.replace(/^0+/, '') : '';
+              
+              var bIsExternal = !!oExternalDepositMap[sNormalizedMatnr];
+              var bIsOriginal = aExistingDepositMatnrs.indexOf(sNormalizedMatnr) !== -1 && !bIsExternal;
+              
+              console.log("Matnr:", oItem.Matnr, "Normalized:", sNormalizedMatnr, "IsExternal:", bIsExternal, "IsOriginal:", bIsOriginal);
+              
+              oItem.IsExisting = bIsOriginal; // Original deposit from delivery - disable input
+              oItem.IsExternal = bIsExternal; // User added externally - editable
+              
+              if (bIsExternal) {
+                oItem.Quantity = oExternalDepositMap[sNormalizedMatnr];
+                console.log("Setting quantity for external:", sNormalizedMatnr, "to", oItem.Quantity);
+                // IsExisting stays false so it remains editable
+              } else {
+                oItem.Quantity = "";
+              }
             });
 
             // Always show the dialog so user can cancel if needed
@@ -1255,8 +1406,12 @@ sap.ui.define(
           error: function (oError) {
             sap.ui.core.BusyIndicator.hide();
             console.error("DepositGISet load error:", oError);
-            // On error, proceed with goods issue anyway
-            this._executePostGoodsIssue(sPackingNumber);
+            // On error, if in Mal Çıkış mode, proceed anyway
+            if (!this._bDepositOnlyMode) {
+              this._executePostGoodsIssue(sPackingNumber);
+            } else {
+              MessageBox.error("Depozito listesi yüklenemedi.");
+            }
           }.bind(this),
         });
       },
@@ -1275,6 +1430,26 @@ sap.ui.define(
           );
           this.getView().addDependent(this._oDepositAddDialog);
         }
+
+        // Update button texts and visibility based on mode
+        var bDepositOnlyMode = this._bDepositOnlyMode;
+        var aButtons = this._oDepositAddDialog.getButtons();
+        
+        aButtons.forEach(function(oBtn) {
+          var sId = oBtn.getId();
+          if (sId && sId.indexOf("idDepositSaveBtn") !== -1) {
+            // Save button - update text based on mode
+            if (bDepositOnlyMode) {
+              oBtn.setText("Kaydet");
+            } else {
+              oBtn.setText("Kaydet ve Mal Çıkış");
+            }
+          } else if (sId && sId.indexOf("idDepositSkipBtn") !== -1) {
+            // Skip button - only visible in Mal Çıkış mode
+            oBtn.setVisible(!bDepositOnlyMode);
+          }
+        });
+
         this._oDepositAddDialog.open();
       },
 
@@ -1296,17 +1471,24 @@ sap.ui.define(
         var oDepositAddModel = this.getView().getModel("depositAddModel");
         var aItems = oDepositAddModel.getProperty("/items");
         var sPackingNumber = this._sCurrentPackingNumber;
+        var bDepositOnlyMode = this._bDepositOnlyMode;
 
-        // Filter items with quantity > 0
+        // Filter items with quantity > 0 AND not already saved (IsExternal = false or new)
         var aItemsToSave = aItems.filter(function (oItem) {
           var fQty = parseFloat(oItem.Quantity);
-          return !isNaN(fQty) && fQty > 0;
+          // Only save if has quantity, not original existing, and not already saved external
+          return !isNaN(fQty) && fQty > 0 && !oItem.IsExisting;
         });
 
         if (aItemsToSave.length === 0) {
-          // No deposits entered, proceed directly
+          // No new deposits to save
           this._oDepositAddDialog.close();
-          this._executePostGoodsIssue(sPackingNumber);
+          if (!bDepositOnlyMode) {
+            // Mal Çıkış mode - proceed to goods issue
+            this._executePostGoodsIssue(sPackingNumber);
+          } else {
+            MessageToast.show("Kaydedilecek yeni depozito yok.");
+          }
           return;
         }
 
@@ -1319,7 +1501,7 @@ sap.ui.define(
         // Sequential processing to avoid batch changeset issues
         var fnProcessNext = function (iIndex) {
           if (iIndex >= aItemsToSave.length) {
-            that._onDepositSaveComplete(iErrorCount, sPackingNumber);
+            that._onDepositSaveComplete(iErrorCount, sPackingNumber, bDepositOnlyMode);
             return;
           }
 
@@ -1353,24 +1535,38 @@ sap.ui.define(
         fnProcessNext(0);
       },
 
-      _onDepositSaveComplete: function (iErrorCount, sPackingNumber) {
+      _onDepositSaveComplete: function (iErrorCount, sPackingNumber, bDepositOnlyMode) {
         sap.ui.core.BusyIndicator.hide();
         this._oDepositAddDialog.close();
 
-        if (iErrorCount > 0) {
-          MessageBox.warning(
-            "Bazı harici depozitolar kaydedilemedi (" +
-              iErrorCount +
-              " hata). Mal çıkış işlemine devam edilecek.",
-            {
-              onClose: function () {
-                this._executePostGoodsIssue(sPackingNumber);
-              }.bind(this),
-            }
-          );
+        if (bDepositOnlyMode) {
+          // Deposit-only mode: just show message and refresh
+          if (iErrorCount > 0) {
+            MessageBox.warning(
+              "Bazı harici depozitolar kaydedilemedi (" + iErrorCount + " hata)."
+            );
+          } else {
+            MessageToast.show("Harici depozitolar kaydedildi");
+          }
+          // Refresh package data to show new deposits
+          this._refreshSinglePackageWithExpand(sPackingNumber);
         } else {
-          MessageToast.show("Harici depozitolar kaydedildi");
-          this._executePostGoodsIssue(sPackingNumber);
+          // Mal Çıkış mode: proceed to goods issue
+          if (iErrorCount > 0) {
+            MessageBox.warning(
+              "Bazı harici depozitolar kaydedilemedi (" +
+                iErrorCount +
+                " hata). Mal çıkış işlemine devam edilecek.",
+              {
+                onClose: function () {
+                  this._executePostGoodsIssue(sPackingNumber);
+                }.bind(this),
+              }
+            );
+          } else {
+            MessageToast.show("Harici depozitolar kaydedildi");
+            this._executePostGoodsIssue(sPackingNumber);
+          }
         }
       },
       onDepositAddCancel: function () {
@@ -1378,7 +1574,10 @@ sap.ui.define(
       },
       onDepositAddSkip: function () {
         this._oDepositAddDialog.close();
-        this._executePostGoodsIssue(this._sCurrentPackingNumber);
+        // Only proceed to Mal Çıkış if not in deposit-only mode
+        if (!this._bDepositOnlyMode) {
+          this._executePostGoodsIssue(this._sCurrentPackingNumber);
+        }
       },
 
       _executePostGoodsIssue: function (sPackingNumber) {
@@ -1570,6 +1769,54 @@ sap.ui.define(
           }.bind(this),
           error: function (oError) {
             console.error("Refresh failed:", oError);
+          }.bind(this),
+        });
+      },
+
+      _refreshSinglePackageWithExpand: function (sPackingNumber) {
+        var oModel = this.getOwnerComponent().getModel();
+        var oIssuePackagesModel = this.getView().getModel("issuePackagesModel");
+        var aPackages = oIssuePackagesModel.getData();
+        var oCurrentPkg = aPackages.find(function (pkg) {
+          return pkg.PackingNumber === sPackingNumber;
+        });
+
+        if (!oCurrentPkg) return;
+
+        var aFilters = [
+          new Filter("PackingNumber", FilterOperator.EQ, sPackingNumber),
+        ];
+
+        sap.ui.core.BusyIndicator.show(0);
+        oModel.read("/IssuePackageSet", {
+          filters: aFilters,
+          urlParameters: { $expand: "ToItems" },
+          success: function (oData) {
+            sap.ui.core.BusyIndicator.hide();
+            if (oData.results && oData.results.length > 0) {
+              var oUpdatedPkg = oData.results[0];
+              // Keep panel expanded to show new deposits
+              oUpdatedPkg.expanded = true;
+              oUpdatedPkg._refreshTrigger =
+                (oCurrentPkg._refreshTrigger || 0) + 1;
+
+              var iPkgIndex = aPackages.findIndex(function (p) {
+                return p.PackingNumber === sPackingNumber;
+              });
+              if (iPkgIndex >= 0) {
+                aPackages[iPkgIndex] = oUpdatedPkg;
+                oIssuePackagesModel.refresh(true);
+                // Use timeout to ensure model is updated before rendering
+                setTimeout(function() {
+                  this._calculateAndRenderItems();
+                }.bind(this), 100);
+              }
+            }
+          }.bind(this),
+          error: function (oError) {
+            sap.ui.core.BusyIndicator.hide();
+            console.error("Refresh failed:", oError);
+            MessageBox.error("Veriler yenilenemedi.");
           }.bind(this),
         });
       },

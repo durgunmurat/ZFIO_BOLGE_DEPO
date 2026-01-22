@@ -5,14 +5,15 @@
     <Dialog
         id="idDepositAddDialog"
         title="Harici Depozito Ekle"
-        contentWidth="600px"
-        contentHeight="400px"
+        contentWidth="95%"
         stretch="{device>/isPhone}"
+        verticalScrolling="true"
+        horizontalScrolling="false"
     >
         <content>
             <VBox class="sapUiSmallMargin">
                 <MessageStrip
-                    text="Aşağıdaki listeden harici depozito malzemelerinin miktarlarını giriniz. Teslimatın içinde olan malzemeler pasiftir."
+                    text="Aşağıdaki listeden harici depozito malzemelerinin miktarlarını giriniz."
                     type="Information"
                     showIcon="true"
                     class="sapUiSmallMarginBottom"
@@ -20,37 +21,33 @@
                 <Table
                     id="idDepositAddTable"
                     items="{depositAddModel>/items}"
-                    growing="true"
-                    growingThreshold="50"
+                    growing="false"
                     noDataText="Harici depozito malzemesi bulunamadı"
+                    fixedLayout="true"
                 >
                     <columns>
-                        <Column width="6em">
-                            <Text text="Malzeme No" />
-                        </Column>
-                        <Column>
+                        <Column width="60%">
                             <Text text="Malzeme Adı" />
                         </Column>
-                        <Column width="5em" hAlign="Center">
-                            <Text text="Birim" />
-                        </Column>
-                        <Column width="8em" hAlign="Center">
+                        <Column width="40%" hAlign="Center">
                             <Text text="Miktar" />
                         </Column>
                     </columns>
                     <items>
-                        <ColumnListItem>
+                        <ColumnListItem
+                            highlight="{= ${depositAddModel>IsExternal} ? 'Success' : (${depositAddModel>IsExisting} ? 'None' : 'Information') }"
+                        >
                             <cells>
-                                <Text text="{= parseInt(${depositAddModel>Matnr}) }" />
-                                <Text text="{depositAddModel>Maktx}" />
-                                <Text text="{depositAddModel>Uom}" />
+                                <Text text="{depositAddModel>Maktx}" wrapping="true" />
                                 <StepInput
                                     value="{depositAddModel>Quantity}"
                                     min="0"
+                                    max="999"
                                     step="1"
+                                    width="100%"
                                     displayValuePrecision="0"
                                     textAlign="Center"
-                                    enabled="{= !${depositAddModel>IsExisting} }"
+                                    enabled="{= !${depositAddModel>IsExisting} || ${depositAddModel>IsExternal} }"
                                     change="onDepositQuantityChange"
                                 />
                             </cells>
@@ -59,22 +56,18 @@
                 </Table>
             </VBox>
         </content>
-        <beginButton>
+        <buttons>
             <Button
-                text="Kaydet ve Mal Çıkış"
+                id="idDepositSaveBtn"
+                text="Kaydet"
                 type="Emphasized"
                 press="onDepositAddSave"
             />
-        </beginButton>
-        <endButton>
-            <!-- <Button
-                text="Atla"
-                press="onDepositAddSkip"
-            /> -->
-                <Button
+            <Button
                 text="İptal"
                 type="Transparent"
-                press="onDepositAddCancel"/>
-        </endButton>
+                press="onDepositAddCancel"
+            />
+        </buttons> 
     </Dialog>
 </core:FragmentDefinition>

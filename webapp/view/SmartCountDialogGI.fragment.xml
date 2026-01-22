@@ -12,6 +12,7 @@
                 <!-- Header: Ürün Bilgisi -->
                 <VBox class="sapUiSmallMarginBottom">
                     <Title text="{smartCountModel>/materialText}" level="H4" class="sapUiTinyMarginBottom"/>
+                    <Text text="Malzeme No: {smartCountModel>/materialNumber}" class="sapUiTinyMarginBottom"/>
                     
                     <HBox justifyContent="SpaceBetween" alignItems="Center">
                         <Label text="Beklenen: {smartCountModel>/expectedQuantity} {smartCountModel>/uom}" design="Bold"/>
