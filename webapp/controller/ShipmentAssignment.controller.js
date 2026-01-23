@@ -403,7 +403,7 @@ sap.ui.define(
           // Create dialog if not exists
           if (!this._oPersonnelDialog) {
             this._oPersonnelDialog = new sap.m.Dialog({
-              title: "Personel Seçimi (Maksimum 5)",
+              title: "Personel Seçimi (Min. 2, Maks. 5)",
               contentWidth: "400px",
               contentHeight: "500px",
               resizable: true,
@@ -415,7 +415,8 @@ sap.ui.define(
                     path: "employeeModel>/",
                     template: new sap.m.StandardListItem({
                       title: "{employeeModel>EmployeeName}",
-                      type: "Active",
+                      description: "{employeeModel>_assignedAsOfficerText}",
+                      type: "{= ${employeeModel>_isAssignedAsOfficer} ? 'Inactive' : 'Active' }",
                     }),
                   },
                   selectionChange: this._onDialogSelectionChange.bind(this),
@@ -438,6 +439,10 @@ sap.ui.define(
 
           // Set selection AFTER dialog opens and items are rendered
           var oList = this._oPersonnelDialog.getContent()[0];
+          
+          // Mark employees who are assigned as officers for this shipment
+          this._markEmployeesAssignedAsOfficers();
+          
           oList.getBinding("items").refresh();
 
           // Set selected items based on SelectedEmployeeKeys
@@ -464,28 +469,63 @@ sap.ui.define(
             if (oContext) {
               var sEmployeeId = oContext.getProperty("EmployeeId");
               var bSelected = aSelectedKeys.indexOf(sEmployeeId) !== -1;
-              oList.setSelectedItem(oItem, bSelected);
+              // Don't select if assigned as officer
+              var bIsAssignedAsOfficer = oContext.getProperty("_isAssignedAsOfficer");
+              if (bIsAssignedAsOfficer) {
+                oList.setSelectedItem(oItem, false);
+              } else {
+                oList.setSelectedItem(oItem, bSelected);
+              }
             }
           });
         },
 
         /**
-         * Handle selection change in dialog - enforce max 5 limit
+         * Mark employees who are assigned as officers for current shipment
+         * This updates employeeModel with _isAssignedAsOfficer flag
+         */
+        _markEmployeesAssignedAsOfficers: function () {
+          var oEmployeeModel = this.getView().getModel("employeeModel");
+          var aEmployees = oEmployeeModel.getData();
+          var aSelectedOfficerKeys = this._currentShipment.SelectedOfficerKeys || [];
+
+          aEmployees.forEach(function (oEmployee) {
+            // OfficerModel uses OfficerId, EmployeeModel uses EmployeeId
+            // Since backend now allows same person in both lists, check if EmployeeId matches any OfficerId
+            var bIsAssignedAsOfficer = aSelectedOfficerKeys.indexOf(oEmployee.EmployeeId) !== -1;
+            oEmployee._isAssignedAsOfficer = bIsAssignedAsOfficer;
+            oEmployee._assignedAsOfficerText = bIsAssignedAsOfficer ? "(Memur olarak atanmış)" : "";
+          });
+
+          oEmployeeModel.refresh();
+        },
+
+        /**
+         * Handle selection change in dialog - enforce max 5 limit and check officer assignment
          */
         _onDialogSelectionChange: function (oEvent) {
           var oList = oEvent.getSource();
+          var oListItem = oEvent.getParameter("listItem");
+          var bSelected = oEvent.getParameter("selected");
           var aSelectedItems = oList.getSelectedItems();
 
-          // Check if trying to select more than 5
-          if (aSelectedItems.length > 5) {
-            var oListItem = oEvent.getParameter("listItem");
-            var bSelected = oEvent.getParameter("selected");
-
-            // If user tried to select 6th item, deselect it
-            if (bSelected && aSelectedItems.length > 5) {
-              oList.setSelectedItem(oListItem, false);
-              MessageBox.warning("Maksimum 5 personel seçebilirsiniz.");
+          // Check if the selected employee is assigned as officer for this shipment
+          if (bSelected && oListItem) {
+            var oContext = oListItem.getBindingContext("employeeModel");
+            if (oContext) {
+              var bIsAssignedAsOfficer = oContext.getProperty("_isAssignedAsOfficer");
+              if (bIsAssignedAsOfficer) {
+                oList.setSelectedItem(oListItem, false);
+                MessageToast.show("Bu personel memur olarak atanmış. Personel olarak seçilemez.");
+                return;
+              }
             }
+          }
+
+          // Check if trying to select more than 5
+          if (bSelected && aSelectedItems.length > 5) {
+            oList.setSelectedItem(oListItem, false);
+            MessageBox.warning("Maksimum 5 personel seçebilirsiniz.");
           }
         },
 
@@ -495,6 +535,12 @@ sap.ui.define(
         _onSavePersonnelDialog: function () {
           var oList = this._oPersonnelDialog.getContent()[0];
           var aSelectedItems = oList.getSelectedItems();
+
+          // Minimum 2 personel kontrolü
+          if (aSelectedItems.length < 2) {
+            MessageBox.warning("En az 2 personel seçmelisiniz.");
+            return;
+          }
 
           // Get selected employee IDs
           var aSelectedEmployeeKeys = aSelectedItems.map(function (oItem) {
@@ -947,6 +993,7 @@ sap.ui.define(
             urlParameters: {
               ShipmentId: sShipmentId,
               AssignedEmployeeIds: sAssignedEmployeeIds,
+              Type: aType,
             },
             success: function (oData, oResponse) {
               MessageBox.success("Kayıt başarılı.");

@@ -28,6 +28,16 @@ sap.ui.define(
       _sCurrentNotePackingNumber: null,
       _mTableGrowingState: {}, // Map to store growing state per table
       
+      // --- PERFORMANCE OPTIMIZATION ---
+      _iRenderDebounceTimer: null,
+      _iRefreshDebounceTimer: null,
+      _mCategoryCache: {}, // Cache for category data per package
+      _mItemsCache: {}, // Cache for items data per package
+      _bBatchUpdateInProgress: false,
+      _aPendingUpdates: [], // Queue for batch updates
+      _iLastRenderTime: 0,
+      _iMinRenderInterval: 150, // Minimum ms between renders
+      
       // --- FEATURE FLAGS ---
       // Mal Çıkış öncesi Depozito Ekleme dialogunu göster/gizle
       // true: Dialog gösterilir, false: Dialog atlanır ve direkt Mal Çıkış yapılır
@@ -96,6 +106,12 @@ sap.ui.define(
           return false;
         }
 
+        // Use cache if available and refresh trigger hasn't changed
+        var sCacheKey = sPackingNumber + "_" + (refreshTrigger || 0);
+        if (this._mMalCikisCache && this._mMalCikisCache[sCacheKey] !== undefined) {
+          return this._mMalCikisCache[sCacheKey];
+        }
+
         var oIssuePackagesModel = this.getView().getModel("issuePackagesModel");
         if (!oIssuePackagesModel) {
           return false;
@@ -119,7 +135,59 @@ sap.ui.define(
           return oItem.Approved === "X";
         });
 
+        // Cache result
+        if (!this._mMalCikisCache) {
+          this._mMalCikisCache = {};
+        }
+        this._mMalCikisCache[sCacheKey] = bAllApproved;
+
         return bAllApproved;
+      },
+
+      /**
+       * Formatter: Check if bulk approve button should be enabled
+       * Returns true if there are items with:
+       * - CountedQuantity > 0 or _hasBeenCounted = true (miktar girilmiş)
+       * - Approved !== 'X' (henüz onaylanmamış)
+       * - CountedQuantity === TargetQuantity (miktarlar eşit)
+       */
+      isBulkApproveEnabled: function (sPackingNumber, refreshTrigger) {
+        if (!sPackingNumber) {
+          return false;
+        }
+
+        var oIssuePackagesModel = this.getView().getModel("issuePackagesModel");
+        if (!oIssuePackagesModel) {
+          return false;
+        }
+
+        var aPackages = oIssuePackagesModel.getData();
+        var oPackage = aPackages.find(function (oPkg) {
+          return oPkg.PackingNumber === sPackingNumber;
+        });
+
+        if (!oPackage || !oPackage.ToItems || !oPackage.ToItems.results) {
+          return false;
+        }
+
+        var aItems = oPackage.ToItems.results;
+        if (aItems.length === 0) {
+          return false;
+        }
+
+        // Check if there are any items matching the criteria
+        var bHasApprovableItems = aItems.some(function (oItem) {
+          var fCounted = parseFloat(oItem.CountedQuantity || "0");
+          var fTarget = parseFloat(oItem.TargetQuantity || "0");
+          var bHasBeenCounted = oItem._hasBeenCounted === true || oItem.LocalStatus === "IP";
+          var bNotApproved = oItem.Approved !== "X";
+          var bQuantityMatches = fCounted === fTarget;
+          var bHasQuantity = fCounted > 0 || bHasBeenCounted;
+
+          return bHasQuantity && bNotApproved && bQuantityMatches;
+        });
+
+        return bHasApprovableItems;
       },
 
       // --- LIFECYCLE METHODS ---
@@ -134,6 +202,13 @@ sap.ui.define(
         this.getView().setModel(oEditReasonsModel, "editReasonsModel");
         this._loadEditReasons();
 
+        // Initialize performance caches
+        this._mCategoryCache = {};
+        this._mItemsCache = {};
+        this._mMalCikisCache = {};
+        this._mTableGrowingState = {};
+        this._mTemplateCache = {}; // Cache for table templates
+
         this.getRouter()
           .getRoute("goodsIssue")
           .attachPatternMatched(this._onRouteMatched, this);
@@ -145,6 +220,16 @@ sap.ui.define(
       },
 
       _createTableItemTemplate: function (sModelName) {
+        // OPTIMIZATION: Cache templates per model name to avoid recreation
+        if (!this._mTemplateCache) {
+          this._mTemplateCache = {};
+        }
+        
+        // Return cached template if exists (clone it for reuse)
+        if (this._mTemplateCache[sModelName]) {
+          return this._mTemplateCache[sModelName].clone();
+        }
+        
         var oTemplate = new sap.m.ColumnListItem({
           highlight: {
             parts: [
@@ -182,10 +267,11 @@ sap.ui.define(
             //     textAlign: "Center"
             // }),
 
-            // ACTION BUTTONS
+            // ACTION BUTTONS - Hidden when package Status is 'X' (completed)
             new sap.m.HBox({
               justifyContent: "SpaceAround",
               width: "100%",
+              visible: "{= ${" + sModelName + ">Status} !== 'X' }",
               items: [
                 new sap.m.Button({
                   type: {
@@ -246,7 +332,26 @@ sap.ui.define(
           formatter: this.formatRowHighlight.bind(this),
         });
 
-        return oTemplate;
+        // Cache the template for reuse
+        this._mTemplateCache[sModelName] = oTemplate;
+
+        return oTemplate.clone();
+      },
+
+      // --- TABLE PERFORMANCE HANDLERS ---
+      
+      onTableUpdateStarted: function (oEvent) {
+        // Show busy indicator for large updates
+        var oTable = oEvent.getSource();
+        var sReason = oEvent.getParameter("reason");
+        if (sReason === "Growing" || sReason === "Filter" || sReason === "Sort") {
+          oTable.setBusy(true);
+        }
+      },
+      
+      onTableUpdateFinished: function (oEvent) {
+        var oTable = oEvent.getSource();
+        oTable.setBusy(false);
       },
 
       _loadEditReasons: function () {
@@ -268,6 +373,22 @@ sap.ui.define(
         if (oItemsModel) oItemsModel.setData([]);
         var oIssuePackagesModel = this.getView().getModel("issuePackagesModel");
         if (oIssuePackagesModel) oIssuePackagesModel.setData([]);
+        
+        // Clear performance caches
+        this._mCategoryCache = {};
+        this._mItemsCache = {};
+        this._mMalCikisCache = {};
+        this._mTableGrowingState = {};
+        
+        // Clear any pending timers
+        if (this._iRenderDebounceTimer) {
+          clearTimeout(this._iRenderDebounceTimer);
+          this._iRenderDebounceTimer = null;
+        }
+        if (this._iRefreshDebounceTimer) {
+          clearTimeout(this._iRefreshDebounceTimer);
+          this._iRefreshDebounceTimer = null;
+        }
       },
 
       _loadGoodsIssueData: function () {
@@ -344,6 +465,155 @@ sap.ui.define(
       },
 
       // --- SMART COUNT LOGIC ---
+
+      /**
+       * Bulk approve all items that match criteria:
+       * - Has quantity entered (CountedQuantity > 0 or _hasBeenCounted)
+       * - Not yet approved (Approved !== 'X')
+       * - CountedQuantity === TargetQuantity
+       */
+      onBulkApprovePress: function (oEvent) {
+        var oButton = oEvent.getSource();
+        var oPanel = oButton.getParent();
+        while (oPanel && oPanel.getMetadata().getName() !== "sap.m.Panel") {
+          oPanel = oPanel.getParent();
+        }
+        if (!oPanel) {
+          MessageBox.error("Panel bulunamadı.");
+          return;
+        }
+        var oL1Context = oPanel.getBindingContext("issuePackagesModel");
+        if (!oL1Context) {
+          MessageBox.error("Package context bulunamadı.");
+          return;
+        }
+        var oPackage = oL1Context.getObject();
+        var sPackingNumber = oPackage.PackingNumber;
+
+        if (!oPackage.ToItems || !oPackage.ToItems.results) {
+          MessageToast.show("Onaylanacak kalem bulunamadı.");
+          return;
+        }
+
+        // Find all items matching the criteria
+        var aItemsToApprove = oPackage.ToItems.results.filter(function (oItem) {
+          var fCounted = parseFloat(oItem.CountedQuantity || "0");
+          var fTarget = parseFloat(oItem.TargetQuantity || "0");
+          var bHasBeenCounted = oItem._hasBeenCounted === true || oItem.LocalStatus === "IP";
+          var bNotApproved = oItem.Approved !== "X";
+          var bQuantityMatches = fCounted === fTarget;
+          var bHasQuantity = fCounted > 0 || bHasBeenCounted;
+
+          return bHasQuantity && bNotApproved && bQuantityMatches;
+        });
+
+        if (aItemsToApprove.length === 0) {
+          MessageToast.show("Onaylanacak uygun kalem bulunamadı.");
+          return;
+        }
+
+        // Confirm before bulk approval
+        MessageBox.confirm(
+          aItemsToApprove.length + " kalem toplu olarak onaylanacak. Devam etmek istiyor musunuz?",
+          {
+            title: "Toplu Onay",
+            onClose: function (sAction) {
+              if (sAction === MessageBox.Action.OK) {
+                this._executeBulkApprove(sPackingNumber, aItemsToApprove);
+              }
+            }.bind(this)
+          }
+        );
+      },
+
+      /**
+       * Execute bulk approval for selected items
+       */
+      _executeBulkApprove: function (sPackingNumber, aItemsToApprove) {
+        var oIssuePackagesModel = this.getView().getModel("issuePackagesModel");
+        var aPackages = oIssuePackagesModel.getData();
+        var oPackage = aPackages.find(function (pkg) {
+          return pkg.PackingNumber === sPackingNumber;
+        });
+
+        // OPTIMISTIC UPDATE - immediate UI feedback
+        if (oPackage && oPackage.ToItems) {
+          aItemsToApprove.forEach(function (oItemToApprove) {
+            oPackage.ToItems.results.forEach(function (oBackendItem) {
+              if (oBackendItem.Material === oItemToApprove.Material) {
+                oBackendItem.Approved = "X";
+                oBackendItem.LocalStatus = "COMPLETED";
+              }
+            });
+          });
+          oPackage._refreshTrigger = (oPackage._refreshTrigger || 0) + 1;
+          
+          // Clear cache for this package
+          if (this._mMalCikisCache) {
+            delete this._mMalCikisCache[sPackingNumber + "_" + (oPackage._refreshTrigger - 1)];
+          }
+          
+          var iPkgIndex = aPackages.indexOf(oPackage);
+          if (iPkgIndex >= 0) {
+            oIssuePackagesModel.setProperty("/" + iPkgIndex + "/_refreshTrigger", oPackage._refreshTrigger);
+          }
+          
+          this._calculateAndRenderItems(sPackingNumber);
+        }
+
+        // Backend update - sequential processing
+        sap.ui.core.BusyIndicator.show(0);
+        var oModel = this.getOwnerComponent().getModel();
+        var iSuccessCount = 0;
+        var iErrorCount = 0;
+        var that = this;
+
+        var fnProcessNext = function (iIndex) {
+          if (iIndex >= aItemsToApprove.length) {
+            // All done
+            sap.ui.core.BusyIndicator.hide();
+            if (iErrorCount > 0) {
+              MessageBox.warning(
+                iSuccessCount + " kalem onaylandı, " + iErrorCount + " kalemde hata oluştu."
+              );
+              // Refresh from backend on partial error
+              that._refreshSinglePackage(sPackingNumber);
+            } else {
+              MessageToast.show(iSuccessCount + " kalem başarıyla onaylandı.");
+            }
+            return;
+          }
+
+          var oItem = aItemsToApprove[iIndex];
+          oModel.callFunction("/UpdateIssueQuantity", {
+            method: "POST",
+            groupId: "bulkApprove" + iIndex,
+            changeSetId: "bulkApproveCS" + iIndex,
+            urlParameters: {
+              PackingNumber: sPackingNumber,
+              Matnr: oItem.Material,
+              Quantity: parseFloat(oItem.CountedQuantity),
+              OriginalQty: parseFloat(oItem.TargetQuantity) || 0,
+              EditReason: oItem.EditReason || "",
+              Harici: false,
+              Status: "0",
+              Approved: "X",
+              Uom: oItem.UoM || "",
+            },
+            success: function () {
+              iSuccessCount++;
+              fnProcessNext(iIndex + 1);
+            },
+            error: function (oError) {
+              console.error("Bulk approve error for item:", oItem.Material, oError);
+              iErrorCount++;
+              fnProcessNext(iIndex + 1);
+            },
+          });
+        };
+
+        fnProcessNext(0);
+      },
 
       onSmartCountPress: function (oEvent) {
         var oButton = oEvent.getSource();
@@ -519,8 +789,20 @@ sap.ui.define(
             }
           });
           oPackage._refreshTrigger = (oPackage._refreshTrigger || 0) + 1;
-          oIssuePackagesModel.refresh(true);
-          this._calculateAndRenderItems();
+          
+          // Clear cache for this package
+          if (this._mMalCikisCache) {
+            delete this._mMalCikisCache[sPackingNumber + "_" + (oPackage._refreshTrigger - 1)];
+          }
+          
+          // OPTIMIZATION: Use setProperty for specific path instead of full refresh
+          var iPkgIndex = aPackages.indexOf(oPackage);
+          if (iPkgIndex >= 0) {
+            oIssuePackagesModel.setProperty("/" + iPkgIndex + "/_refreshTrigger", oPackage._refreshTrigger);
+          }
+          
+          // OPTIMIZATION: Only render the specific package
+          this._calculateAndRenderItems(sPackingNumber);
         }
 
         sap.ui.core.BusyIndicator.show(0);
@@ -685,8 +967,20 @@ sap.ui.define(
           });
           // Increment refresh trigger to update Mal Çıkış button state
           oPackage._refreshTrigger = (oPackage._refreshTrigger || 0) + 1;
-          oIssuePackagesModel.refresh(true);
-          this._calculateAndRenderItems();
+          
+          // Clear cache for this package
+          if (this._mMalCikisCache) {
+            delete this._mMalCikisCache[sPackingNumber + "_" + (oPackage._refreshTrigger - 1)];
+          }
+          
+          // OPTIMIZATION: Use setProperty for specific path instead of full refresh
+          var iPkgIndex = aPackages.indexOf(oPackage);
+          if (iPkgIndex >= 0) {
+            oIssuePackagesModel.setProperty("/" + iPkgIndex + "/_refreshTrigger", oPackage._refreshTrigger);
+          }
+          
+          // OPTIMIZATION: Only render the specific package
+          this._calculateAndRenderItems(sPackingNumber);
         }
 
         // Backend update - skip refresh on success since optimistic update already done
@@ -731,7 +1025,25 @@ sap.ui.define(
         this._oSmartDialog.close();
       },
 
-      _calculateAndRenderItems: function () {
+      _calculateAndRenderItems: function (sSpecificPackingNumber) {
+        // Throttle rendering to prevent excessive updates
+        var iNow = Date.now();
+        if (iNow - this._iLastRenderTime < this._iMinRenderInterval) {
+          // Schedule a delayed render if not already scheduled
+          if (!this._iRenderDebounceTimer) {
+            this._iRenderDebounceTimer = setTimeout(function() {
+              this._iRenderDebounceTimer = null;
+              this._doCalculateAndRenderItems(sSpecificPackingNumber);
+            }.bind(this), this._iMinRenderInterval);
+          }
+          return;
+        }
+        
+        this._iLastRenderTime = iNow;
+        this._doCalculateAndRenderItems(sSpecificPackingNumber);
+      },
+
+      _doCalculateAndRenderItems: function (sSpecificPackingNumber) {
         var oL1List = this.byId("idGIPackagesList");
         if (!oL1List) return;
         var aL1Items = oL1List.getItems();
@@ -741,16 +1053,30 @@ sap.ui.define(
             var oPanel = oL1Item.getContent()[0];
             if (!oPanel) return;
             var oL1Context = oPanel.getBindingContext("issuePackagesModel");
-            var sPackingNumber = oL1Context.getObject().PackingNumber;
-            var sStatus = oL1Context.getObject().Status;
+            if (!oL1Context) return;
+            
+            var oPackage = oL1Context.getObject();
+            var sPackingNumber = oPackage.PackingNumber;
+            
+            // OPTIMIZATION: Only process specific package if provided
+            if (sSpecificPackingNumber && sPackingNumber !== sSpecificPackingNumber) {
+              return;
+            }
+            
+            // OPTIMIZATION: Skip collapsed panels
+            if (!oPackage.expanded) {
+              return;
+            }
+            
+            var sStatus = oPackage.Status;
 
             var oMaterialMap = {};
-            var oPackage = oL1Context.getObject();
 
-            // Process all items and group by Material
+            // Process all items and group by Material - OPTIMIZED
             if (oPackage.ToItems && oPackage.ToItems.results) {
-              oPackage.ToItems.results.forEach(
-                function (oItem) {
+              var aResults = oPackage.ToItems.results;
+              for (var i = 0, len = aResults.length; i < len; i++) {
+                var oItem = aResults[i];
                   var sMaterial = oItem.Material;
                   var sCountedQtyToUse = oItem.CountedQuantity;
                   var sApprovedToUse = oItem.Approved || "";
@@ -768,11 +1094,6 @@ sap.ui.define(
                   }
 
                   if (!oMaterialMap[sMaterial]) {
-                    // Debug: Log first item to see all available fields from backend
-                    if (Object.keys(oMaterialMap).length === 0) {
-                      console.log("Backend Item Fields:", Object.keys(oItem));
-                      console.log("Fiyatli value:", oItem.Fiyatli);
-                    }
                     oMaterialMap[sMaterial] = {
                       PackingNumber: sPackingNumber,
                       Status: sStatus,
@@ -797,8 +1118,7 @@ sap.ui.define(
                       _hasBeenCounted: oItem._hasBeenCounted || false,
                     };
                   }
-                }.bind(this)
-              );
+              }
             }
 
             // Separate items by DeliveryType
@@ -953,7 +1273,13 @@ sap.ui.define(
               }
             }
 
-            oIssuePackagesModel.refresh(true);
+            // OPTIMIZATION: Only refresh specific package path instead of full model
+            var iPkgIndex = aPackages.indexOf(oCurrentPkg);
+            if (iPkgIndex >= 0 && oCurrentPkg) {
+              oIssuePackagesModel.setProperty("/" + iPkgIndex + "/TotalItemCount", oCurrentPkg.TotalItemCount);
+              oIssuePackagesModel.setProperty("/" + iPkgIndex + "/CompletedItemCount", oCurrentPkg.CompletedItemCount);
+              oIssuePackagesModel.setProperty("/" + iPkgIndex + "/CompletionPercentage", oCurrentPkg.CompletionPercentage);
+            }
           }.bind(this)
         );
       },
@@ -1126,6 +1452,9 @@ sap.ui.define(
         if (!oBinding) return;
 
         var oSorter = new sap.ui.model.Sorter("Kategori", false, false);
+        
+        // OPTIMIZATION: Suspend updates during filter change
+        oBinding.suspend();
         oBinding.sort(oSorter);
 
         if (sSelectedKey === "all") {
@@ -1144,6 +1473,8 @@ sap.ui.define(
           var oFilter = new Filter("Kategori", FilterOperator.EQ, sSelectedKey);
           oBinding.filter([oFilter]);
         }
+        
+        oBinding.resume();
       },
 
       onCategoryFilterSelect: function (oEvent) {
@@ -1165,10 +1496,29 @@ sap.ui.define(
         });
 
         if (!oTable) return;
+        
+        // OPTIMIZATION: Debounce filter application
+        var sFilterKey = sPackingNumber + "_" + sType;
+        if (this._mFilterDebounce && this._mFilterDebounce[sFilterKey]) {
+          clearTimeout(this._mFilterDebounce[sFilterKey]);
+        }
+        if (!this._mFilterDebounce) {
+          this._mFilterDebounce = {};
+        }
+        
+        this._mFilterDebounce[sFilterKey] = setTimeout(function() {
+          this._applyCategoryFilterToTable(oTable, sSelectedKey);
+        }.bind(this), 50);
+      },
+      
+      _applyCategoryFilterToTable: function(oTable, sSelectedKey) {
         var oBinding = oTable.getBinding("items");
         if (!oBinding) return;
 
         var oSorter = new sap.ui.model.Sorter("Kategori", false, false);
+        
+        // OPTIMIZATION: Suspend updates during filter change
+        oBinding.suspend();
         oBinding.sort(oSorter);
 
         if (sSelectedKey === "all") {
@@ -1187,6 +1537,8 @@ sap.ui.define(
           var oFilter = new Filter("Kategori", FilterOperator.EQ, sSelectedKey);
           oBinding.filter([oFilter]);
         }
+        
+        oBinding.resume();
       },
 
       onStatusFilterSelect: function (oEvent) {
@@ -1346,10 +1698,8 @@ sap.ui.define(
         // Also collect externally added deposits (Harici = 'X' or true)
         var aExistingDepositMatnrs = [];
         var oExternalDepositMap = {}; // Map of Matnr -> CountedQuantity for externally added
-        console.log("=== DEBUG: ToItems ===");
         if (oCurrentPackage && oCurrentPackage.ToItems && oCurrentPackage.ToItems.results) {
           oCurrentPackage.ToItems.results.forEach(function (oItem) {
-            console.log("Item:", oItem.Material, "DeliveryType:", oItem.DeliveryType, "Harici:", oItem.Harici, "CountedQty:", oItem.CountedQuantity, "TargetQty:", oItem.TargetQuantity);
             if (oItem.DeliveryType === "D") {
               // Normalize material number (remove leading zeros for comparison)
               var sNormalizedMat = oItem.Material ? oItem.Material.replace(/^0+/, '') : '';
@@ -1361,13 +1711,10 @@ sap.ui.define(
                 var fTargetQty = parseFloat(oItem.TargetQuantity) || 0;
                 var sQty = fCountedQty > 0 ? String(fCountedQty) : (fTargetQty > 0 ? String(fTargetQty) : "0");
                 oExternalDepositMap[sNormalizedMat] = sQty;
-                console.log("External deposit found:", sNormalizedMat, "CountedQty:", fCountedQty, "TargetQty:", fTargetQty, "Using:", sQty);
               }
             }
           });
         }
-        console.log("aExistingDepositMatnrs:", aExistingDepositMatnrs);
-        console.log("oExternalDepositMap:", oExternalDepositMap);
 
         oModel.read("/DepositGISet", {
           // filters: aFilters,
@@ -1378,7 +1725,6 @@ sap.ui.define(
             // Mark items status:
             // - IsExisting: exists in delivery (from backend, not editable)
             // - IsExternal: added by user externally (Harici = 'X', show current quantity, editable)
-            console.log("=== DEBUG: DepositGISet items ===");
             aItems.forEach(function (oItem) {
               // Normalize material number for comparison
               var sNormalizedMatnr = oItem.Matnr ? oItem.Matnr.replace(/^0+/, '') : '';
@@ -1386,14 +1732,11 @@ sap.ui.define(
               var bIsExternal = !!oExternalDepositMap[sNormalizedMatnr];
               var bIsOriginal = aExistingDepositMatnrs.indexOf(sNormalizedMatnr) !== -1 && !bIsExternal;
               
-              console.log("Matnr:", oItem.Matnr, "Normalized:", sNormalizedMatnr, "IsExternal:", bIsExternal, "IsOriginal:", bIsOriginal);
-              
               oItem.IsExisting = bIsOriginal; // Original deposit from delivery - disable input
               oItem.IsExternal = bIsExternal; // User added externally - editable
               
               if (bIsExternal) {
                 oItem.Quantity = oExternalDepositMap[sNormalizedMatnr];
-                console.log("Setting quantity for external:", sNormalizedMatnr, "to", oItem.Quantity);
                 // IsExisting stays false so it remains editable
               } else {
                 oItem.Quantity = "";

@@ -96,6 +96,22 @@
                                     /> -->
                                     <ToolbarSpacer />
                                     <Button
+                                        icon="sap-icon://accept"
+                                        text="Toplu Onayla"
+                                        tooltip="Miktarı eşleşen tüm kalemleri onayla"
+                                        type="Accept"
+                                        press="onBulkApprovePress"
+                                        enabled="{
+                                            parts: [
+                                                {path: 'issuePackagesModel>PackingNumber'},
+                                                {path: 'issuePackagesModel>_refreshTrigger'}
+                                            ],
+                                            formatter: '.isBulkApproveEnabled'
+                                        }"
+                                        visible="{= ${issuePackagesModel>Status} !== 'X' }"
+                                        class="sapUiTinyMarginEnd"
+                                    />
+                                    <Button
                                         icon="sap-icon://notes"
                                         tooltip="Not Ekle/Görüntüle"
                                         press="onNoteGIPress"
@@ -168,12 +184,14 @@
                                                 <Table
                                                     inset="false"
                                                     growing="true"
-                                                    growingThreshold="30"
-                                                    growingScrollToLoad="false"
+                                                    growingThreshold="50"
+                                                    growingScrollToLoad="true"
                                                     growingTriggerText="Daha Fazla Göster"
                                                     width="100%"
                                                     noDataText="Ürün bulunamadı"
                                                     class="giProductTable"
+                                                    updateStarted="onTableUpdateStarted"
+                                                    updateFinished="onTableUpdateFinished"
                                                 >
                                                     <columns>
                                                         <Column width="5em" visible="false">
@@ -277,6 +295,7 @@
                                                     type="Transparent"
                                                     press="onDepositAddPress"
                                                     class="giDepositAddBtn"
+                                                    visible="{= ${issuePackagesModel>Status} !== 'X' }"
                                                 />
                                             </OverflowToolbar>
                                         </headerToolbar>
@@ -286,12 +305,14 @@
                                                 <Table
                                                     inset="false"
                                                     growing="true"
-                                                    growingThreshold="30"
-                                                    growingScrollToLoad="false"
+                                                    growingThreshold="50"
+                                                    growingScrollToLoad="true"
                                                     growingTriggerText="Daha Fazla Göster"
                                                     width="100%"
                                                     noDataText="Depozito bulunamadı"
                                                     class="giDepositTable"
+                                                    updateStarted="onTableUpdateStarted"
+                                                    updateFinished="onTableUpdateFinished"
                                                 >
                                                     <columns>
                                                         <Column width="5em" visible="false">
