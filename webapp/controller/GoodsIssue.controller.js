@@ -538,13 +538,24 @@ sap.ui.define(
 
         // OPTIMISTIC UPDATE - immediate UI feedback
         if (oPackage && oPackage.ToItems) {
+          // Create a set of materials being approved for quick lookup
+          var mApprovedMaterials = {};
           aItemsToApprove.forEach(function (oItemToApprove) {
-            oPackage.ToItems.results.forEach(function (oBackendItem) {
-              if (oBackendItem.Material === oItemToApprove.Material) {
-                oBackendItem.Approved = "X";
-                oBackendItem.LocalStatus = "COMPLETED";
+            mApprovedMaterials[oItemToApprove.Material] = true;
+          });
+          
+          oPackage.ToItems.results.forEach(function (oBackendItem) {
+            if (mApprovedMaterials[oBackendItem.Material]) {
+              // Item is being approved
+              oBackendItem.Approved = "X";
+              oBackendItem.LocalStatus = "COMPLETED";
+            } else {
+              // Item is NOT being approved - preserve _hasBeenCounted and LocalStatus
+              // This ensures items with 0 quantity that were counted keep their status
+              if (oBackendItem._hasBeenCounted && !oBackendItem.LocalStatus) {
+                oBackendItem.LocalStatus = "IP";
               }
-            });
+            }
           });
           oPackage._refreshTrigger = (oPackage._refreshTrigger || 0) + 1;
           

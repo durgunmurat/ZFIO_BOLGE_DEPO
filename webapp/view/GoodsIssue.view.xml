@@ -54,12 +54,7 @@
                                         src="sap-icon://shipping-status"
                                         size="1.5rem"
                                         color="#0854A0"
-                                    />
-                                    <ObjectStatus
-                                        text="{issuePackagesModel>Inco2}"
-                                        class="sapUiTinyMarginBegin"
-                                        visible="{= !!${issuePackagesModel>Inco2} }"
-                                    />
+                                    /> 
                                     <Title
                                         text="{= parseInt(${issuePackagesModel>PackingNumber}) }"
                                         level="H3"
@@ -68,6 +63,11 @@
                                     <ObjectStatus
                                         text="{issuePackagesModel>ShipToName}"
                                         class="sapUiTinyMarginBegin"
+                                    />
+                                    <ObjectStatus
+                                        text="{issuePackagesModel>Inco2}"
+                                        class="sapUiTinyMarginBegin"
+                                        visible="{= !!${issuePackagesModel>Inco2} }"
                                     />
                                     <!-- <ObjectStatus
                                         text="{

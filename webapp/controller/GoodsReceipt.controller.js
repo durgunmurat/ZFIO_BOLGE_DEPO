@@ -215,6 +215,20 @@ sap.ui.define(
               }),
               new sap.m.Text({ text: "{" + sModelName + ">SM}" }),
 
+              // SKT BUTTON
+              new sap.m.Button({
+                icon: "sap-icon://temperature",
+                type: {
+                  path: sModelName + ">Urnskt",
+                  formatter: function (sUrnskt) {
+                    return sUrnskt ? "Accept" : "Default";
+                  },
+                },
+                tooltip: "SKT Bilgisi Gir",
+                press: this.onSktPress.bind(this),
+                visible: "{= ${" + sModelName + ">Status} !== 'X' }",
+              }),
+
               // ACTION BUTTONS - HBox with Smart Count and Bitir buttons
               new sap.m.HBox({
                 justifyContent: "SpaceAround",
@@ -695,6 +709,147 @@ sap.ui.define(
           this._oSmartDialog.close();
         },
 
+        // --- SKT DIALOG LOGIC ---
+
+        /**
+         * SKT Dialog - Open with initialization
+         * Collects UrunSicaklik, Urnskt (SKT Date), Sktmk (SKT Quantity)
+         */
+        onSktPress: function (oEvent) {
+          var oButton = oEvent.getSource();
+
+          // Find binding context and model
+          var oBindingContext = null;
+          var sModelName = null;
+          var oItemsModel = null;
+
+          var aModelNames = Object.keys(this.getView().oModels || {});
+          for (var i = 0; i < aModelNames.length; i++) {
+            if (aModelNames[i].startsWith("itemsModel_")) {
+              var oContext = oButton.getBindingContext(aModelNames[i]);
+              if (oContext) {
+                oBindingContext = oContext;
+                sModelName = aModelNames[i];
+                oItemsModel = this.getView().getModel(sModelName);
+                break;
+              }
+            }
+          }
+
+          if (!oBindingContext || !oItemsModel) {
+            MessageBox.error("Ürün bilgisi alınamadı.");
+            return;
+          }
+
+          var oItem = oBindingContext.getObject();
+
+          // Save context for later use
+          this._oCurrentSktContext = oBindingContext;
+          this._sCurrentSktModelName = sModelName;
+
+          // Parse existing values
+          var fSicaklik = parseFloat(oItem.UrunSicaklik || "0");
+          var sUrnskt = "";
+          if (oItem.Urnskt) {
+            if (oItem.Urnskt instanceof Date) {
+              var d = oItem.Urnskt;
+              sUrnskt = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+            } else if (typeof oItem.Urnskt === "string" && oItem.Urnskt.length > 0) {
+              sUrnskt = oItem.Urnskt;
+            }
+          }
+          var fSktmk = parseFloat(oItem.Sktmk || "0");
+
+          var oSktData = {
+            materialText: oItem.MaterialText,
+            materialNo: String(parseInt(oItem.Material)),
+            UrunSicaklik: fSicaklik,
+            Urnskt: sUrnskt,
+            Sktmk: fSktmk,
+          };
+
+          var oSktModel = new JSONModel(oSktData);
+          this.getView().setModel(oSktModel, "sktDialogModel");
+
+          // Open dialog
+          if (!this._oSktDialog) {
+            this._oSktDialog = sap.ui.xmlfragment(
+              "com.sut.bolgeyonetim.view.SktDialog",
+              this
+            );
+            this.getView().addDependent(this._oSktDialog);
+          }
+          this._oSktDialog.open();
+        },
+
+        onSktKaydet: function () {
+          var oSktModel = this.getView().getModel("sktDialogModel");
+          var oSktData = oSktModel.getData();
+
+          var oItemsModel = this.getView().getModel(this._sCurrentSktModelName);
+          var sPath = this._oCurrentSktContext.getPath();
+          var oItem = this._oCurrentSktContext.getObject();
+
+          // Update SKT fields in the items model
+          oItemsModel.setProperty(sPath + "/UrunSicaklik", String(oSktData.UrunSicaklik));
+          oItemsModel.setProperty(sPath + "/Urnskt", oSktData.Urnskt);
+          oItemsModel.setProperty(sPath + "/Sktmk", String(oSktData.Sktmk));
+
+          // Also update in the goodsReceiptModel (backend source)
+          var oGoodsReceiptModel = this.getView().getModel("goodsReceiptModel");
+          var aLicensePlates = oGoodsReceiptModel.getData();
+          var oLicensePlate = aLicensePlates.find(function(lp) {
+            return lp.LpId === oItem.LpId;
+          });
+
+          if (oLicensePlate && oLicensePlate.ToDeliveryNotes) {
+            oLicensePlate.ToDeliveryNotes.results.forEach(function(oDN) {
+              if (oDN.ToItems && oDN.ToItems.results) {
+                oDN.ToItems.results.forEach(function(oBackendItem) {
+                  if (oBackendItem.Material === oItem.Material) {
+                    oBackendItem.UrunSicaklik = String(oSktData.UrunSicaklik);
+                    oBackendItem.Urnskt = oSktData.Urnskt;
+                    oBackendItem.Sktmk = String(oSktData.Sktmk);
+                  }
+                });
+              }
+            });
+            oGoodsReceiptModel.refresh();
+          }
+
+          // Build payload and save to backend
+          var aSelectedDeliveryNotes = this._getSelectedDeliveryNotesForLpId(oItem.LpId);
+          var oUpdatedItem = {
+            ...oItem,
+            UrunSicaklik: String(oSktData.UrunSicaklik),
+            Urnskt: oSktData.Urnskt,
+            Sktmk: String(oSktData.Sktmk),
+          };
+
+          var aPayloadItems = this._buildDistributedPayload(
+            oUpdatedItem,
+            oItem.ReceivedQuantity,
+            oItem.EditReason || "",
+            oItem.Approved || "",
+            aSelectedDeliveryNotes
+          );
+
+          this._oSktDialog.close();
+
+          // Save to backend
+          this._saveToBackend(oItem.LpId, aPayloadItems, "0")
+            .then(function () {
+              MessageToast.show("SKT bilgileri kaydedildi.");
+            })
+            .catch(function () {
+              // Error already shown by _saveToBackend
+            });
+        },
+
+        onSktIptal: function () {
+          this._oSktDialog.close();
+        },
+
         /**
          * Build distributed payload from aggregated item
          * Distributes the totalCalculated quantity across selected delivery notes
@@ -863,6 +1018,11 @@ sap.ui.define(
               // Purchase order fields
               ebeln: oGroup.ebeln || "",
               ebelp: oGroup.ebelp || "",
+              
+              // SKT fields
+              urunsicaklik: oAggregatedItem.UrunSicaklik || "0",
+              urnskt: oAggregatedItem.Urnskt || "",
+              sktmk: oAggregatedItem.Sktmk || "0",
               
               // Status fields
               approved: sApproved,
@@ -1174,6 +1334,9 @@ sap.ui.define(
                                 PalletCount: oItem.PalletCount,
                                 CrateCount: oItem.CrateCount,
                                 UnitCount: oItem.UnitCount,
+                                UrunSicaklik: oItem.UrunSicaklik || "0",
+                                Urnskt: oItem.Urnskt || "",
+                                Sktmk: oItem.Sktmk || "0",
                               };
                               oMaterialDeliveryCount[sMaterial] = 1;
                               oMaterialApprovedCount[sMaterial] =
@@ -1908,6 +2071,7 @@ sap.ui.define(
           // Initialize note dialog model
           var oNoteDialogModel = new JSONModel({
             newNote: "",
+            aracSicaklik: 0,
             notes: [],
           });
           this.getView().setModel(oNoteDialogModel, "noteDialogModel");
@@ -1945,9 +2109,17 @@ sap.ui.define(
               sap.ui.core.BusyIndicator.hide();
               // var aNotes = oData.results || [];
               // oNoteDialogModel.setProperty("/notes", aNotes);
-              var aNotes = "";
-              aNotes = oData.results[0].Note || "";
-              oNoteDialogModel.setProperty("/newNote", aNotes);
+              var sRawNote = oData.results[0].Note || "";
+              // Parse [AIS:xx.xx] prefix for Araç İçi Sıcaklık
+              var rAIS = /^\[AIS:(-?[\d.]+)\]\s?/;
+              var aMatch = sRawNote.match(rAIS);
+              if (aMatch) {
+                oNoteDialogModel.setProperty("/aracSicaklik", parseFloat(aMatch[1]));
+                sRawNote = sRawNote.replace(rAIS, "");
+              } else {
+                oNoteDialogModel.setProperty("/aracSicaklik", 0);
+              }
+              oNoteDialogModel.setProperty("/newNote", sRawNote);
               // console.log("Notes loaded for LpId", sLpId, ":", aNotes.length);
             }.bind(this),
             error: function (oError) {
@@ -1960,14 +2132,27 @@ sap.ui.define(
 
         onSaveNote: function () {
           var oNoteDialogModel = this.getView().getModel("noteDialogModel");
-          var sNewNote = oNoteDialogModel.getProperty("/newNote");
-          // var sNewNote = oNoteDialogModel.getProperty("/Note");
-          if (!sNewNote || sNewNote.trim().length === 0) {
-            MessageBox.warning("Lütfen bir not girin.");
+          var sNewNote = (oNoteDialogModel.getProperty("/newNote") || "").trim();
+          var fAracSicaklik = parseFloat(oNoteDialogModel.getProperty("/aracSicaklik") || 0);
+
+          // En az biri girilmiş olmalı
+          if (!sNewNote && fAracSicaklik === 0) {
+            MessageBox.warning("Lütfen bir not girin veya sıcaklık değeri belirtin.");
             return;
           }
 
-          if (sNewNote.length > 255) {
+          // Sıcaklık varsa [AIS:xx.xx] prefix ekle
+          var sFinalNote = "";
+          if (fAracSicaklik !== 0) {
+            sFinalNote = "[AIS:" + fAracSicaklik.toFixed(2) + "]";
+            if (sNewNote) {
+              sFinalNote += " " + sNewNote;
+            }
+          } else {
+            sFinalNote = sNewNote;
+          }
+
+          if (sFinalNote.length > 255) {
             MessageBox.error("Not en fazla 255 karakter olabilir.");
             return;
           }
@@ -1980,7 +2165,7 @@ sap.ui.define(
             method: "POST",
             urlParameters: {
               LpId: this._sCurrentNoteLpId,
-              Note: sNewNote.trim(),
+              Note: sFinalNote,
             },
             success: function (oData, oResponse) {
               sap.ui.core.BusyIndicator.hide();
@@ -1988,6 +2173,7 @@ sap.ui.define(
 
               // Clear input
               oNoteDialogModel.setProperty("/newNote", "");
+              oNoteDialogModel.setProperty("/aracSicaklik", 0);
 
               // Reload notes
               this._loadNotes(this._sCurrentNoteLpId);

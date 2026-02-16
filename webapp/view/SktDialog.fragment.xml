@@ -1,0 +1,91 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+>
+    <Dialog
+        id="sktDialog"
+        title="SKT Bilgisi Girişi"
+        contentWidth="400px"
+        draggable="true"
+        resizable="false"
+        class="sapUiSizeCompact"
+    >
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <!-- Malzeme Bilgisi -->
+                <Title
+                    text="{sktDialogModel>/materialText}"
+                    level="H4"
+                    class="sapUiTinyMarginBottom"
+                />
+                <Text
+                    text="Malzeme No: {sktDialogModel>/materialNo}"
+                    class="sapUiSmallMarginBottom"
+                />
+
+                <!-- Ürün Sıcaklık Girişi -->
+                <Label
+                    text="Ürün Sıcaklık (°C)"
+                    design="Bold"
+                    class="sapUiTinyMarginTop"
+                />
+                <StepInput
+                    id="sktSicaklikInput"
+                    value="{sktDialogModel>/UrunSicaklik}"
+                    min="-99999"
+                    max="99999"
+                    step="0.5"
+                    displayValuePrecision="2"
+                    width="100%"
+                />
+
+                <!-- SKT Tarih Girişi -->
+                <Label
+                    text="SKT Tarihi"
+                    design="Bold"
+                    class="sapUiMediumMarginTop"
+                />
+                <DatePicker
+                    id="sktDatePicker"
+                    value="{sktDialogModel>/Urnskt}"
+                    valueFormat="yyyy-MM-dd"
+                    displayFormat="dd.MM.yyyy"
+                    width="100%"
+                    placeholder="Gün.Ay.Yıl"
+                />
+
+                <!-- SKT Miktar Girişi -->
+                <Label
+                    text="SKT Miktarı"
+                    design="Bold"
+                    class="sapUiMediumMarginTop"
+                />
+                <StepInput
+                    id="sktMiktarInput"
+                    value="{sktDialogModel>/Sktmk}"
+                    min="0"
+                    max="9999999999"
+                    step="1"
+                    displayValuePrecision="3"
+                    width="100%"
+                />
+            </VBox>
+        </content>
+        <beginButton>
+            <Button
+                text="Kaydet"
+                type="Emphasized"
+                press="onSktKaydet"
+                icon="sap-icon://save"
+            />
+        </beginButton>
+        <endButton>
+            <Button
+                text="İptal"
+                type="Transparent"
+                press="onSktIptal"
+                icon="sap-icon://decline"
+            />
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

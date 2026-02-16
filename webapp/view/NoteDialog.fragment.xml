@@ -5,22 +5,39 @@
   <Dialog
     title="Not Yönetimi"
     contentWidth="500px"
-    contentHeight="200px"
   >
     <content>
       <VBox class="sapUiSmallMargin">
+        <!-- Araç İçi Sıcaklık -->
         <Label
-          text="Yeni Not Ekle"
+          text="Araç İçi Sıcaklık (°C)"
+          design="Bold"
+          class="sapUiTinyMarginBottom"
+        />
+        <StepInput
+          value="{noteDialogModel>/aracSicaklik}"
+          min="-99"
+          max="99"
+          step="0.5"
+          displayValuePrecision="2"
+          width="100%"
+        />
+
+        <!-- Divider -->
+        <core:HTML content='&lt;div style=&quot;border-top:1px solid #e5e5e5; margin: 0.75rem 0;&quot;&gt;&lt;/div&gt;' />
+
+        <!-- Not Alanı -->
+        <Label
+          text="Not"
           labelFor="idNoteInput"
           class="sapUiTinyMarginBottom"
         />
-
         <TextArea
           id="idNoteInput"
           value="{noteDialogModel>/newNote}"
           rows="3"
-          maxLength="255"
-          placeholder="Max 255 karakter..."
+          maxLength="240"
+          placeholder="Max 240 karakter..."
           width="100%"
         />
       </VBox>

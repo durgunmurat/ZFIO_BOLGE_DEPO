@@ -70,7 +70,44 @@ sap.ui.define([
         },
 
         onInventoryCountPress: function() {
-            this.getRouter().navTo("inventoryCount");
+            // Get session data (sicil, depo)
+            var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
+            var sSicilNo = oSessionModel ? oSessionModel.getProperty("/Login/Username") : "";
+            var sWarehouseNum = oSessionModel ? oSessionModel.getProperty("/Login/WarehouseNum") : "";
+            
+            // Get selected date from filter model
+            var oFilterModel = this.getOwnerComponent().getModel("filterModel");
+            var sSelectedDate = oFilterModel ? oFilterModel.getProperty("/selectedDate") : "";
+            
+            // Navigate to external Fiori app (zmmsayim-display) using Cross Application Navigation
+            if (sap.ushell && sap.ushell.Container) {
+                var oCrossAppNavigator = sap.ushell.Container.getService("CrossApplicationNavigation");
+                
+                oCrossAppNavigator.toExternal({
+                    target: {
+                        semanticObject: "zmmsayim",
+                        action: "display"
+                    },
+                    params: {
+                        Sicil: sSicilNo,
+                        Warehouse: sWarehouseNum,
+                        PlanDate: sSelectedDate
+                    }
+                });
+            } else {
+                // Fallback for standalone mode (not in Fiori Launchpad)
+                // Cross-app navigation only works in Fiori Launchpad environment
+                sap.m.MessageBox.information(
+                    "Sayım Uygulamasına yönlendirme sadece Fiori Launchpad ortamında çalışır.\n\n" +
+                    "Gönderilecek parametreler:\n" +
+                    "• Sicil: " + sSicilNo + "\n" +
+                    "• Depo: " + sWarehouseNum + "\n" +
+                    "• Tarih: " + sSelectedDate,
+                    {
+                        title: "Bilgi"
+                    }
+                );
+            }
         },
 
         onDateChange: function(oEvent) {

@@ -197,6 +197,12 @@
                                                     <Text text="SM" />
                                                 </Column>
                                                 <Column
+                                                    width="4rem"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text text="SKT" />
+                                                </Column>
+                                                <Column
                                                     width="7rem"
                                                     hAlign="Center"
                                                 >
