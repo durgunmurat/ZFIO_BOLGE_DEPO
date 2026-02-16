@@ -169,9 +169,6 @@
                                             noDataText="Lütfen bir irsaliye seçin"
                                         >
                                             <columns>
-                                                <Column width="5em">
-                                                    <Text text="KOD" />
-                                                </Column>
                                                 <Column
                                                     minScreenWidth="Phone"
                                                     demandPopin="true"
@@ -197,13 +194,7 @@
                                                     <Text text="SM" />
                                                 </Column>
                                                 <Column
-                                                    width="4rem"
-                                                    hAlign="Center"
-                                                >
-                                                    <Text text="SKT" />
-                                                </Column>
-                                                <Column
-                                                    width="7rem"
+                                                    width="9rem"
                                                     hAlign="Center"
                                                 >
                                                     <Text text="İŞLEM" />

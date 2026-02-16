@@ -194,9 +194,6 @@ sap.ui.define(
         _createTableItemTemplate: function (sModelName) {
           var oTemplate = new sap.m.ColumnListItem({
             cells: [
-              new sap.m.Text({
-                text: "{= parseInt(${" + sModelName + ">Material}) }",
-              }),
               new sap.m.Text({ text: "{" + sModelName + ">MaterialText}" }),
               new sap.m.ObjectNumber({
                 number: {
@@ -215,25 +212,25 @@ sap.ui.define(
               }),
               new sap.m.Text({ text: "{" + sModelName + ">SM}" }),
 
-              // SKT BUTTON
-              new sap.m.Button({
-                icon: "sap-icon://temperature",
-                type: {
-                  path: sModelName + ">Urnskt",
-                  formatter: function (sUrnskt) {
-                    return sUrnskt ? "Accept" : "Default";
-                  },
-                },
-                tooltip: "SKT Bilgisi Gir",
-                press: this.onSktPress.bind(this),
-                visible: "{= ${" + sModelName + ">Status} !== 'X' }",
-              }),
-
-              // ACTION BUTTONS - HBox with Smart Count and Bitir buttons
+              // ACTION BUTTONS - HBox with SKT, Smart Count and Bitir buttons
               new sap.m.HBox({
-                justifyContent: "SpaceAround",
+                justifyContent: "Start",
                 width: "100%",
                 items: [
+                  // SKT BUTTON
+                  new sap.m.Button({
+                    icon: "sap-icon://temperature",
+                    type: {
+                      path: sModelName + ">Urnskt",
+                      formatter: function (sUrnskt) {
+                        return sUrnskt ? "Accept" : "Default";
+                      },
+                    },
+                    tooltip: "SKT Bilgisi Gir",
+                    press: this.onSktPress.bind(this),
+                    visible: "{= ${" + sModelName + ">Status} !== 'X' }",
+                  }).addStyleClass("sapUiTinyMarginEnd"),
+
                   // SMART COUNT BUTTON
                   new sap.m.Button({
                     // text: {
@@ -260,7 +257,7 @@ sap.ui.define(
                     },
                     press: this.onSmartCountPress.bind(this),
                     visible: "{= ${" + sModelName + ">Status} !== 'X' }",
-                  }),
+                  }).addStyleClass("sapUiTinyMarginEnd"),
 
                   // BITIR BUTTON - Only visible when ReceivedQuantity > 0 and not approved
                   new sap.m.Button({
@@ -364,6 +361,7 @@ sap.ui.define(
 
           var oSmartData = {
             materialText: oItem.MaterialText,
+            materialNo: String(parseInt(oItem.Material)),
             expectedQuantity: parseFloat(oItem.ExpectedQuantity),
             uom: oItem.UoM,
 
