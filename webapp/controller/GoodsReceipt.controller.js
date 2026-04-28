@@ -162,6 +162,68 @@ sap.ui.define(
           return bAllApproved;
         },
 
+        /**
+         * Formatter: Check if bulk approve button should be enabled
+         * Returns true if there are items with:
+         * - ReceivedQuantity > 0 or _hasBeenCounted = true (miktar girilmiş)
+         * - Approved !== 'X' (henüz onaylanmamış)
+         * - ReceivedQuantity === ExpectedQuantity (miktarlar eşit)
+         */
+        isBulkApproveEnabled: function (sLpId, refreshTrigger) {
+          if (!sLpId) {
+            return false;
+          }
+
+          var oGoodsReceiptModel = this.getView().getModel("goodsReceiptModel");
+          if (!oGoodsReceiptModel) {
+            return false;
+          }
+
+          var aLicensePlates = oGoodsReceiptModel.getData();
+          var oLicensePlate = aLicensePlates.find(function (oLp) {
+            return oLp.LpId === sLpId;
+          });
+
+          if (
+            !oLicensePlate ||
+            !oLicensePlate.ToDeliveryNotes ||
+            !oLicensePlate.ToDeliveryNotes.results
+          ) {
+            return false;
+          }
+
+          var aDeliveryNotes = oLicensePlate.ToDeliveryNotes.results;
+          if (aDeliveryNotes.length === 0) {
+            return false;
+          }
+
+          // Collect ALL items from ALL delivery notes
+          var aAllItems = [];
+          aDeliveryNotes.forEach(function (oDeliveryNote) {
+            if (oDeliveryNote.ToItems && oDeliveryNote.ToItems.results) {
+              aAllItems = aAllItems.concat(oDeliveryNote.ToItems.results);
+            }
+          });
+
+          if (aAllItems.length === 0) {
+            return false;
+          }
+
+          // Check if there are any items matching the criteria
+          var bHasApprovableItems = aAllItems.some(function (oItem) {
+            var fReceived = parseFloat(oItem.ReceivedQuantity || "0");
+            var fExpected = parseFloat(oItem.ExpectedQuantity || "0");
+            var bHasBeenCounted = oItem._hasBeenCounted === true || oItem.LocalStatus === "IP";
+            var bNotApproved = oItem.Approved !== "X";
+            var bQuantityMatches = fReceived === fExpected;
+            var bHasQuantity = fReceived > 0 || bHasBeenCounted;
+
+            return bHasQuantity && bNotApproved && bQuantityMatches;
+          });
+
+          return bHasApprovableItems;
+        },
+
         // --- LIFECYCLE METHODS ---
 
         onInit: function () {
@@ -297,6 +359,140 @@ sap.ui.define(
           return oTemplate;
         },
 
+        // --- BULK APPROVE LOGIC (TOPLU ONAY) ---
+
+        /**
+         * Bulk approve all items that match criteria:
+         * - Has quantity entered (ReceivedQuantity > 0 or _hasBeenCounted)
+         * - Not yet approved (Approved !== 'X')
+         * - ReceivedQuantity === ExpectedQuantity
+         */
+        onBulkApprovePress: function (oEvent) {
+          var oButton = oEvent.getSource();
+          var oPanel = oButton.getParent();
+          while (oPanel && oPanel.getMetadata().getName() !== "sap.m.Panel") {
+            oPanel = oPanel.getParent();
+          }
+          if (!oPanel) {
+            MessageBox.error("Panel bulunamadı.");
+            return;
+          }
+          var oL1Context = oPanel.getBindingContext("goodsReceiptModel");
+          if (!oL1Context) {
+            MessageBox.error("License Plate context bulunamadı.");
+            return;
+          }
+          var oLicensePlate = oL1Context.getObject();
+          var sLpId = oLicensePlate.LpId;
+
+          if (!oLicensePlate.ToDeliveryNotes || !oLicensePlate.ToDeliveryNotes.results) {
+            MessageToast.show("Onaylanacak kalem bulunamadı.");
+            return;
+          }
+
+          // Collect ALL items from ALL delivery notes that match criteria
+          var aItemsToApprove = [];
+          oLicensePlate.ToDeliveryNotes.results.forEach(function (oDeliveryNote) {
+            if (oDeliveryNote.ToItems && oDeliveryNote.ToItems.results) {
+              oDeliveryNote.ToItems.results.forEach(function (oItem) {
+                var fReceived = parseFloat(oItem.ReceivedQuantity || "0");
+                var fExpected = parseFloat(oItem.ExpectedQuantity || "0");
+                var bHasBeenCounted = oItem._hasBeenCounted === true || oItem.LocalStatus === "IP";
+                var bNotApproved = oItem.Approved !== "X";
+                var bQuantityMatches = fReceived === fExpected;
+                var bHasQuantity = fReceived > 0 || bHasBeenCounted;
+
+                if (bHasQuantity && bNotApproved && bQuantityMatches) {
+                  aItemsToApprove.push({
+                    item: oItem,
+                    deliveryNote: oDeliveryNote
+                  });
+                }
+              });
+            }
+          });
+
+          if (aItemsToApprove.length === 0) {
+            MessageToast.show("Onaylanacak uygun kalem bulunamadı.");
+            return;
+          }
+
+          // Confirm before bulk approval
+          MessageBox.confirm(
+            aItemsToApprove.length + " kalem toplu olarak onaylanacak. Devam etmek istiyor musunuz?",
+            {
+              title: "Toplu Onay",
+              onClose: function (sAction) {
+                if (sAction === MessageBox.Action.OK) {
+                  this._executeBulkApproveGR(sLpId, oLicensePlate, aItemsToApprove);
+                }
+              }.bind(this)
+            }
+          );
+        },
+
+        /**
+         * Execute bulk approval for selected items in GoodsReceipt
+         */
+        _executeBulkApproveGR: function (sLpId, oLicensePlate, aItemsToApprove) {
+          var oGoodsReceiptModel = this.getView().getModel("goodsReceiptModel");
+
+          // OPTIMISTIC UPDATE - immediate UI feedback
+          aItemsToApprove.forEach(function (oItemData) {
+            oItemData.item.Approved = "X";
+            oItemData.item.LocalStatus = "COMPLETED";
+          });
+
+          // Trigger refresh
+          oLicensePlate._refreshTrigger = (oLicensePlate._refreshTrigger || 0) + 1;
+          oGoodsReceiptModel.refresh();
+          this._calculateAndRenderItems();
+
+          // Build payload for backend
+          var aPendingItems = [];
+          aItemsToApprove.forEach(function (oItemData) {
+            var oItem = oItemData.item;
+            var oDeliveryNote = oItemData.deliveryNote;
+
+            aPendingItems.push({
+              lpid: oLicensePlate.LpId || "",
+              warehousenum: oLicensePlate.WarehouseNum || "",
+              platenumber: oLicensePlate.PlateNumber || "",
+              arrivaldate: oLicensePlate.ArrivalDate || "",
+              werks: oLicensePlate.Werks || "",
+              deliverynumber: oDeliveryNote.DeliveryNumber || "",
+              deliveryitemid: oItem.DeliveryItemId || "",
+              itemnumber: oItem.ItemNumber || "",
+              material: oItem.Material || "",
+              expectedquantity: String(parseFloat(oItem.ExpectedQuantity || "0")),
+              receivedquantity: String(parseFloat(oItem.ReceivedQuantity || "0")),
+              baseQuantity: parseFloat(oItem.ReceivedQuantity || "0"),
+              palletCount: parseFloat(oItem.PalletCount || "0"),
+              crateCount: parseFloat(oItem.CrateCount || "0"),
+              uom: oItem.UoM || "",
+              sm: oItem.SM || "",
+              ebeln: oItem.Ebeln || "",
+              ebelp: oItem.Ebelp || "",
+              urunsicaklik: oItem.UrunSicaklik || "0",
+              urnskt: oItem.Urnskt || "",
+              sktmk: oItem.Sktmk || "0",
+              approved: "X",
+              editreason: oItem.EditReason || "",
+            });
+          });
+
+          // Save to backend with Status="0" (intermediate save)
+          this._saveToBackend(sLpId, aPendingItems, "0")
+            .then(function () {
+              MessageToast.show(aItemsToApprove.length + " kalem başarıyla onaylandı.");
+            }.bind(this))
+            .catch(function () {
+              // Error already shown by _saveToBackend
+              // Revert optimistic update on failure
+              this._refreshSingleLicensePlate(sLpId);
+            }.bind(this));
+        },
+
         // --- SMART COUNT LOGIC (AKILLI SAYIM) ---
 
         /**
@@ -383,6 +579,7 @@ sap.ui.define(
             reasonErrorState: false,
             quantityExceeded: false,
             quantityErrorState: false,
+            quickAdjustValue: "",
           };
 
           var oSmartModel = new JSONModel(oSmartData);
@@ -391,12 +588,41 @@ sap.ui.define(
           // Open dialog
           if (!this._oSmartDialog) {
             this._oSmartDialog = sap.ui.xmlfragment(
+              "smartCountGR",
               "com.sut.bolgeyonetim.view.SmartCountDialog",
               this
             );
             this.getView().addDependent(this._oSmartDialog);
+            // Dialog açıldığında StepInput eventlerini ekle
+            this._oSmartDialog.attachAfterOpen(this._attachSmartInputEventsGR, this);
           }
           this._oSmartDialog.open();
+        },
+
+        /**
+         * StepInput'lara focus eventi ekler
+         * - Focus olduğunda tüm değeri seçer (tablet kullanımı için)
+         */
+        _attachSmartInputEventsGR: function () {
+          var aStepInputIds = ["idSmartTotalStepGR", "idSmartPalletStepGR", "idSmartCrateStepGR"];
+
+          aStepInputIds.forEach(function (sId) {
+            var oStepInput = sap.ui.core.Fragment.byId("smartCountGR", sId);
+            if (oStepInput) {
+              var oInputDom = oStepInput.$().find("input")[0];
+              if (oInputDom && !oInputDom._smartEventsAttached) {
+                oInputDom._smartEventsAttached = true;
+
+                // Focus olduğunda tüm metni seç
+                jQuery(oInputDom).on("focus.smartCount", function () {
+                  var self = this;
+                  setTimeout(function () {
+                    self.select();
+                  }, 50);
+                });
+              }
+            }
+          });
         },
 
         // + / - Butonlarına basıldığında çalışır
@@ -472,6 +698,55 @@ sap.ui.define(
           oModel.setProperty("/totalCalculated", fExpected);
           oModel.setProperty("/showReasonError", false);
           oModel.setProperty("/reasonErrorState", false);
+        },
+
+        /**
+         * Hızlı Düzeltme: Miktara ekle (+)
+         */
+        onQuickAdjustPlusGR: function () {
+          this._applyQuickAdjustGR(1);
+        },
+
+        /**
+         * Hızlı Düzeltme: Miktardan çıkar (-)
+         */
+        onQuickAdjustMinusGR: function () {
+          this._applyQuickAdjustGR(-1);
+        },
+
+        /**
+         * Hızlı düzeltme değerini mevcut miktara uygular
+         * @param {number} iDirection - 1: ekle, -1: çıkar
+         */
+        _applyQuickAdjustGR: function (iDirection) {
+          var oModel = this.getView().getModel("smartCountModel");
+          var oData = oModel.getData();
+          var fAdjustValue = parseFloat(oData.quickAdjustValue);
+
+          if (isNaN(fAdjustValue) || fAdjustValue <= 0) {
+            MessageToast.show("Lütfen geçerli bir düzeltme miktarı girin");
+            return;
+          }
+
+          var fCurrentTotal = oData.totalCalculated || 0;
+          var fNewValue = fCurrentTotal + (fAdjustValue * iDirection);
+
+          // Negatif değere izin verme
+          if (fNewValue < 0) {
+            fNewValue = 0;
+            MessageToast.show("Miktar 0'dan küçük olamaz");
+          }
+
+          oModel.setProperty("/baseQuantity", fNewValue);
+          oModel.setProperty("/palletCount", 0);
+          oModel.setProperty("/crateCount", 0);
+          oModel.setProperty("/totalCalculated", fNewValue);
+          oModel.setProperty("/quickAdjustValue", ""); // Input'ı temizle
+
+          if (fNewValue === oData.expectedQuantity) {
+            oModel.setProperty("/showReasonError", false);
+            oModel.setProperty("/reasonErrorState", false);
+          }
         },
 
         onSmartSaveIntermediate: function () {

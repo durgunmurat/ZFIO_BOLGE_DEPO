@@ -27,12 +27,17 @@ sap.ui.define(
       _oCurrentNoteContext: null,
       _sCurrentNotePackingNumber: null,
       _mTableGrowingState: {}, // Map to store growing state per table
+      _iSelectedPackageIndex: null, // Index of selected package in master list
+      _sSelectedPackingNumber: null, // PackingNumber of selected package
+      _oCurrentPhotoContext: null, // Photo dialog context
+      _sCurrentPhotoId: null, // Current photo ID (PackingNumber + Date)
       
       // --- PERFORMANCE OPTIMIZATION ---
       _iRenderDebounceTimer: null,
       _iRefreshDebounceTimer: null,
       _mCategoryCache: {}, // Cache for category data per package
       _mItemsCache: {}, // Cache for items data per package
+      _depositListCache: null, // Cache for deposit list (DepositGISet)
       _bBatchUpdateInProgress: false,
       _aPendingUpdates: [], // Queue for batch updates
       _iLastRenderTime: 0,
@@ -209,6 +214,14 @@ sap.ui.define(
         this._mTableGrowingState = {};
         this._mTemplateCache = {}; // Cache for table templates
 
+        // Initialize photo model
+        var oPhotoModel = new JSONModel({
+          photos: [],
+          photoCount: 0,
+          photoId: null,
+        });
+        this.getView().setModel(oPhotoModel, "photoModel");
+
         this.getRouter()
           .getRoute("goodsIssue")
           .attachPatternMatched(this._onRouteMatched, this);
@@ -217,6 +230,94 @@ sap.ui.define(
       _onRouteMatched: function (oEvent) {
         this._cleanupView();
         this._loadGoodsIssueData();
+      },
+
+      // --- MASTER-DETAIL NAVIGATION ---
+
+      _showMasterView: function () {
+        var oMaster = this.byId("idGIMasterView");
+        var oDetail = this.byId("idGIDetailView");
+        if (oMaster) oMaster.setVisible(true);
+        if (oDetail) oDetail.setVisible(false);
+        this._iSelectedPackageIndex = null;
+        this._sSelectedPackingNumber = null;
+      },
+
+      _showDetailView: function () {
+        var oMaster = this.byId("idGIMasterView");
+        var oDetail = this.byId("idGIDetailView");
+        if (oMaster) oMaster.setVisible(false);
+        if (oDetail) oDetail.setVisible(true);
+      },
+
+      onPackageSelect: function (oEvent) {
+        var oItem = oEvent.getSource();
+        var oContext = oItem.getBindingContext("issuePackagesModel");
+        if (!oContext) return;
+
+        var oPackage = oContext.getObject();
+        var sPackingNumber = oPackage.PackingNumber;
+        var sPath = oContext.getPath(); // e.g., "/3"
+        var iIndex = parseInt(sPath.substring(1));
+
+        this._iSelectedPackageIndex = iIndex;
+        this._sSelectedPackingNumber = sPackingNumber;
+
+        this._loadPackageItems(sPackingNumber, iIndex);
+      },
+
+      _loadPackageItems: function (sPackingNumber, iIndex) {
+        // Data already loaded with $expand in _loadGoodsIssueData - use model directly
+        var oIssuePackagesModel = this.getView().getModel("issuePackagesModel");
+        var aPackages = oIssuePackagesModel.getData();
+        var oPackage = aPackages[iIndex];
+
+        if (!oPackage) {
+          MessageBox.error("Paket bulunamadı.");
+          return;
+        }
+
+        oPackage.expanded = true;
+
+        // Set binding context on detail panel
+        var oDetailPanel = this.byId("idGIDetailPanel");
+        oDetailPanel.setBindingContext(
+          oIssuePackagesModel.createBindingContext("/" + iIndex),
+          "issuePackagesModel"
+        );
+
+        // Show detail view and render items
+        this._showDetailView();
+        this._calculateAndRenderItems(sPackingNumber);
+      },
+
+      onBackToPackageList: function () {
+        // Clear item models for current package
+        if (this._sSelectedPackingNumber) {
+          var sProductModelName = "itemsModel_" + this._sSelectedPackingNumber + "_product";
+          var sDepositModelName = "itemsModel_" + this._sSelectedPackingNumber + "_deposit";
+          var oProductModel = this.getView().getModel(sProductModelName);
+          var oDepositModel = this.getView().getModel(sDepositModelName);
+          if (oProductModel) oProductModel.setData([]);
+          if (oDepositModel) oDepositModel.setData([]);
+        }
+
+        // Hide sub-panels in detail view
+        var oDetailPanel = this.byId("idGIDetailPanel");
+        if (oDetailPanel) {
+          var oVBoxContainer = oDetailPanel.getContent()[0];
+          if (oVBoxContainer && oVBoxContainer.getItems) {
+            oVBoxContainer.getItems().forEach(function (oChildPanel) {
+              if (oChildPanel && oChildPanel.setVisible) {
+                oChildPanel.setVisible(false);
+              }
+            });
+          }
+        }
+
+        // Update status counts (may have changed after operations)
+        this._updateStatusFilterCounts();
+        this._showMasterView();
       },
 
       _createTableItemTemplate: function (sModelName) {
@@ -379,6 +480,8 @@ sap.ui.define(
         this._mItemsCache = {};
         this._mMalCikisCache = {};
         this._mTableGrowingState = {};
+        this._iSelectedPackageIndex = null;
+        this._sSelectedPackingNumber = null;
         
         // Clear any pending timers
         if (this._iRenderDebounceTimer) {
@@ -392,6 +495,11 @@ sap.ui.define(
       },
 
       _loadGoodsIssueData: function () {
+        // Clear caches when loading new data
+        this._mCategoryCache = {};
+        this._mItemsCache = {};
+        this._depositListCache = null; // Clear deposit list cache
+        
         var oModel = this.getOwnerComponent().getModel();
         var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
         var sSicilNo = oSessionModel
@@ -457,6 +565,7 @@ sap.ui.define(
               oStatusFilterBar.setSelectedKey("pending");
               this._applyStatusFilter("pending");
             }
+            this._showMasterView();
           }.bind(this),
           error: function (oError) {
             MessageBox.error("Mal çıkış verileri yüklenemedi.");
@@ -688,6 +797,7 @@ sap.ui.define(
           reasonErrorState: false,
           quantityExceeded: false,
           quantityErrorState: false,
+          quickAdjustValue: "",
         };
 
         var oSmartModel = new JSONModel(oSmartData);
@@ -695,12 +805,41 @@ sap.ui.define(
 
         if (!this._oSmartDialog) {
           this._oSmartDialog = sap.ui.xmlfragment(
+            "smartCountGI",
             "com.sut.bolgeyonetim.view.SmartCountDialogGI",
             this
           );
           this.getView().addDependent(this._oSmartDialog);
+          // Dialog açıldığında StepInput eventlerini ekle
+          this._oSmartDialog.attachAfterOpen(this._attachSmartInputEvents, this);
         }
         this._oSmartDialog.open();
+      },
+
+      /**
+       * StepInput'lara focus eventi ekler
+       * - Focus olduğunda tüm değeri seçer (tablet kullanımı için)
+       */
+      _attachSmartInputEvents: function () {
+        var aStepInputIds = ["idSmartTotalStep", "idSmartPalletStep", "idSmartCrateStep"];
+
+        aStepInputIds.forEach(function (sId) {
+          var oStepInput = sap.ui.core.Fragment.byId("smartCountGI", sId);
+          if (oStepInput) {
+            var oInputDom = oStepInput.$().find("input")[0];
+            if (oInputDom && !oInputDom._smartEventsAttached) {
+              oInputDom._smartEventsAttached = true;
+
+              // Focus olduğunda tüm metni seç
+              jQuery(oInputDom).on("focus.smartCount", function () {
+                var self = this;
+                setTimeout(function () {
+                  self.select();
+                }, 50);
+              });
+            }
+          }
+        });
       },
 
       onSmartInputChanged: function () {
@@ -753,6 +892,64 @@ sap.ui.define(
         }
       },
 
+      /**
+       * Hızlı Düzeltme: Miktara ekle (+)
+       */
+      onQuickAdjustPlus: function () {
+        this._applyQuickAdjust(1);
+      },
+
+      /**
+       * Hızlı Düzeltme: Miktardan çıkar (-)
+       */
+      onQuickAdjustMinus: function () {
+        this._applyQuickAdjust(-1);
+      },
+
+      /**
+       * Hızlı düzeltme değerini mevcut miktara uygular
+       * @param {number} iDirection - 1: ekle, -1: çıkar
+       */
+      _applyQuickAdjust: function (iDirection) {
+        var oModel = this.getView().getModel("smartCountModel");
+        var oData = oModel.getData();
+        var fAdjustValue = parseFloat(oData.quickAdjustValue);
+
+        if (isNaN(fAdjustValue) || fAdjustValue <= 0) {
+          MessageToast.show("Lütfen geçerli bir düzeltme miktarı girin");
+          return;
+        }
+
+        var fCurrentTotal = oData.totalCalculated || 0;
+        var fNewValue = fCurrentTotal + (fAdjustValue * iDirection);
+
+        // Negatif değere izin verme
+        if (fNewValue < 0) {
+          fNewValue = 0;
+          MessageToast.show("Miktar 0'dan küçük olamaz");
+        }
+
+        // Beklenen miktardan fazla giriş kontrolü
+        if (fNewValue > oData.expectedQuantity) {
+          oModel.setProperty("/quantityErrorState", true);
+          oModel.setProperty("/quantityExceeded", true);
+        } else {
+          oModel.setProperty("/quantityErrorState", false);
+          oModel.setProperty("/quantityExceeded", false);
+        }
+
+        oModel.setProperty("/baseQuantity", fNewValue);
+        oModel.setProperty("/palletCount", 0);
+        oModel.setProperty("/crateCount", 0);
+        oModel.setProperty("/totalCalculated", fNewValue);
+        oModel.setProperty("/quickAdjustValue", ""); // Input'ı temizle
+
+        if (fNewValue === oData.expectedQuantity) {
+          oModel.setProperty("/showReasonError", false);
+          oModel.setProperty("/reasonErrorState", false);
+        }
+      },
+
       onCopyExpectedToReceived: function () {
         var oModel = this.getView().getModel("smartCountModel");
         var fExpected = oModel.getProperty("/expectedQuantity");
@@ -780,6 +977,31 @@ sap.ui.define(
           MessageToast.show("Beklenen miktardan fazla giriş yapamazsınız.");
           return;
         }
+
+        // Fiyatlı ürün kontrolü
+        if (oItem.Fiyatli === "X") {
+          MessageBox.confirm(
+            "Fiyatlı ürüne giriş yaptınız, emin misiniz?",
+            {
+              title: "Fiyatlı Ürün Uyarısı",
+              onClose: function (sAction) {
+                if (sAction === MessageBox.Action.OK) {
+                  this._executeSmartSaveIntermediateGI();
+                }
+              }.bind(this)
+            }
+          );
+        } else {
+          this._executeSmartSaveIntermediateGI();
+        }
+      },
+
+      _executeSmartSaveIntermediateGI: function () {
+        var oSmartModel = this.getView().getModel("smartCountModel");
+        var oSmartData = oSmartModel.getData();
+        var oItem = this._oCurrentSmartContext.getObject();
+        var fTotal = parseFloat(oSmartData.totalCalculated);
+        var sPackingNumber = oItem.PackingNumber;
 
         this._oSmartDialog.close();
 
@@ -959,6 +1181,27 @@ sap.ui.define(
 
       _finalizeBitir: function (sEditReason) {
         var oItem = this._oCurrentBitirContext.getObject();
+
+        // Fiyatlı ürün kontrolü
+        if (oItem.Fiyatli === "X") {
+          MessageBox.confirm(
+            "Fiyatlı ürüne giriş yaptınız, emin misiniz?",
+            {
+              title: "Fiyatlı Ürün Uyarısı",
+              onClose: function (sAction) {
+                if (sAction === MessageBox.Action.OK) {
+                  this._executeFinalzeBitir(sEditReason);
+                }
+              }.bind(this)
+            }
+          );
+        } else {
+          this._executeFinalzeBitir(sEditReason);
+        }
+      },
+
+      _executeFinalzeBitir: function (sEditReason) {
+        var oItem = this._oCurrentBitirContext.getObject();
         var sPackingNumber = oItem.PackingNumber;
 
         // OPTIMISTIC UPDATE - immediate UI feedback
@@ -1055,29 +1298,19 @@ sap.ui.define(
       },
 
       _doCalculateAndRenderItems: function (sSpecificPackingNumber) {
-        var oL1List = this.byId("idGIPackagesList");
-        if (!oL1List) return;
-        var aL1Items = oL1List.getItems();
+        // Master-Detail: Process only the single selected package via detail panel
+        var oPanel = this.byId("idGIDetailPanel");
+        if (!oPanel) return;
+        var oL1Context = oPanel.getBindingContext("issuePackagesModel");
+        if (!oL1Context) return;
 
-        aL1Items.forEach(
-          function (oL1Item) {
-            var oPanel = oL1Item.getContent()[0];
-            if (!oPanel) return;
-            var oL1Context = oPanel.getBindingContext("issuePackagesModel");
-            if (!oL1Context) return;
-            
-            var oPackage = oL1Context.getObject();
-            var sPackingNumber = oPackage.PackingNumber;
-            
-            // OPTIMIZATION: Only process specific package if provided
-            if (sSpecificPackingNumber && sPackingNumber !== sSpecificPackingNumber) {
-              return;
-            }
-            
-            // OPTIMIZATION: Skip collapsed panels
-            if (!oPackage.expanded) {
-              return;
-            }
+        var oPackage = oL1Context.getObject();
+        var sPackingNumber = oPackage.PackingNumber;
+
+        // Only process specific package if provided
+        if (sSpecificPackingNumber && sPackingNumber !== sSpecificPackingNumber) {
+          return;
+        }
             
             var sStatus = oPackage.Status;
 
@@ -1116,7 +1349,8 @@ sap.ui.define(
                       TargetQuantity: oItem.TargetQuantity,
                       CountedQuantity: sCountedQtyToUse,
                       UoM: oItem.UoM,
-                      SM: oItem.SM,
+                      // SM: oItem.SM,
+                      SM: oItem.SepetMiktari,
                       Fiyatli: oItem.Fiyatli || "",
                       Approved: sApprovedToUse,
                       EditReason: sEditReasonToUse,
@@ -1243,7 +1477,8 @@ sap.ui.define(
                 "deposit",
                 null
               );
-              oDepositPanel.setVisible(aDepositItems.length > 0);
+              // Depozito paneli her zaman görünür - depozito yoksa bile kullanıcı ekleyebilir
+              oDepositPanel.setVisible(true);
 
               // Calculate total Palet and Sepet quantities from PaletSepet field
               var iTotalPalet = 0;
@@ -1291,8 +1526,6 @@ sap.ui.define(
               oIssuePackagesModel.setProperty("/" + iPkgIndex + "/CompletedItemCount", oCurrentPkg.CompletedItemCount);
               oIssuePackagesModel.setProperty("/" + iPkgIndex + "/CompletionPercentage", oCurrentPkg.CompletionPercentage);
             }
-          }.bind(this)
-        );
       },
 
       _setupItemPanel: function (
@@ -1554,7 +1787,7 @@ sap.ui.define(
 
       onStatusFilterSelect: function (oEvent) {
         var sKey = oEvent.getParameter("key");
-        this._collapseAllPanels();
+        this._showMasterView();
         this._applyStatusFilter(sKey);
       },
 
@@ -1609,7 +1842,7 @@ sap.ui.define(
       },
 
       _applyStatusFilter: function (sStatus) {
-        var oList = this.byId("idGIPackagesList");
+        var oList = this.byId("idGIPackageSelectionList");
         var oBinding = oList.getBinding("items");
         if (!oBinding) return;
         var aFilters = [];
@@ -1695,9 +1928,6 @@ sap.ui.define(
       },
 
       _loadDepositAddItems: function (sPackingNumber) {
-        var oModel = this.getOwnerComponent().getModel();
-        sap.ui.core.BusyIndicator.show(0);
-
         // Get existing deposit materials from the current package
         var oIssuePackagesModel = this.getView().getModel("issuePackagesModel");
         var aPackages = oIssuePackagesModel.getData();
@@ -1727,11 +1957,43 @@ sap.ui.define(
           });
         }
 
+        // Check if we have cached deposit list
+        if (this._depositListCache) {
+          // Use cached data - clone to avoid mutation
+          var aCachedItems = JSON.parse(JSON.stringify(this._depositListCache));
+          
+          // Update status based on current package
+          aCachedItems.forEach(function (oItem) {
+            var sNormalizedMatnr = oItem.Matnr ? oItem.Matnr.replace(/^0+/, '') : '';
+            var bIsExternal = !!oExternalDepositMap[sNormalizedMatnr];
+            var bIsOriginal = aExistingDepositMatnrs.indexOf(sNormalizedMatnr) !== -1 && !bIsExternal;
+            
+            oItem.IsExisting = bIsOriginal;
+            oItem.IsExternal = bIsExternal;
+            
+            if (bIsExternal) {
+              oItem.Quantity = oExternalDepositMap[sNormalizedMatnr];
+            } else {
+              oItem.Quantity = "";
+            }
+          });
+          
+          // Show dialog immediately with cached data
+          this._showDepositAddDialog(aCachedItems);
+          return;
+        }
+
+        // No cache - load from backend
+        var oModel = this.getOwnerComponent().getModel();
+        sap.ui.core.BusyIndicator.show(0);
+
         oModel.read("/DepositGISet", {
-          // filters: aFilters,
           success: function (oData) {
             sap.ui.core.BusyIndicator.hide();
             var aItems = oData.results || [];
+
+            // Cache the original list for future use
+            this._depositListCache = JSON.parse(JSON.stringify(aItems));
 
             // Mark items status:
             // - IsExisting: exists in delivery (from backend, not editable)
@@ -1842,7 +2104,7 @@ sap.ui.define(
             this._executePostGoodsIssue(sPackingNumber);
           } else {
             MessageToast.show("Kaydedilecek yeni depozito yok.");
-          }
+          } 
           return;
         }
 
@@ -2311,6 +2573,328 @@ sap.ui.define(
         if (this._oNoteDialogGI) {
           this._oNoteDialogGI.close();
         }
+      },
+
+      // --- PHOTO MANAGEMENT (GI) ---
+
+      /**
+       * Generate PhotoId from PackingNumber and selected date
+       * Format: PackingNumber + YYYYMMDD
+       */
+      _generatePhotoId: function (sPackingNumber) {
+        var oFilterModel = this.getOwnerComponent().getModel("filterModel");
+        var sSelectedDate = oFilterModel
+          ? oFilterModel.getProperty("/selectedDate")
+          : null;
+
+        var sDatePart;
+        if (sSelectedDate) {
+          // selectedDate format is YYYY-MM-DD
+          sDatePart = sSelectedDate.replace(/-/g, "");
+        } else {
+          var oToday = new Date();
+          var sYear = oToday.getFullYear();
+          var sMonth = String(oToday.getMonth() + 1).padStart(2, "0");
+          var sDay = String(oToday.getDate()).padStart(2, "0");
+          sDatePart = sYear + sMonth + sDay;
+        }
+
+        return sPackingNumber + sDatePart;
+      },
+
+      onPhotoPress: function (oEvent) {
+        if (!navigator.onLine) {
+          MessageBox.error("İnternet bağlantısı yok. Fotoğraf yüklenemez.");
+          return;
+        }
+
+        var oButton = oEvent.getSource();
+        var oPanel = oButton.getParent();
+        while (oPanel && oPanel.getMetadata().getName() !== "sap.m.Panel") {
+          oPanel = oPanel.getParent();
+        }
+
+        if (!oPanel) {
+          MessageBox.error("Panel bilgisi bulunamadı.");
+          return;
+        }
+
+        var oContext = oPanel.getBindingContext("issuePackagesModel");
+        if (!oContext) {
+          MessageBox.error("Paket bilgisi bulunamadı.");
+          return;
+        }
+
+        var oPackage = oContext.getObject();
+        var sPackingNumber = oPackage.PackingNumber;
+        var sPhotoId = this._generatePhotoId(sPackingNumber);
+        var iPhotoCount = parseInt(oPackage.PhotoCount || "0");
+
+        this._oCurrentPhotoContext = oContext;
+        this._sCurrentPhotoId = sPhotoId;
+
+        var oPhotoModel = this.getView().getModel("photoModel");
+        oPhotoModel.setProperty("/photoId", sPhotoId);
+        oPhotoModel.setProperty("/photoCount", iPhotoCount);
+
+        if (!this._oPhotoDialog) {
+          this._oPhotoDialog = sap.ui.xmlfragment(
+            "photoDialogGI",
+            "com.sut.bolgeyonetim.view.PhotoUploadDialog",
+            this
+          );
+          this.getView().addDependent(this._oPhotoDialog);
+        }
+
+        this._loadPhotosGI(sPhotoId);
+        this._oPhotoDialog.open();
+      },
+
+      _loadPhotosGI: function (sPhotoId) {
+        var oModel = this.getOwnerComponent().getModel();
+        var oPhotoModel = this.getView().getModel("photoModel");
+
+        if (!sPhotoId) {
+          console.error("PhotoId is missing");
+          return;
+        }
+
+        sap.ui.core.BusyIndicator.show(0);
+        var sPath = "/PlatePhotoSet";
+
+        oModel.read(sPath, {
+          urlParameters: {
+            $filter: "LpId eq '" + sPhotoId + "' and Type eq '2'",
+            $select: "PhotoId,LpId,FileName,MimeType,Type",
+          },
+          success: function (oData) {
+            sap.ui.core.BusyIndicator.hide();
+            var aPhotos = oData.results || [];
+            oPhotoModel.setProperty("/photos", aPhotos);
+            oPhotoModel.setProperty("/photoCount", aPhotos.length);
+          }.bind(this),
+          error: function (oError) {
+            sap.ui.core.BusyIndicator.hide();
+            console.error("Failed to load photos:", oError);
+            // Try without filter
+            oModel.read(sPath, {
+              success: function (oData) {
+                var aAllPhotos = oData.results || [];
+                var aFilteredPhotos = aAllPhotos.filter(function (oPhoto) {
+                  return oPhoto.LpId === sPhotoId && oPhoto.Type === "2";
+                });
+                oPhotoModel.setProperty("/photos", aFilteredPhotos);
+                oPhotoModel.setProperty("/photoCount", aFilteredPhotos.length);
+              }.bind(this),
+              error: function (oErr) {
+                MessageBox.error("Fotoğraflar yüklenirken hata oluştu.");
+              }.bind(this),
+            });
+          }.bind(this),
+        });
+      },
+
+      onClosePhotoDialog: function () {
+        if (this._oPhotoDialog) {
+          this._oPhotoDialog.close();
+        }
+      },
+
+      onFilePress: function (oEvent) {
+        var oUploadCollection = oEvent.getSource();
+        var aSelectedItems = oUploadCollection.getSelectedItems();
+        if (!aSelectedItems || aSelectedItems.length === 0) return;
+
+        var oItem = aSelectedItems[0];
+        var oContext = oItem.getBindingContext("photoModel");
+        if (!oContext) return;
+
+        var oPhoto = oContext.getObject();
+        var sPhotoId = oPhoto.PhotoId;
+        var sImageUrl =
+          "/sap/opu/odata/sap/ZMM_BOLGE_DEPO_YONETIM_SRV/PlatePhotoSet('" +
+          sPhotoId +
+          "')/$value";
+
+        if (!this._oLightBox) {
+          this._oLightBox = new sap.m.LightBox({
+            imageContent: [
+              new sap.m.LightBoxItem({
+                imageSrc: sImageUrl,
+                title: oPhoto.FileName || "Fotoğraf",
+              }),
+            ],
+          });
+          this.getView().addDependent(this._oLightBox);
+        } else {
+          var oLightBoxItem = this._oLightBox.getImageContent()[0];
+          oLightBoxItem.setImageSrc(sImageUrl);
+          oLightBoxItem.setTitle(oPhoto.FileName || "Fotoğraf");
+        }
+
+        this._oLightBox.open();
+        setTimeout(function () {
+          if (oItem && oItem.setSelected) {
+            oItem.setSelected(false);
+          }
+        }, 100);
+      },
+
+      onBeforeUploadStarts: function (oEvent) {
+        var oModel = this.getOwnerComponent().getModel();
+        oModel.refreshSecurityToken();
+        var sToken = oModel.getSecurityToken();
+
+        var sFileName = oEvent.getParameter("fileName");
+        var sPhotoId = this._sCurrentPhotoId;
+
+        if (!sPhotoId || !sFileName) {
+          MessageBox.error("Geçersiz veri. Lütfen tekrar deneyin.");
+          oEvent.preventDefault();
+          return;
+        }
+
+        // Slug format: LpId|FileName|Type (Type=2 for GoodsIssue)
+        var sSlug = sPhotoId + "|" + sFileName + "|2";
+
+        var oCustomerHeaderToken = new sap.m.UploadCollectionParameter({
+          name: "x-csrf-token",
+          value: sToken,
+        });
+        oEvent.getParameters().addHeaderParameter(oCustomerHeaderToken);
+
+        var oCustomerHeaderSlug = new sap.m.UploadCollectionParameter({
+          name: "slug",
+          value: sSlug,
+        });
+        oEvent.getParameters().addHeaderParameter(oCustomerHeaderSlug);
+      },
+
+      onUploadComplete: function (oEvent) {
+        var mParams = oEvent.getParameters();
+        var iStatus = mParams.status || mParams.getParameter("status");
+        var sResponse = mParams.response || mParams.getParameter("response");
+
+        if (iStatus === 201) {
+          MessageToast.show("Fotoğraf başarıyla yüklendi.");
+          this._loadPhotosGI(this._sCurrentPhotoId);
+
+          // Update photo count in model
+          var oContext = this._oCurrentPhotoContext;
+          if (oContext) {
+            var sPath = oContext.getPath();
+            var oIssuePackagesModel = oContext.getModel();
+            var iCurrentCount = parseInt(
+              oContext.getProperty("PhotoCount") || "0"
+            );
+            oIssuePackagesModel.setProperty(
+              sPath + "/PhotoCount",
+              String(iCurrentCount + 1)
+            );
+          }
+        } else {
+          var sErrorMsg = "Fotoğraf yüklenirken hata oluştu.";
+          if (sResponse) {
+            try {
+              var oErrorResponse = JSON.parse(sResponse);
+              if (
+                oErrorResponse.error &&
+                oErrorResponse.error.message &&
+                oErrorResponse.error.message.value
+              ) {
+                sErrorMsg += "\n\nDetay: " + oErrorResponse.error.message.value;
+              }
+            } catch (e) {
+              sErrorMsg += "\n\nDetay: " + sResponse.substring(0, 200);
+            }
+          }
+          MessageBox.error(sErrorMsg);
+        }
+      },
+
+      onUploadTerminated: function (oEvent) {
+        var mParams = oEvent.getParameters();
+        var sFileName = mParams.fileName || mParams.getParameter("fileName");
+        MessageBox.error("Fotoğraf yüklemesi iptal edildi: " + sFileName);
+      },
+
+      onFileChange: function (oEvent) {
+        var aFiles = oEvent.getParameter("files");
+        if (!aFiles || aFiles.length === 0) return;
+
+        var oFile = aFiles[0];
+        var oPhotoModel = this.getView().getModel("photoModel");
+        var iPhotoCount = oPhotoModel.getProperty("/photoCount");
+
+        if (iPhotoCount >= 5) {
+          MessageBox.warning("Maksimum 5 fotoğraf yükleyebilirsiniz.");
+          oEvent.preventDefault();
+          return;
+        }
+
+        var iMaxSize = 5 * 1024 * 1024; // 5MB
+        if (oFile.size > iMaxSize) {
+          MessageBox.error("Dosya boyutu 5MB'dan büyük olamaz.");
+          oEvent.preventDefault();
+          return;
+        }
+      },
+
+      onFileDeleted: function (oEvent) {
+        var oItem = oEvent.getParameter("item");
+        var sDocumentId = oItem.getDocumentId();
+
+        if (!sDocumentId) {
+          MessageBox.error("Geçersiz fotoğraf ID'si.");
+          return;
+        }
+
+        this._deletePhotoGI(sDocumentId);
+      },
+
+      _deletePhotoGI: function (sPhotoId) {
+        var oModel = this.getOwnerComponent().getModel();
+        var sPath = "/PlatePhotoSet('" + sPhotoId + "')";
+
+        sap.ui.core.BusyIndicator.show(0);
+        oModel.remove(sPath, {
+          success: function () {
+            sap.ui.core.BusyIndicator.hide();
+            MessageToast.show("Fotoğraf silindi.");
+            this._loadPhotosGI(this._sCurrentPhotoId);
+
+            // Update photo count in model
+            var oContext = this._oCurrentPhotoContext;
+            if (oContext) {
+              var sContextPath = oContext.getPath();
+              var oIssuePackagesModel = oContext.getModel();
+              var iCurrentCount = parseInt(
+                oContext.getProperty("PhotoCount") || "0"
+              );
+              oIssuePackagesModel.setProperty(
+                sContextPath + "/PhotoCount",
+                String(Math.max(0, iCurrentCount - 1))
+              );
+            }
+          }.bind(this),
+          error: function (oError) {
+            sap.ui.core.BusyIndicator.hide();
+            var sErrorMsg = "Fotoğraf silinirken hata oluştu.";
+            if (oError && oError.responseText) {
+              try {
+                var oErrorResponse = JSON.parse(oError.responseText);
+                if (
+                  oErrorResponse.error &&
+                  oErrorResponse.error.message &&
+                  oErrorResponse.error.message.value
+                ) {
+                  sErrorMsg = oErrorResponse.error.message.value;
+                }
+              } catch (e) {}
+            }
+            MessageBox.error(sErrorMsg);
+          }.bind(this),
+        });
       },
     });
   }

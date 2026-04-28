@@ -29,15 +29,8 @@
                     <!-- 1. Ana Miktar (Manuel Giriş) -->
                     <VBox width="30%">
                         <Label text="Miktar" design="Bold" required="true" class="sapUiTinyMarginBottom"/>
-                        <!-- <Input
-                            value="{smartCountModel>/totalCalculated}"
-                            type="Number"
-                            liveChange="onTotalManualChange"
-                            textAlign="Center"
-                            description="{smartCountModel>/uom}"
-                            valueState="{= ${smartCountModel>/quantityErrorState} ? 'Error' : 'None' }"
-                            valueStateText="Beklenen miktardan fazla giremezsiniz"/> -->
                       <StepInput
+                            id="idSmartTotalStepGR"
                             value="{smartCountModel>/totalCalculated}"
                             min="0"
                             step="1"
@@ -52,6 +45,7 @@
                     <VBox width="30%">
                         <Label text="Palet ({smartCountModel>/palletFactor})" design="Bold" class="sapUiTinyMarginBottom"/>
                         <StepInput
+                            id="idSmartPalletStepGR"
                             value="{smartCountModel>/palletCount}"
                             min="0"
                             step="1"
@@ -64,6 +58,7 @@
                     <VBox width="30%">
                         <Label text="Sepet ({smartCountModel>/crateFactor})" design="Bold" class="sapUiTinyMarginBottom"/>
                         <StepInput
+                            id="idSmartCrateStepGR"
                             value="{smartCountModel>/crateCount}"
                             min="0"
                             step="1"
@@ -72,6 +67,32 @@
                             change="onSmartInputChanged"/>
                     </VBox>
                 </HBox>
+
+                <!-- Hızlı Düzeltme Bölümü -->
+                <VBox class="sapUiSmallMarginTop">
+                    <Label text="Hızlı Düzeltme" design="Bold" class="sapUiTinyMarginBottom"/>
+                    <HBox alignItems="Center">
+                        <Button
+                            icon="sap-icon://less"
+                            type="Reject"
+                            press="onQuickAdjustMinusGR"
+                            class="sapUiTinyMarginEnd"
+                            tooltip="Miktarı Azalt"/>
+                        <Input
+                            id="idQuickAdjustInputGR"
+                            value="{smartCountModel>/quickAdjustValue}"
+                            type="Number"
+                            textAlign="Center"
+                            width="120px"
+                            placeholder="Miktar"
+                            class="sapUiTinyMarginEnd"/>
+                        <Button
+                            icon="sap-icon://add"
+                            type="Accept"
+                            press="onQuickAdjustPlusGR"
+                            tooltip="Miktarı Artır"/>
+                    </HBox>
+                </VBox>
                 
                 <!-- Footer: Fark Nedeni -->
                 <VBox visible="{smartCountModel>/showReasonError}" class="sapUiMediumMarginTop">

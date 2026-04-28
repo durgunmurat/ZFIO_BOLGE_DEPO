@@ -355,3 +355,9 @@
 .shipmentCardAssigned:hover {
     border-color: #0d6630 !important;
 }
+
+.shipmentCardGIDone {
+    border-color: #666666 !important;
+    background-color: rgba(102, 102, 102, 0.08) !important;
+    opacity: 0.8;
+}

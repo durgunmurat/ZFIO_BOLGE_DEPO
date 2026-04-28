@@ -74,6 +74,12 @@
                         text="Atanan"
                         count="{shipmentStatsModel>/currentTypeAssignedCount}"
                     />
+                    <IconTabFilter
+                        id="idGIDoneTab"
+                        key="gidone"
+                        text="Mal Çıkışı Tamamlananlar"
+                        count="{shipmentStatsModel>/currentTypeGIDoneCount}"
+                    />
                 </items>
             </IconTabBar>
 
@@ -97,7 +103,7 @@
                                 alignItems="Start"
                                 justifyContent="SpaceBetween"
                                 width="100%"
-                                class="{= (${shipmentModel>SelectedOfficerKeys}.length === 0 &amp;&amp; ${shipmentModel>SelectedEmployeeKeys}.length === 0) ? 'sapUiSmallPadding shipmentCard shipmentCardPending' : 'sapUiSmallPadding shipmentCard shipmentCardAssigned' }"
+                                class="{= ${shipmentModel>GIDone} === 'X' ? 'sapUiSmallPadding shipmentCard shipmentCardGIDone' : (${shipmentModel>SelectedOfficerKeys}.length === 0 &amp;&amp; ${shipmentModel>SelectedEmployeeKeys}.length === 0) ? 'sapUiSmallPadding shipmentCard shipmentCardPending' : 'sapUiSmallPadding shipmentCard shipmentCardAssigned' }"
                             >
                                 <!-- Left Side: Shipment Info -->
                                 <VBox
@@ -112,7 +118,7 @@
                                         <core:Icon
                                             src="sap-icon://shipping-status"
                                             size="2rem"
-                                            color="{= (${shipmentModel>SelectedOfficerKeys}.length === 0 &amp;&amp; ${shipmentModel>SelectedEmployeeKeys}.length === 0) ? '#e9730c' : '#0854A0' }"
+                                            color="{= ${shipmentModel>GIDone} === 'X' ? '#666666' : (${shipmentModel>SelectedOfficerKeys}.length === 0 &amp;&amp; ${shipmentModel>SelectedEmployeeKeys}.length === 0) ? '#e9730c' : '#0854A0' }"
                                             class="sapUiSmallMarginEnd"
                                         />
                                         <VBox>
@@ -136,6 +142,11 @@
                                         text="{shipmentModel>CustomerName}"
                                         class="sapUiTinyMarginTop"
                                     />
+                                    <Label
+                                        text="{shipmentModel>Inco2}"
+                                        class="sapUiTinyMarginTop"
+                                        visible="{= !!${shipmentModel>Inco2} }"
+                                    />
                                 </VBox>
 
                                 <!-- Right Side: Personnel Assignment -->
@@ -151,6 +162,7 @@
                                         press="onOpenOfficerDialog"
                                         width="75%"
                                         type="{= ${shipmentModel>SelectedOfficerKeys}.length > 0 ? 'Accept' : 'Emphasized' }"
+                                        enabled="{= ${shipmentModel>GIDone} !== 'X' }"
                                     />
                                     <Label
                                         text="Atanan Personel (Max: 5)"
@@ -163,6 +175,7 @@
                                         press="onOpenPersonnelDialog"
                                         width="75%"
                                         type="{= ${shipmentModel>SelectedEmployeeKeys}.length > 0 ? 'Accept' : 'Emphasized' }"
+                                        enabled="{= ${shipmentModel>GIDone} !== 'X' }"
                                         class="sapUiTinyMarginBottom"
                                     />
                                 </VBox>

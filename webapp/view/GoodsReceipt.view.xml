@@ -75,6 +75,22 @@
                                         class="sapUiTinyMarginBegin"
                                     />
                                     <Button
+                                        icon="sap-icon://accept"
+                                        text="Toplu Onayla"
+                                        tooltip="Miktarı eşleşen tüm kalemleri onayla"
+                                        type="Accept"
+                                        press="onBulkApprovePress"
+                                        enabled="{
+                                            parts: [
+                                                {path: 'goodsReceiptModel>LpId'},
+                                                {path: 'goodsReceiptModel>_refreshTrigger'}
+                                            ],
+                                            formatter: '.isBulkApproveEnabled'
+                                        }"
+                                        visible="{= ${goodsReceiptModel>Status} !== 'X' }"
+                                        class="sapUiTinyMarginEnd"
+                                    />
+                                    <Button
                                         text="Mal Kabul"
                                         type="Emphasized"
                                         press="onMalKabulPress"

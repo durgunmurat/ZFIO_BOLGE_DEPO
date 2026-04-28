@@ -83,6 +83,7 @@ sap.ui.define(
             currentTypeAllCount: 0,
             currentTypePendingCount: 0,
             currentTypeAssignedCount: 0,
+            currentTypeGIDoneCount: 0,
           });
           this.getView().setModel(oStatsModel, "shipmentStatsModel");
 
@@ -786,7 +787,7 @@ sap.ui.define(
           var iOrganizeCount = 0;
           aAllShipments.forEach(function (oShipment) {
             var sType = (oShipment.Type || "").toUpperCase();
-            if (sType.indexOf("MONO") !== -1) {
+            if (sType.indexOf("MONO") !== -1 || sType.indexOf("DISTRIB") !== -1 || sType.indexOf("DİSTRİB") !== -1) {
               iMonoCount++;
             } else if (sType.indexOf("ORGAN") !== -1) {
               iOrganizeCount++;
@@ -797,7 +798,7 @@ sap.ui.define(
           var aTypeFiltered = aAllShipments.filter(function (oShipment) {
             var sType = (oShipment.Type || "").toUpperCase();
             if (sTypeFilter === "MONO") {
-              return sType.indexOf("MONO") !== -1;
+              return sType.indexOf("MONO") !== -1 || sType.indexOf("DISTRIB") !== -1 || sType.indexOf("DİSTRİB") !== -1;
             } else {
               return sType.indexOf("ORGAN") !== -1;
             }
@@ -868,7 +869,7 @@ sap.ui.define(
           var iOrganizeCount = 0;
           aAllShipments.forEach(function (oShipment) {
             var sType = (oShipment.Type || "").toUpperCase();
-            if (sType.indexOf("MONO") !== -1) {
+            if (sType.indexOf("MONO") !== -1 || sType.indexOf("DISTRIB") !== -1 || sType.indexOf("DİSTRİB") !== -1) {
               iMonoCount++;
             } else if (sType.indexOf("ORGAN") !== -1) {
               iOrganizeCount++;
@@ -880,7 +881,7 @@ sap.ui.define(
           var aTypeFiltered = aAllShipments.filter(function (oShipment) {
             var sType = (oShipment.Type || "").toUpperCase();
             if (sTypeFilter === "MONO") {
-              return sType.indexOf("MONO") !== -1;
+              return sType.indexOf("MONO") !== -1 || sType.indexOf("DISTRIB") !== -1 || sType.indexOf("DİSTRİB") !== -1;
             } else {
               return sType.indexOf("ORGAN") !== -1;
             }
@@ -890,8 +891,11 @@ sap.ui.define(
           var iCurrentTypeAllCount = aTypeFiltered.length;
           var iCurrentTypePendingCount = 0;
           var iCurrentTypeAssignedCount = 0;
+          var iCurrentTypeGIDoneCount = 0;
           aTypeFiltered.forEach(function (oShipment) {
-            if (oShipment._isAssigned) {
+            if (oShipment.GIDone === "X") {
+              iCurrentTypeGIDoneCount++;
+            } else if (oShipment._isAssigned) {
               iCurrentTypeAssignedCount++;
             } else {
               iCurrentTypePendingCount++;
@@ -905,6 +909,7 @@ sap.ui.define(
             currentTypeAllCount: iCurrentTypeAllCount,
             currentTypePendingCount: iCurrentTypePendingCount,
             currentTypeAssignedCount: iCurrentTypeAssignedCount,
+            currentTypeGIDoneCount: iCurrentTypeGIDoneCount,
           });
 
           // Apply assignment filter
@@ -912,11 +917,15 @@ sap.ui.define(
           var aAssignmentFiltered = aTypeFiltered;
           if (sAssignmentFilter === "pending") {
             aAssignmentFiltered = aTypeFiltered.filter(function (oShipment) {
-              return !oShipment._isAssigned;
+              return !oShipment._isAssigned && oShipment.GIDone !== "X";
             });
           } else if (sAssignmentFilter === "assigned") {
             aAssignmentFiltered = aTypeFiltered.filter(function (oShipment) {
-              return oShipment._isAssigned;
+              return oShipment._isAssigned && oShipment.GIDone !== "X";
+            });
+          } else if (sAssignmentFilter === "gidone") {
+            aAssignmentFiltered = aTypeFiltered.filter(function (oShipment) {
+              return oShipment.GIDone === "X";
             });
           }
 

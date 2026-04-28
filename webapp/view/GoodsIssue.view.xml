@@ -33,347 +33,351 @@
                 </items>
             </IconTabBar>
 
-            <!-- LEVEL 1: Packages List -->
-            <List
-                id="idGIPackagesList"
-                items="{issuePackagesModel>/}"
-                noDataText="Bekleyen mal çıkış kaydı bulunamadı"
-            >
-                <items>
-                    <!-- L1 Panel: Each Package -->
-                    <CustomListItem>
-                        <Panel
-                            expandable="true"
-                            expanded="{issuePackagesModel>expanded}"
-                            expand="onPackageExpand"
-                            class="sapUiSmallMarginBottom"
+            <!-- ===== MASTER VIEW: Nakliye Listesi ===== -->
+            <VBox id="idGIMasterView">
+                <List
+                    id="idGIPackageSelectionList"
+                    items="{issuePackagesModel>/}"
+                    noDataText="Bekleyen mal çıkış kaydı bulunamadı"
+                >
+                    <items>
+                        <ObjectListItem
+                            title="Nakliye: {= parseInt(${issuePackagesModel>PackingNumber}) }"
+                            icon="sap-icon://shipping-status"
+                            type="Active"
+                            press="onPackageSelect"
                         >
-                            <headerToolbar>
-                                <OverflowToolbar>
-                                    <core:Icon
-                                        src="sap-icon://shipping-status"
-                                        size="1.5rem"
-                                        color="#0854A0"
-                                    /> 
-                                    <Title
-                                        text="{= parseInt(${issuePackagesModel>PackingNumber}) }"
-                                        level="H3"
-                                        class="sapUiTinyMarginBegin"
-                                    />
-                                    <ObjectStatus
-                                        text="{issuePackagesModel>ShipToName}"
-                                        class="sapUiTinyMarginBegin"
-                                    />
-                                    <ObjectStatus
-                                        text="{issuePackagesModel>Inco2}"
-                                        class="sapUiTinyMarginBegin"
-                                        visible="{= !!${issuePackagesModel>Inco2} }"
-                                    />
-                                    <!-- <ObjectStatus
-                                        text="{
-                                            path: 'issuePackagesModel>PlanDate',
-                                            type: 'sap.ui.model.type.Date',
-                                            formatOptions: { pattern: 'dd/MM/yyyy' }
-                                        }"
-                                        class="sapUiTinyMarginBegin"
-                                    />
-                                    <ToolbarSpacer />
-                                    <ObjectNumber
-                                        number="{issuePackagesModel>CompletedItemCount}"
-                                        unit="/{issuePackagesModel>TotalItemCount}"
-                                        state="{= ${issuePackagesModel>CompletedItemCount} === ${issuePackagesModel>TotalItemCount} ? 'Success' : 'Warning'}"
-                                        class="sapUiTinyMarginBegin"
-                                    />
-                                    <Label
-                                        text="ÜRÜN"
-                                        class="sapUiTinyMarginBegin"
-                                    />
-                                    <ObjectStatus
-                                        text="%{issuePackagesModel>CompletionPercentage} Tamamlandı"
-                                        state="{= ${issuePackagesModel>CompletionPercentage} === 100 ? 'Success' : 'Warning'}"
-                                        icon="{= ${issuePackagesModel>CompletionPercentage} === 100 ? 'sap-icon://accept' : ''}"
-                                        class="sapUiTinyMarginBegin"
-                                    /> -->
-                                    <ToolbarSpacer />
-                                    <Button
-                                        icon="sap-icon://accept"
-                                        text="Toplu Onayla"
-                                        tooltip="Miktarı eşleşen tüm kalemleri onayla"
-                                        type="Accept"
-                                        press="onBulkApprovePress"
-                                        enabled="{
-                                            parts: [
-                                                {path: 'issuePackagesModel>PackingNumber'},
-                                                {path: 'issuePackagesModel>_refreshTrigger'}
-                                            ],
-                                            formatter: '.isBulkApproveEnabled'
-                                        }"
-                                        visible="{= ${issuePackagesModel>Status} !== 'X' }"
-                                        class="sapUiTinyMarginEnd"
-                                    />
-                                    <Button
-                                        icon="sap-icon://notes"
-                                        tooltip="Not Ekle/Görüntüle"
-                                        press="onNoteGIPress"
-                                        class="sapUiTinyMarginEnd"
-                                    />
-                                    <Button
-                                        text="Mal Çıkış"
-                                        type="Emphasized"
-                                        press="onMalCikisPress"
-                                        enabled="{
-                                            parts: [
-                                                {path: 'issuePackagesModel>PackingNumber'},
-                                                {path: 'issuePackagesModel>_refreshTrigger'}
-                                            ],
-                                            formatter: '.isMalCikisEnabled'
-                                        }"
-                                        visible="{= ${issuePackagesModel>Status} !== 'X' }"
-                                        class="sapUiTinyMarginBegin"
-                                    />
-                                </OverflowToolbar>
-                            </headerToolbar>
-                            <content>
-                                <VBox>
-                                    <!-- ÜRÜNLER PANEL (DeliveryType = M) -->
-                                    <Panel
-                                        expandable="true"
-                                        expanded="true"
-                                        headerText="Ürünler"
-                                        class="sapUiSmallMarginTop giProductPanel"
-                                        visible="false"
-                                    >
-                                        <headerToolbar>
-                                            <OverflowToolbar>
-                                                <core:Icon
-                                                    src="sap-icon://product"
-                                                    size="1.2rem"
-                                                    color="#107E3E"
-                                                />
-                                                <Title
-                                                    text="Ürünler"
-                                                    level="H4"
-                                                    class="sapUiTinyMarginBegin"
-                                                />
-                                                <ObjectNumber
-                                                    number="0"
-                                                    class="sapUiTinyMarginBegin giProductCount"
-                                                />
-                                                <ToolbarSpacer />
-                                            </OverflowToolbar>
-                                        </headerToolbar>
-                                        <content>
-                                            <VBox>
-                                                <!-- Category Filters for Products -->
-                                                <IconTabBar
-                                                    select="onCategoryFilterSelect"
-                                                    class="sapUiSmallMarginBottom giProductCategoryBar"
-                                                    upperCase="false"
-                                                >
-                                                    <items>
-                                                        <IconTabFilter
-                                                            key="all"
-                                                            text="Tümü"
-                                                            count="0"
-                                                        />
-                                                        <IconTabSeparator />
-                                                    </items>
-                                                </IconTabBar>
+                            <attributes>
+                                <ObjectAttribute text="{issuePackagesModel>ShipToName}" />
+                                <ObjectAttribute text="{issuePackagesModel>Inco2}" visible="{= !!${issuePackagesModel>Inco2} }" />
+                            </attributes>
+                            <firstStatus>
+                                <ObjectStatus
+                                    text="{= ${issuePackagesModel>Status} === 'X' ? 'Tamamlandı' : 'Bekliyor' }"
+                                    state="{= ${issuePackagesModel>Status} === 'X' ? 'Success' : 'Warning' }"
+                                />
+                            </firstStatus>
+                        </ObjectListItem>
+                    </items>
+                </List>
+            </VBox>
 
-                                                <!-- Products Table -->
-                                                <Table
-                                                    inset="false"
-                                                    growing="true"
-                                                    growingThreshold="50"
-                                                    growingScrollToLoad="true"
-                                                    growingTriggerText="Daha Fazla Göster"
-                                                    width="100%"
-                                                    noDataText="Ürün bulunamadı"
-                                                    class="giProductTable"
-                                                    updateStarted="onTableUpdateStarted"
-                                                    updateFinished="onTableUpdateFinished"
-                                                >
-                                                    <columns>
-                                                        <Column width="5em" visible="false">
-                                                            <Text text="KOD" />
-                                                        </Column>
-                                                        <Column
-                                                            minScreenWidth="Phone"
-                                                            demandPopin="true"
-                                                        >
-                                                            <Text
-                                                                text="ÜRÜN ADI"
-                                                            />
-                                                        </Column>
-                                                        <Column
-                                                            width="6em"
-                                                            hAlign="Right"
-                                                        >
-                                                            <Text
-                                                                text="TM"
-                                                            />
-                                                        </Column>
-                                                        <Column
-                                                            width="4em"
-                                                            hAlign="Center"
-                                                        >
-                                                            <Text
-                                                                text="SYM"
-                                                            />
-                                                        </Column>
-                                                        <Column
-                                                            width="3em"
-                                                            hAlign="Center"
-                                                        >
-                                                            <Text text="SM" />
-                                                        </Column>
-                                                        <Column
-                                                            width="3em"
-                                                            hAlign="Center"
-                                                        >
-                                                            <Text text="F" />
-                                                        </Column>
-                                                        <Column
-                                                            width="5rem"
-                                                            hAlign="Center"
-                                                        >
-                                                            <Text
-                                                                text="İŞLEM"
-                                                            />
-                                                        </Column>
-                                                    </columns>
-                                                    <!-- NOTE: Item template is generated dynamically in Controller -->
-                                                </Table>
-                                            </VBox>
-                                        </content>
-                                    </Panel>
+            <!-- ===== DETAIL VIEW: Seçilen Nakliye Detayı ===== -->
+            <VBox id="idGIDetailView" visible="false">
+                <Panel
+                    id="idGIDetailPanel"
+                    class="sapUiSmallMarginBottom"
+                >
+                    <headerToolbar>
+                        <OverflowToolbar>
+                            <Button
+                                icon="sap-icon://nav-back"
+                                press="onBackToPackageList"
+                                type="Transparent"
+                                tooltip="Listeye Dön"
+                            />
+                            <core:Icon
+                                src="sap-icon://shipping-status"
+                                size="1.5rem"
+                                color="#0854A0"
+                            /> 
+                            <Title
+                                text="{= parseInt(${issuePackagesModel>PackingNumber}) }"
+                                level="H3"
+                                class="sapUiTinyMarginBegin"
+                            />
+                            <ObjectStatus
+                                text="{issuePackagesModel>ShipToName}"
+                                class="sapUiTinyMarginBegin"
+                            />
+                            <ObjectStatus
+                                text="{issuePackagesModel>Inco2}"
+                                class="sapUiTinyMarginBegin"
+                                visible="{= !!${issuePackagesModel>Inco2} }"
+                            />
+                            <ToolbarSpacer />
+                            <Button
+                                icon="sap-icon://accept"
+                                text="Toplu Onayla"
+                                tooltip="Miktarı eşleşen tüm kalemleri onayla"
+                                type="Accept"
+                                press="onBulkApprovePress"
+                                enabled="{
+                                    parts: [
+                                        {path: 'issuePackagesModel>PackingNumber'},
+                                        {path: 'issuePackagesModel>_refreshTrigger'}
+                                    ],
+                                    formatter: '.isBulkApproveEnabled'
+                                }"
+                                visible="{= ${issuePackagesModel>Status} !== 'X' }"
+                                class="sapUiTinyMarginEnd"
+                            />
+                            <Button
+                                icon="sap-icon://notes"
+                                tooltip="Not Ekle/Görüntüle"
+                                press="onNoteGIPress"
+                                class="sapUiTinyMarginEnd"
+                            />
+                            <Button
+                                text="Foto ({= ${issuePackagesModel>PhotoCount} || '0' } / 5)"
+                                press="onPhotoPress"
+                                class="sapUiTinyMarginEnd"
+                            />
+                            <Button
+                                text="Mal Çıkış"
+                                type="Emphasized"
+                                press="onMalCikisPress"
+                                enabled="{
+                                    parts: [
+                                        {path: 'issuePackagesModel>PackingNumber'},
+                                        {path: 'issuePackagesModel>_refreshTrigger'}
+                                    ],
+                                    formatter: '.isMalCikisEnabled'
+                                }"
+                                visible="{= ${issuePackagesModel>Status} !== 'X' }"
+                                class="sapUiTinyMarginBegin"
+                            />
+                        </OverflowToolbar>
+                    </headerToolbar>
+                    <content>
+                        <VBox>
+                            <!-- ÜRÜNLER PANEL (DeliveryType = M) -->
+                            <Panel
+                                expandable="true"
+                                expanded="true"
+                                headerText="Ürünler"
+                                class="sapUiSmallMarginTop giProductPanel"
+                                visible="false"
+                            >
+                                <headerToolbar>
+                                    <OverflowToolbar>
+                                        <core:Icon
+                                            src="sap-icon://product"
+                                            size="1.2rem"
+                                            color="#107E3E"
+                                        />
+                                        <Title
+                                            text="Ürünler"
+                                            level="H4"
+                                            class="sapUiTinyMarginBegin"
+                                        />
+                                        <ObjectNumber
+                                            number="0"
+                                            class="sapUiTinyMarginBegin giProductCount"
+                                        />
+                                        <ToolbarSpacer />
+                                    </OverflowToolbar>
+                                </headerToolbar>
+                                <content>
+                                    <VBox>
+                                        <!-- Category Filters for Products -->
+                                        <IconTabBar
+                                            select="onCategoryFilterSelect"
+                                            class="sapUiSmallMarginBottom giProductCategoryBar"
+                                            upperCase="false"
+                                        >
+                                            <items>
+                                                <IconTabFilter
+                                                    key="all"
+                                                    text="Tümü"
+                                                    count="0"
+                                                />
+                                                <IconTabSeparator />
+                                            </items>
+                                        </IconTabBar>
 
-                                    <!-- DEPOZİTO PANEL (DeliveryType = D) -->
-                                    <Panel
-                                        expandable="true"
-                                        expanded="true"
-                                        headerText="Depozito"
-                                        class="sapUiSmallMarginTop giDepositPanel"
-                                        visible="false"
-                                    >
-                                        <headerToolbar>
-                                            <OverflowToolbar>
-                                                <core:Icon
-                                                    src="sap-icon://inventory-deposit"
-                                                    size="1.2rem"
-                                                    color="#0854A0"
-                                                />
-                                                <Title
-                                                    text="Depozito"
-                                                    level="H4"
-                                                    class="sapUiTinyMarginBegin"
-                                                />
-                                                <ObjectNumber
-                                                    number="0"
-                                                    class="sapUiTinyMarginBegin giDepositCount"
-                                                />
-                                                <Label
-                                                    text="Toplam Palet:"
-                                                    class="sapUiSmallMarginBegin"
-                                                />
-                                                <ObjectNumber
-                                                    number="0"
-                                                    class="sapUiTinyMarginBegin giTotalPalet"
-                                                />
-                                                <Label
-                                                    text="Toplam Sepet:"
-                                                    class="sapUiSmallMarginBegin"
-                                                />
-                                                <ObjectNumber
-                                                    number="0"
-                                                    class="sapUiTinyMarginBegin giTotalSepet"
-                                                />
-                                                <ToolbarSpacer />
-                                                <Button
-                                                    text="Depozito Ekle"
-                                                    icon="sap-icon://add"
-                                                    type="Transparent"
-                                                    press="onDepositAddPress"
-                                                    class="giDepositAddBtn"
-                                                    visible="{= ${issuePackagesModel>Status} !== 'X' }"
-                                                />
-                                            </OverflowToolbar>
-                                        </headerToolbar>
-                                        <content>
-                                            <VBox>
-                                                <!-- Deposit Table -->
-                                                <Table
-                                                    inset="false"
-                                                    growing="true"
-                                                    growingThreshold="50"
-                                                    growingScrollToLoad="true"
-                                                    growingTriggerText="Daha Fazla Göster"
-                                                    width="100%"
-                                                    noDataText="Depozito bulunamadı"
-                                                    class="giDepositTable"
-                                                    updateStarted="onTableUpdateStarted"
-                                                    updateFinished="onTableUpdateFinished"
+                                        <!-- Products Table -->
+                                        <Table
+                                            inset="false"
+                                            growing="true"
+                                            growingThreshold="50"
+                                            growingScrollToLoad="true"
+                                            growingTriggerText="Daha Fazla Göster"
+                                            width="100%"
+                                            noDataText="Ürün bulunamadı"
+                                            class="giProductTable"
+                                            updateStarted="onTableUpdateStarted"
+                                            updateFinished="onTableUpdateFinished"
+                                        >
+                                            <columns>
+                                                <Column width="5em" visible="false">
+                                                    <Text text="KOD" />
+                                                </Column>
+                                                <Column
+                                                    minScreenWidth="Phone"
+                                                    demandPopin="true"
                                                 >
-                                                    <columns>
-                                                        <Column width="5em" visible="false">
-                                                            <Text text="KOD" />
-                                                        </Column>
-                                                        <Column
-                                                            minScreenWidth="Phone"
-                                                            demandPopin="true"
-                                                        >
-                                                            <Text
-                                                                text="ÜRÜN ADI"
-                                                            />
-                                                        </Column>
-                                                        <Column
-                                                            width="6em"
-                                                            hAlign="Right"
-                                                        >
-                                                            <Text
-                                                                text="MİKTAR"
-                                                            />
-                                                        </Column>
-                                                        <Column
-                                                            width="4em"
-                                                            hAlign="Center"
-                                                        >
-                                                            <Text
-                                                                text="SAYIM"
-                                                            />
-                                                        </Column>
-                                                        <Column
-                                                            width="3em"
-                                                            hAlign="Center"
-                                                        >
-                                                            <Text text="SM" />
-                                                        </Column>
-                                                        <Column
-                                                            width="3em"
-                                                            hAlign="Center"
-                                                        >
-                                                            <Text text="FYT" />
-                                                        </Column>
-                                                        <Column
-                                                            width="5rem"
-                                                            hAlign="Center"
-                                                        >
-                                                            <Text
-                                                                text="İŞLEM"
-                                                            />
-                                                        </Column>
-                                                    </columns>
-                                                    <!-- NOTE: Item template is generated dynamically in Controller -->
-                                                </Table>
-                                            </VBox>
-                                        </content>
-                                    </Panel>
-                                </VBox>
-                            </content>
-                        </Panel>
-                    </CustomListItem>
-                </items>
-            </List>
+                                                    <Text
+                                                        text="ÜRÜN ADI"
+                                                    />
+                                                </Column>
+                                                <Column
+                                                    width="6em"
+                                                    hAlign="Right"
+                                                >
+                                                    <Text
+                                                        text="TM"
+                                                    />
+                                                </Column>
+                                                <Column
+                                                    width="4em"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text
+                                                        text="SYM"
+                                                    />
+                                                </Column>
+                                                <Column
+                                                    width="4em"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text text="SM" />
+                                                </Column>
+                                                <Column
+                                                    width="3em"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text text="F" />
+                                                </Column>
+                                                <Column
+                                                    width="5rem"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text
+                                                        text="İŞLEM"
+                                                    />
+                                                </Column>
+                                            </columns>
+                                            <!-- NOTE: Item template is generated dynamically in Controller -->
+                                        </Table>
+                                    </VBox>
+                                </content>
+                            </Panel>
+
+                            <!-- DEPOZİTO PANEL (DeliveryType = D) -->
+                            <Panel
+                                expandable="true"
+                                expanded="true"
+                                headerText="Depozito"
+                                class="sapUiSmallMarginTop giDepositPanel"
+                                visible="true"
+                            >
+                                <headerToolbar>
+                                    <OverflowToolbar>
+                                        <core:Icon
+                                            src="sap-icon://inventory-deposit"
+                                            size="1.2rem"
+                                            color="#0854A0"
+                                        />
+                                        <Title
+                                            text="Depozito"
+                                            level="H4"
+                                            class="sapUiTinyMarginBegin"
+                                        />
+                                        <ObjectNumber
+                                            number="0"
+                                            class="sapUiTinyMarginBegin giDepositCount"
+                                        />
+                                        <Label
+                                            text="Toplam Palet:"
+                                            class="sapUiSmallMarginBegin"
+                                        />
+                                        <ObjectNumber
+                                            number="0"
+                                            class="sapUiTinyMarginBegin giTotalPalet"
+                                        />
+                                        <Label
+                                            text="Toplam Sepet:"
+                                            class="sapUiSmallMarginBegin"
+                                        />
+                                        <ObjectNumber
+                                            number="0"
+                                            class="sapUiTinyMarginBegin giTotalSepet"
+                                        />
+                                        <ToolbarSpacer />
+                                        <Button
+                                            text="Depozito Ekle"
+                                            icon="sap-icon://add"
+                                            type="Transparent"
+                                            press="onDepositAddPress"
+                                            class="giDepositAddBtn"
+                                            visible="{= ${issuePackagesModel>Status} !== 'X' }" 
+                                        />
+                                    </OverflowToolbar>
+                                </headerToolbar>
+                                <content>
+                                    <VBox>
+                                        <!-- Deposit Table -->
+                                        <Table
+                                            inset="false"
+                                            growing="true"
+                                            growingThreshold="50"
+                                            growingScrollToLoad="true"
+                                            growingTriggerText="Daha Fazla Göster"
+                                            width="100%"
+                                            noDataText="Depozito bulunamadı"
+                                            class="giDepositTable"
+                                            updateStarted="onTableUpdateStarted"
+                                            updateFinished="onTableUpdateFinished"
+                                        >
+                                            <columns>
+                                                <Column width="5em" visible="false">
+                                                    <Text text="KOD" />
+                                                </Column>
+                                                <Column
+                                                    minScreenWidth="Phone"
+                                                    demandPopin="true"
+                                                >
+                                                    <Text
+                                                        text="ÜRÜN ADI"
+                                                    />
+                                                </Column>
+                                                <Column
+                                                    width="6em"
+                                                    hAlign="Right"
+                                                >
+                                                    <Text
+                                                        text="MİKTAR"
+                                                    />
+                                                </Column>
+                                                <Column
+                                                    width="4em"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text
+                                                        text="SAYIM"
+                                                    />
+                                                </Column>
+                                                <Column
+                                                    width="4em"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text text="SM" />
+                                                </Column>
+                                                <Column
+                                                    width="3em"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text text="FYT" />
+                                                </Column>
+                                                <Column
+                                                    width="5rem"
+                                                    hAlign="Center"
+                                                >
+                                                    <Text
+                                                        text="İŞLEM"
+                                                    />
+                                                </Column>
+                                            </columns>
+                                            <!-- NOTE: Item template is generated dynamically in Controller -->
+                                        </Table>
+                                    </VBox>
+                                </content>
+                            </Panel>
+                        </VBox>
+                    </content>
+                </Panel>
+            </VBox>
         </content>
     </Page>
 </mvc:View>
