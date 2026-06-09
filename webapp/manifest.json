@@ -124,6 +124,11 @@
                     "pattern": "inventoryCount",
                     "name": "inventoryCount",
                     "target": "inventoryCount"
+                },
+                {
+                    "pattern": "returnCount",
+                    "name": "returnCount",
+                    "target": "returnCount"
                 }
             ],
             "targets": {
@@ -153,6 +158,10 @@
                 },
                 "inventoryCount": {
                     "viewName": "InventoryCount",
+                    "viewLevel": 2
+                },
+                "returnCount": {
+                    "viewName": "ReturnCount",
                     "viewLevel": 2
                 },
                 "passwordResetVerify": {

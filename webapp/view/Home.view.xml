@@ -116,6 +116,25 @@
                             animateTextChange="true"/>
                     </TileContent>
                 </GenericTile>
+
+                <!-- Tile 5: İade Sayım (Return Count) -->
+                <GenericTile
+                    class="sapUiTinyMarginBottom"
+                    frameType="TwoByOne"
+                    header="İade Sayım"
+                    subheader="İade ürünlerin kontrolü ve sayımı"
+                    press="onReturnCountPress">
+                    <TileContent footer="Bekleyen İade">
+                        <NumericContent
+                            value="{dashboardData>/pendingReturnCount}"
+                            valueColor="{dashboardData>/pendingReturnCountColor}"
+                            indicator="{dashboardData>/pendingReturnCountIndicator}"
+                            icon="sap-icon://supplier"
+                            truncateValueTo="4"
+                            withMargin="false"
+                            animateTextChange="true"/>
+                    </TileContent>
+                </GenericTile>
             </l:Grid>
         </content>
     </Page>

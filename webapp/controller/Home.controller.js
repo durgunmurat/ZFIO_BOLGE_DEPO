@@ -45,7 +45,8 @@ sap.ui.define([
                     pendingReceipts: 0,
                     pendingShipments: 0,
                     pendingDeliveries: 0,
-                    pendingCounts: 0
+                    pendingCounts: 0,
+                    pendingReturnCount: 0
                 });
                 this.getOwnerComponent().setModel(oDashboardModel, "dashboardData");
             }
@@ -67,6 +68,10 @@ sap.ui.define([
 
         onGoodsIssuePress: function() {
             this.getRouter().navTo("goodsIssue");
+        },
+
+        onReturnCountPress: function() {
+            this.getRouter().navTo("returnCount");
         },
 
         onInventoryCountPress: function() {
@@ -186,6 +191,7 @@ sap.ui.define([
             var oShipments = fnState(oData.pendingShipments);
             var oDeliveries = fnState(oData.pendingDeliveries);
             var oCounts = fnState(oData.pendingCounts);
+            var oReturnCount = fnState(oData.pendingReturnCount);
 
             // Set computed indicator/color properties back on dashboardData model so bindings update
             oModel.setProperty("/pendingReceiptsColor", oReceipts.color);
@@ -199,6 +205,9 @@ sap.ui.define([
 
             oModel.setProperty("/pendingCountsColor", oCounts.color);
             oModel.setProperty("/pendingCountsIndicator", oCounts.indicator);
+
+            oModel.setProperty("/pendingReturnCountColor", oReturnCount.color);
+            oModel.setProperty("/pendingReturnCountIndicator", oReturnCount.indicator);
         }
     });
 });

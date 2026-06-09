@@ -61,7 +61,8 @@ sap.ui.define([
                                 pendingReceipts: 0,
                                 pendingShipments: 0,
                                 pendingDeliveries: 0,
-                                pendingCounts: 0
+                                pendingCounts: 0,
+                                pendingReturnCount: 0
                             });
                         }
                         
@@ -271,7 +272,11 @@ sap.ui.define([
                     pendingReceipts: oLoginPayload.PendingGRCount || 0,
                     pendingShipments: oLoginPayload.PendingShipAssignCount || 0,
                     pendingDeliveries: oLoginPayload.PendingGICount || 0,
-                    pendingCounts: oLoginPayload.PendingInvCount || 0
+                    pendingCounts: oLoginPayload.PendingInvCount || 0,
+                    pendingReturnCount: oLoginPayload.PendingReturnCount ||
+                        oLoginPayload.Pendingreturncount ||
+                        oLoginPayload.pendingReturnCount ||
+                        oLoginPayload.pendingreturncount || 0
                 };
                 
                 if (oDashboardModel) {

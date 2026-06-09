@@ -1,0 +1,178 @@
+<mvc:View
+    controllerName="com.sut.bolgeyonetim.controller.ReturnCount"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+    <Page
+        title="İade Sayım"
+        showNavButton="true"
+        navButtonPress="onNavBack">
+        <customHeader>
+            <Toolbar>
+                <Button
+                    icon="sap-icon://nav-back"
+                    type="Transparent"
+                    press="onNavBack"/>
+                <Title text="İade Sayım"/>
+                <ToolbarSpacer/>
+                <DatePicker
+                    id="idReturnDateFilter"
+                    value="{filterModel>/selectedDate}"
+                    displayFormat="dd.MM.yyyy"
+                    valueFormat="yyyy-MM-dd"
+                    change="onDateChange"
+                    width="10rem"/>
+                <Label
+                    text="{sessionModel>/Login/WarehouseNum}"
+                    class="sapUiSmallMarginBegin"/>
+            </Toolbar>
+        </customHeader>
+        <content>
+            <IconTabBar
+                id="idReturnStatusFilterBar"
+                selectedKey="pending"
+                select="onStatusFilterSelect"
+                class="sapUiResponsiveContentPadding"
+                upperCase="false">
+                <items>
+                    <IconTabFilter
+                        id="idReturnPendingTab"
+                        key="pending"
+                        text="Bekleyen İadeler"
+                        count="{returnCountModel>/pendingCount}"/>
+                    <IconTabFilter
+                        id="idReturnCompletedTab"
+                        key="completed"
+                        text="Tamamlanan Sayımlar"
+                        count="{returnCountModel>/completedCount}"/>
+                </items>
+            </IconTabBar>
+
+            <List
+                id="idReturnRepresentativeList"
+                items="{returnCountModel>/visibleGroups}"
+                noDataText="Seçilen tarih ve depo için iade kaydı bulunamadı">
+                <items>
+                    <CustomListItem>
+                        <Panel
+                            expandable="true"
+                            expanded="{returnCountModel>expanded}"
+                            class="sapUiSmallMarginBottom">
+                            <headerToolbar>
+                                <OverflowToolbar>
+                                    <core:Icon
+                                        src="sap-icon://employee"
+                                        size="1.5rem"
+                                        color="#0854A0"/>
+                                    <Title
+                                        text="{returnCountModel>Plasiyer} - {returnCountModel>PlasiyerName}"
+                                        level="H3"
+                                        class="sapUiTinyMarginBegin"/>
+                                    <ToolbarSpacer/>
+                                    <CheckBox
+                                        text="Tümü"
+                                        selected="{returnCountModel>selectAll}"
+                                        select="onSelectAllWaybills"/>
+                                    <Button
+                                        icon="sap-icon://accept"
+                                        text="Sayımı Onayla"
+                                        type="Emphasized"
+                                        press="onApproveCountPress"
+                                        visible="{= !${returnCountModel>isCompleted} }"
+                                        class="sapUiTinyMarginBegin"/>
+                                </OverflowToolbar>
+                            </headerToolbar>
+                            <content>
+                                <VBox>
+                                    <List
+                                        items="{returnCountModel>Waybills}"
+                                        noDataText="İrsaliye bulunamadı">
+                                        <items>
+                                            <CustomListItem>
+                                                <HBox
+                                                    alignItems="Center"
+                                                    width="100%">
+                                                    <CheckBox
+                                                        selected="{returnCountModel>selected}"
+                                                        select="onWaybillSelect"/>
+                                                    <VBox class="sapUiTinyMarginBegin">
+                                                        <Text text="İrsaliye No: {returnCountModel>IrsNo}"/>
+                                                        <Text
+                                                            text="{returnCountModel>ReturnTypeText}"
+                                                            class="sapUiTinyMarginTop"/>
+                                                    </VBox>
+                                                </HBox>
+                                            </CustomListItem>
+                                        </items>
+                                    </List>
+
+                                    <Table
+                                        items="{returnCountModel>Items}"
+                                        inset="false"
+                                        growing="true"
+                                        growingThreshold="50"
+                                        width="auto"
+                                        noDataText="Sayım için en az bir irsaliye seçin"
+                                        class="sapUiSmallMarginTop">
+                                        <columns>
+                                            <Column minScreenWidth="Phone" demandPopin="true">
+                                                <Text text="ÜRÜN ADI"/>
+                                            </Column>
+                                            <Column width="7rem" hAlign="End">
+                                                <Text text="BEKLENEN"/>
+                                            </Column>
+                                            <Column width="8rem" hAlign="End">
+                                                <Text text="TOPLAM SAYIM"/>
+                                            </Column>
+                                            <Column width="9rem" hAlign="End">
+                                                <Text text="FİRE MİKTARI"/>
+                                            </Column>
+                                            <Column width="9rem" hAlign="End">
+                                                <Text text="KALİTE MİKTARI"/>
+                                            </Column>
+                                            <Column width="11rem" hAlign="End">
+                                                <Text text="SATILABİLİR MİKTAR"/>
+                                            </Column>
+                                        </columns>
+                                        <items>
+                                            <ColumnListItem
+                                                highlight="{= ${returnCountModel>MengeSayim} !== ${returnCountModel>MengeSiparis} ? 'Error' : 'None' }">
+                                                <cells>
+                                                    <ObjectIdentifier
+                                                        title="{returnCountModel>Maktx}"
+                                                        text="{returnCountModel>Matnr}"/>
+                                                    <ObjectNumber
+                                                        number="{returnCountModel>MengeSiparis}"
+                                                        unit="{returnCountModel>Meins}"/>
+                                                    <ObjectNumber
+                                                        number="{returnCountModel>MengeSayim}"
+                                                        unit="{returnCountModel>Meins}"
+                                                        state="{= ${returnCountModel>MengeSayim} !== ${returnCountModel>MengeSiparis} ? 'Error' : 'None' }"/>
+                                                    <Input
+                                                        value="{returnCountModel>MengeFire}"
+                                                        type="Number"
+                                                        editable="{= !${returnCountModel>_completed} }"
+                                                        liveChange="onCountLiveChange"/>
+                                                    <Input
+                                                        value="{returnCountModel>MengeKalite}"
+                                                        type="Number"
+                                                        editable="{= !${returnCountModel>_completed} }"
+                                                        liveChange="onCountLiveChange"/>
+                                                    <Input
+                                                        value="{returnCountModel>MengeSatilab}"
+                                                        type="Number"
+                                                        editable="{= !${returnCountModel>_completed} }"
+                                                        liveChange="onCountLiveChange"/>
+                                                </cells>
+                                            </ColumnListItem>
+                                        </items>
+                                    </Table>
+                                </VBox>
+                            </content>
+                        </Panel>
+                    </CustomListItem>
+                </items>
+            </List>
+        </content>
+    </Page>
+</mvc:View>
