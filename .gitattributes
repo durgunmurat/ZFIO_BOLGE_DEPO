@@ -1,0 +1,6 @@
+webapp/**/*.js text eol=lf
+webapp/**/*.xml text eol=lf
+webapp/**/*.json text eol=lf
+webapp/**/*.css text eol=lf
+webapp/**/*.properties text eol=lf
+webapp/**/*.html text eol=lf

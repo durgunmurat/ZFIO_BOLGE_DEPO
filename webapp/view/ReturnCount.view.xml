@@ -89,7 +89,7 @@
                                         size="1.5rem"
                                         color="#0854A0"/>
                                     <Title
-                                        text="{returnCountModel>Plasiyer} - {returnCountModel>PlasiyerName}"
+                                        text="{returnCountModel>PlasiyerDisplay} - {returnCountModel>PlasiyerName}"
                                         level="H3"
                                         class="sapUiTinyMarginBegin"/>
                                     <ToolbarSpacer/>

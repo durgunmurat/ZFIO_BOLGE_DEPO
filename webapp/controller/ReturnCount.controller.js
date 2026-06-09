@@ -166,6 +166,9 @@ sap.ui.define([
                 if (!mGroups[sGroupKey]) {
                     mGroups[sGroupKey] = {
                         Plasiyer: oHeader.Plasiyer,
+                        PlasiyerDisplay: this._formatNumericCode(
+                            oHeader.Plasiyer
+                        ),
                         PlasiyerName: oHeader.PlasiyerName,
                         expanded: false,
                         selectAll: false,
@@ -257,6 +260,7 @@ sap.ui.define([
                 if (aWaybills.length) {
                     aVisibleGroups.push({
                         Plasiyer: oGroup.Plasiyer,
+                        PlasiyerDisplay: oGroup.PlasiyerDisplay,
                         PlasiyerName: oGroup.PlasiyerName,
                         expanded: false,
                         selectAll: false,
@@ -273,7 +277,11 @@ sap.ui.define([
         },
 
         _formatMaterialCode: function(sMatnr) {
-            var sCode = String(sMatnr || "").replace(/^0+/, "");
+            return this._formatNumericCode(sMatnr);
+        },
+
+        _formatNumericCode: function(sValue) {
+            var sCode = String(sValue || "").replace(/^0+/, "");
             return sCode || "0";
         },
 
