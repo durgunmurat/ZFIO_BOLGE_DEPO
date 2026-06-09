@@ -313,7 +313,7 @@ sap.ui.define([
                 oWaybill.selected = sSelectionScope === "ALL" ||
                     oWaybill.ReturnType === sSelectionScope;
             });
-            this._refreshGroupItems(oContext);
+            this._refreshGroupItems(oContext, sSelectionScope);
         },
 
         onWaybillSelect: function(oEvent) {
@@ -337,7 +337,7 @@ sap.ui.define([
                 : null;
         },
 
-        _refreshGroupItems: function(oGroupContext) {
+        _refreshGroupItems: function(oGroupContext, sSelectionScope) {
             var oModel = oGroupContext.getModel();
             var sGroupPath = oGroupContext.getPath();
             var oGroup = oGroupContext.getObject();
@@ -352,7 +352,7 @@ sap.ui.define([
             oModel.setProperty(sGroupPath + "/Items", aItems);
             oModel.setProperty(
                 sGroupPath + "/selectionScope",
-                this._getSelectionScope(oGroup.Waybills)
+                sSelectionScope || this._getSelectionScope(oGroup.Waybills)
             );
             oModel.refresh(true);
         },

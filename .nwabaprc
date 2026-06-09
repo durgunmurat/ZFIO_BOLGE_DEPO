@@ -2,6 +2,7 @@
  "base":"./dist",
  "files":"**/*.{js,json,xml,css,html,properties,map}",
  "preserve_unselected":true,
+ "calcappindex":true,
  "conn_usestrictssl":false, 
  "conn_server":"https://sapfioridev.sutas.com.tr:8443", 
  "conn_client":"100", 

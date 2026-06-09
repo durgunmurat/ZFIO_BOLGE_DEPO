@@ -16,6 +16,7 @@
                 <Title text="İade Sayım"/>
                 <ToolbarSpacer/>
                 <DatePicker
+                    visible="false"
                     id="idReturnDateFilter"
                     value="{filterModel>/selectedDate}"
                     displayFormat="dd.MM.yyyy"
@@ -23,6 +24,7 @@
                     change="onDateChange"
                     width="10rem"/>
                 <Label
+                    visible="false"
                     text="{sessionModel>/Login/WarehouseNum}"
                     class="sapUiSmallMarginBegin"/>
             </Toolbar>
