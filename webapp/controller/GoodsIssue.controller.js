@@ -2113,46 +2113,76 @@ sap.ui.define(
         var oModel = this.getOwnerComponent().getModel();
         var iErrorCount = 0;
         var that = this;
+        var bProcessingComplete = false;
+        var iProcessedCount = 0;
+
+        // Timeout protection: if processing takes too long, force cleanup
+        var iTimeoutId = setTimeout(function() {
+          if (!bProcessingComplete) {
+            console.error("Deposit save timeout - forcing cleanup");
+            sap.ui.core.BusyIndicator.hide();
+            MessageBox.error("İşlem zaman aşımına uğradı. Lütfen verileri kontrol edip tekrar deneyin.");
+          }
+        }, 30000); // 30 second timeout
 
         // Sequential processing to avoid batch changeset issues
         var fnProcessNext = function (iIndex) {
           if (iIndex >= aItemsToSave.length) {
+            bProcessingComplete = true;
+            clearTimeout(iTimeoutId);
             that._onDepositSaveComplete(iErrorCount, sPackingNumber, bDepositOnlyMode);
             return;
           }
 
           var oItem = aItemsToSave[iIndex];
-          oModel.callFunction("/UpdateIssueQuantity", {
-            method: "POST",
-            groupId: "depositSave" + iIndex,
-            changeSetId: "depositSaveCS" + iIndex,
-            urlParameters: {
-              PackingNumber: sPackingNumber,
-              Matnr: oItem.Matnr,
-              Quantity: parseFloat(oItem.Quantity),
-              OriginalQty: parseFloat(oItem.TargetQuantity) || 0,
-              EditReason: "",
-              Harici: true,
-              Status: "0",
-              Approved: "X",
-              Uom: oItem.Uom || "ADT",
-            },
-            success: function () {
-              fnProcessNext(iIndex + 1);
-            },
-            error: function (oError) {
-              console.error("UpdateIssueQuantity error:", oError);
-              iErrorCount++;
-              fnProcessNext(iIndex + 1);
-            },
-          });
+          
+          try {
+            oModel.callFunction("/UpdateIssueQuantity", {
+              method: "POST",
+              groupId: "depositSave" + iIndex,
+              changeSetId: "depositSaveCS" + iIndex,
+              urlParameters: {
+                PackingNumber: sPackingNumber,
+                Matnr: oItem.Matnr,
+                Quantity: parseFloat(oItem.Quantity),
+                OriginalQty: parseFloat(oItem.TargetQuantity) || 0,
+                EditReason: "",
+                Harici: true,
+                Status: "0",
+                Approved: "X",
+                Uom: oItem.Uom || "ADT",
+              },
+              success: function () {
+                iProcessedCount++;
+                fnProcessNext(iIndex + 1);
+              },
+              error: function (oError) {
+                console.error("UpdateIssueQuantity error for item " + iIndex + ":", oError);
+                iErrorCount++;
+                iProcessedCount++;
+                fnProcessNext(iIndex + 1);
+              },
+            });
+          } catch (e) {
+            console.error("Exception in deposit save:", e);
+            iErrorCount++;
+            iProcessedCount++;
+            // Continue to next even if exception occurs
+            fnProcessNext(iIndex + 1);
+          }
         };
 
         fnProcessNext(0);
       },
 
       _onDepositSaveComplete: function (iErrorCount, sPackingNumber, bDepositOnlyMode) {
-        sap.ui.core.BusyIndicator.hide();
+        // Ensure BusyIndicator is hidden
+        try {
+          sap.ui.core.BusyIndicator.hide();
+        } catch (e) {
+          console.error("Error hiding BusyIndicator:", e);
+        }
+
         this._oDepositAddDialog.close();
 
         if (bDepositOnlyMode) {
@@ -2404,11 +2434,25 @@ sap.ui.define(
         ];
 
         sap.ui.core.BusyIndicator.show(0);
+        
+        // Timeout protection for read operation
+        var bReadComplete = false;
+        var iTimeoutId = setTimeout(function() {
+          if (!bReadComplete) {
+            console.error("Package refresh timeout");
+            sap.ui.core.BusyIndicator.hide();
+            MessageBox.error("Veri yenileme zaman aşımına uğradı.");
+          }
+        }, 15000); // 15 second timeout
+
         oModel.read("/IssuePackageSet", {
           filters: aFilters,
           urlParameters: { $expand: "ToItems" },
           success: function (oData) {
+            bReadComplete = true;
+            clearTimeout(iTimeoutId);
             sap.ui.core.BusyIndicator.hide();
+            
             if (oData.results && oData.results.length > 0) {
               var oUpdatedPkg = oData.results[0];
               // Keep panel expanded to show new deposits
@@ -2430,6 +2474,8 @@ sap.ui.define(
             }
           }.bind(this),
           error: function (oError) {
+            bReadComplete = true;
+            clearTimeout(iTimeoutId);
             sap.ui.core.BusyIndicator.hide();
             console.error("Refresh failed:", oError);
             MessageBox.error("Veriler yenilenemedi.");

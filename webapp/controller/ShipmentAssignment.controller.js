@@ -189,6 +189,9 @@ sap.ui.define(
             return;
           }
 
+          // Show loading indicator
+          sap.ui.core.BusyIndicator.show(0);
+
           // Convert date to OData format
           var oDateForFilter;
           if (sSelectedDate) {
@@ -279,9 +282,9 @@ sap.ui.define(
                   oShipment.SelectedEmployeeKeys = aSelectedEmployeeKeys;
                   oShipment.SelectedOfficerKeys = aSelectedOfficerKeys;
 
-                  // Calculate if assigned (has at least one officer or employee)
+                  // Calculate if assigned (has at least one officer and employee)
                   oShipment._isAssigned =
-                    aSelectedEmployeeKeys.length > 0 ||
+                    aSelectedEmployeeKeys.length > 0 &&
                     aSelectedOfficerKeys.length > 0;
                 });
 
@@ -300,10 +303,12 @@ sap.ui.define(
 
                 // Calculate stats and apply initial filter
                 this._updateStatsAndFilter();
+                sap.ui.core.BusyIndicator.hide();
               }.bind(this),
             )
             .catch(
               function (oError) {
+                sap.ui.core.BusyIndicator.hide();
                 var sErrorMessage = this._extractErrorMessage(oError);
                 MessageBox.error(
                   sErrorMessage || "Yükleme verileri yüklenirken hata oluştu.",
@@ -447,14 +452,15 @@ sap.ui.define(
           oList.getBinding("items").refresh();
 
           // Set selected items based on SelectedEmployeeKeys
-          this._oPersonnelDialog.attachAfterOpen(
-            function () {
-              this._updateDialogSelection(
-                oList,
-                this._currentShipment.SelectedEmployeeKeys || [],
-              );
-            }.bind(this),
-          );
+          // CRITICAL: Detach previous handler to prevent memory leak
+          this._oPersonnelDialog.detachAfterOpen(this._fnPersonnelAfterOpen);
+          this._fnPersonnelAfterOpen = function () {
+            this._updateDialogSelection(
+              oList,
+              this._currentShipment.SelectedEmployeeKeys || [],
+            );
+          }.bind(this);
+          this._oPersonnelDialog.attachAfterOpen(this._fnPersonnelAfterOpen);
 
           this._oPersonnelDialog.open();
         },
@@ -578,6 +584,10 @@ sap.ui.define(
             aSelectedOfficerKeys,
           );
 
+          // Refresh UI immediately to show changes
+          this._updateStatsAndFilter();
+          this.getView().getModel("shipmentModel").refresh(true);
+
           // Save to backend with BOTH employee and officer keys
           this._saveAssignments(
             this._currentShipment.ShipmentId,
@@ -647,14 +657,15 @@ sap.ui.define(
           oList.getBinding("items").refresh();
 
           // Set selected items based on SelectedOfficerKeys
-          this._oOfficerDialog.attachAfterOpen(
-            function () {
-              this._updateOfficerDialogSelection(
-                oList,
-                this._currentShipment.SelectedOfficerKeys || [],
-              );
-            }.bind(this),
-          );
+          // CRITICAL: Detach previous handler to prevent memory leak
+          this._oOfficerDialog.detachAfterOpen(this._fnOfficerAfterOpen);
+          this._fnOfficerAfterOpen = function () {
+            this._updateOfficerDialogSelection(
+              oList,
+              this._currentShipment.SelectedOfficerKeys || [],
+            );
+          }.bind(this);
+          this._oOfficerDialog.attachAfterOpen(this._fnOfficerAfterOpen);
 
           this._oOfficerDialog.open();
         },
@@ -737,6 +748,10 @@ sap.ui.define(
             aSelectedOfficerKeys,
           );
 
+          // Refresh UI immediately to show changes
+          this._updateStatsAndFilter();
+          this.getView().getModel("shipmentModel").refresh(true);
+
           // Save to backend with BOTH employee and officer keys
           this._saveAssignments(
             this._currentShipment.ShipmentId,
@@ -751,6 +766,7 @@ sap.ui.define(
 
         /**
          * Update _aAllShipments array when assignment changes
+         * Note: This only updates the data, caller is responsible for refreshing UI
          */
         _updateAllShipmentsAssignment: function (
           sShipmentId,
@@ -767,10 +783,7 @@ sap.ui.define(
             oShipment.SelectedEmployeeKeys = aEmployeeKeys || [];
             oShipment.SelectedOfficerKeys = aOfficerKeys || [];
             oShipment._isAssigned =
-              aEmployeeKeys.length > 0 || aOfficerKeys.length > 0;
-
-            // Recalculate stats for current type
-            this._updateStatsOnly();
+              aEmployeeKeys.length > 0 && aOfficerKeys.length > 0;
           }
         },
 
@@ -804,12 +817,15 @@ sap.ui.define(
             }
           });
 
-          // Calculate assignment counts
+          // Calculate assignment counts for current type (including GIDone)
           var iCurrentTypeAllCount = aTypeFiltered.length;
           var iCurrentTypePendingCount = 0;
           var iCurrentTypeAssignedCount = 0;
+          var iCurrentTypeGIDoneCount = 0;
           aTypeFiltered.forEach(function (oShipment) {
-            if (oShipment._isAssigned) {
+            if (oShipment.GIDone === "X") {
+              iCurrentTypeGIDoneCount++;
+            } else if (oShipment._isAssigned) {
               iCurrentTypeAssignedCount++;
             } else {
               iCurrentTypePendingCount++;
@@ -822,6 +838,7 @@ sap.ui.define(
             currentTypeAllCount: iCurrentTypeAllCount,
             currentTypePendingCount: iCurrentTypePendingCount,
             currentTypeAssignedCount: iCurrentTypeAssignedCount,
+            currentTypeGIDoneCount: iCurrentTypeGIDoneCount,
           });
         },
 
@@ -973,6 +990,9 @@ sap.ui.define(
         ) {
           var oModel = this.getOwnerComponent().getModel();
 
+          // Show loading indicator for save operation
+          sap.ui.core.BusyIndicator.show(0);
+
           // Combine employee and officer IDs
           var aCombinedIds = [];
           if (aType == "EMPLOYEE") {
@@ -1005,11 +1025,13 @@ sap.ui.define(
               Type: aType,
             },
             success: function (oData, oResponse) {
+              sap.ui.core.BusyIndicator.hide();
               MessageBox.success("Kayıt başarılı.");
               // Refresh dashboard data to update pending counts
               this.refreshDashboardData();
             }.bind(this),
             error: function (oError) {
+              sap.ui.core.BusyIndicator.hide();
               MessageBox.error("Kayıt başarısız. Lütfen tekrar deneyin.");
 
               // Reload data to sync state
