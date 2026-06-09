@@ -20,7 +20,10 @@ sap.ui.define([
             var oReturnCountModel = new JSONModel({
                 groups: [],
                 visibleGroups: [],
+                selectedType: "MD",
                 selectedStatus: "pending",
+                mdCount: 0,
+                opCount: 0,
                 pendingCount: 0,
                 completedCount: 0
             });
@@ -33,9 +36,11 @@ sap.ui.define([
         },
 
         _onRouteMatched: function() {
+            this.byId("idReturnTypeFilterBar").setSelectedKey("MD");
             this.byId("idReturnStatusFilterBar").setSelectedKey("pending");
-            this.getView().getModel("returnCountModel")
-                .setProperty("/selectedStatus", "pending");
+            var oModel = this.getView().getModel("returnCountModel");
+            oModel.setProperty("/selectedType", "MD");
+            oModel.setProperty("/selectedStatus", "pending");
             this._loadReturnCountData();
         },
 
@@ -123,11 +128,14 @@ sap.ui.define([
         _setReturnCountData: function(aHeaders) {
             var mGroups = {};
             var aGroups = [];
-            var iPendingCount = 0;
-            var iCompletedCount = 0;
+            var iMdCount = 0;
+            var iOpCount = 0;
 
             aHeaders.forEach(function(oRawHeader) {
                 var oHeader = this._normalizeReturnHeader(oRawHeader);
+                oHeader.ShipmentType = String(
+                    oHeader.ShipmentType || ""
+                ).toUpperCase();
                 var sGroupKey = oHeader.Plasiyer || "";
                 var sStatusKey = this._getStatusKey(oHeader);
                 var aItems = oHeader.ToItems && oHeader.ToItems.results
@@ -146,6 +154,9 @@ sap.ui.define([
                     oItem.MengeFire = this._toNumber(oItem.MengeFire);
                     oItem.MengeKalite = this._toNumber(oItem.MengeKalite);
                     oItem.MengeSatilab = this._toNumber(oItem.MengeSatilab);
+                    oItem.MaterialDisplayCode = this._formatMaterialCode(
+                        oItem.Matnr
+                    );
                     oItem._completed = sStatusKey === "completed";
                     oItem.MengeSayim = oItem.MengeFire +
                         oItem.MengeKalite +
@@ -165,17 +176,17 @@ sap.ui.define([
                 }
                 mGroups[sGroupKey].Waybills.push(oHeader);
 
-                if (sStatusKey === "completed") {
-                    iCompletedCount++;
-                } else {
-                    iPendingCount++;
+                if (oHeader.ShipmentType === "MD") {
+                    iMdCount++;
+                } else if (oHeader.ShipmentType === "OP") {
+                    iOpCount++;
                 }
             }.bind(this));
 
             var oModel = this.getView().getModel("returnCountModel");
             oModel.setProperty("/groups", aGroups);
-            oModel.setProperty("/pendingCount", iPendingCount);
-            oModel.setProperty("/completedCount", iCompletedCount);
+            oModel.setProperty("/mdCount", iMdCount);
+            oModel.setProperty("/opCount", iOpCount);
             this._applyStatusFilter();
         },
 
@@ -210,15 +221,37 @@ sap.ui.define([
             this._applyStatusFilter();
         },
 
+        onTypeFilterSelect: function(oEvent) {
+            var oModel = this.getView().getModel("returnCountModel");
+            oModel.setProperty("/selectedType", oEvent.getParameter("key"));
+            oModel.setProperty("/selectedStatus", "pending");
+            this.byId("idReturnStatusFilterBar").setSelectedKey("pending");
+            this._applyStatusFilter();
+        },
+
         _applyStatusFilter: function() {
             var oModel = this.getView().getModel("returnCountModel");
+            var sType = oModel.getProperty("/selectedType");
             var sStatus = oModel.getProperty("/selectedStatus");
             var aGroups = oModel.getProperty("/groups") || [];
             var aVisibleGroups = [];
+            var iPendingCount = 0;
+            var iCompletedCount = 0;
 
             aGroups.forEach(function(oGroup) {
-                var aWaybills = oGroup.Waybills.filter(function(oWaybill) {
+                var aTypeWaybills = oGroup.Waybills.filter(function(oWaybill) {
+                    return oWaybill.ShipmentType === sType;
+                });
+                var aWaybills = aTypeWaybills.filter(function(oWaybill) {
                     return oWaybill._statusKey === sStatus;
+                });
+
+                aTypeWaybills.forEach(function(oWaybill) {
+                    if (oWaybill._statusKey === "completed") {
+                        iCompletedCount++;
+                    } else {
+                        iPendingCount++;
+                    }
                 });
 
                 if (aWaybills.length) {
@@ -234,7 +267,14 @@ sap.ui.define([
                 }
             });
 
+            oModel.setProperty("/pendingCount", iPendingCount);
+            oModel.setProperty("/completedCount", iCompletedCount);
             oModel.setProperty("/visibleGroups", aVisibleGroups);
+        },
+
+        _formatMaterialCode: function(sMatnr) {
+            var sCode = String(sMatnr || "").replace(/^0+/, "");
+            return sCode || "0";
         },
 
         onSelectAllWaybills: function(oEvent) {

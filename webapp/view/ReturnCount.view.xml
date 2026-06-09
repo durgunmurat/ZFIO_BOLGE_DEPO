@@ -29,11 +29,35 @@
         </customHeader>
         <content>
             <IconTabBar
+                id="idReturnTypeFilterBar"
+                selectedKey="MD"
+                select="onTypeFilterSelect"
+                class="sapUiResponsiveContentPadding returnCountTypeBar"
+                upperCase="false"
+                stretchContentHeight="false"
+                expandable="false">
+                <items>
+                    <IconTabFilter
+                        key="MD"
+                        text="Monodistribütör"
+                        count="{returnCountModel>/mdCount}"
+                        icon="sap-icon://supplier"/>
+                    <IconTabFilter
+                        key="OP"
+                        text="Organize Dağıtım"
+                        count="{returnCountModel>/opCount}"
+                        icon="sap-icon://tree"/>
+                </items>
+            </IconTabBar>
+
+            <IconTabBar
                 id="idReturnStatusFilterBar"
                 selectedKey="pending"
                 select="onStatusFilterSelect"
-                class="sapUiResponsiveContentPadding"
-                upperCase="false">
+                class="returnCountStatusBar"
+                upperCase="false"
+                stretchContentHeight="false"
+                expandable="false">
                 <items>
                     <IconTabFilter
                         id="idReturnPendingTab"
@@ -109,29 +133,27 @@
                                     <Table
                                         items="{returnCountModel>Items}"
                                         inset="false"
+                                        fixedLayout="true"
                                         growing="true"
                                         growingThreshold="50"
-                                        width="auto"
+                                        width="100%"
                                         noDataText="Sayım için en az bir irsaliye seçin"
-                                        class="sapUiSmallMarginTop">
+                                        class="sapUiSmallMarginTop returnCountTable">
                                         <columns>
-                                            <Column minScreenWidth="Phone" demandPopin="true">
-                                                <Text text="ÜRÜN ADI"/>
+                                            <Column width="40%">
+                                                <Text text="ÜRÜN"/>
                                             </Column>
-                                            <Column width="7rem" hAlign="End">
-                                                <Text text="BEKLENEN"/>
+                                            <Column width="12%" hAlign="End">
+                                                <Text text="TOPLAM"/>
                                             </Column>
-                                            <Column width="8rem" hAlign="End">
-                                                <Text text="TOPLAM SAYIM"/>
+                                            <Column width="16%" hAlign="End">
+                                                <Text text="FİRE"/>
                                             </Column>
-                                            <Column width="9rem" hAlign="End">
-                                                <Text text="FİRE MİKTARI"/>
+                                            <Column width="16%" hAlign="End">
+                                                <Text text="KALİTE"/>
                                             </Column>
-                                            <Column width="9rem" hAlign="End">
-                                                <Text text="KALİTE MİKTARI"/>
-                                            </Column>
-                                            <Column width="11rem" hAlign="End">
-                                                <Text text="SATILABİLİR MİKTAR"/>
+                                            <Column width="16%" hAlign="End">
+                                                <Text text="SATILABİLİR"/>
                                             </Column>
                                         </columns>
                                         <items>
@@ -140,10 +162,8 @@
                                                 <cells>
                                                     <ObjectIdentifier
                                                         title="{returnCountModel>Maktx}"
-                                                        text="{returnCountModel>Matnr}"/>
-                                                    <ObjectNumber
-                                                        number="{returnCountModel>MengeSiparis}"
-                                                        unit="{returnCountModel>Meins}"/>
+                                                        text="{returnCountModel>MaterialDisplayCode}"
+                                                        class="returnCountMaterial"/>
                                                     <ObjectNumber
                                                         number="{returnCountModel>MengeSayim}"
                                                         unit="{returnCountModel>Meins}"
@@ -151,16 +171,22 @@
                                                     <Input
                                                         value="{returnCountModel>MengeFire}"
                                                         type="Number"
+                                                        width="100%"
+                                                        textAlign="End"
                                                         editable="{= !${returnCountModel>_completed} }"
                                                         liveChange="onCountLiveChange"/>
                                                     <Input
                                                         value="{returnCountModel>MengeKalite}"
                                                         type="Number"
+                                                        width="100%"
+                                                        textAlign="End"
                                                         editable="{= !${returnCountModel>_completed} }"
                                                         liveChange="onCountLiveChange"/>
                                                     <Input
                                                         value="{returnCountModel>MengeSatilab}"
                                                         type="Number"
+                                                        width="100%"
+                                                        textAlign="End"
                                                         editable="{= !${returnCountModel>_completed} }"
                                                         liveChange="onCountLiveChange"/>
                                                 </cells>
