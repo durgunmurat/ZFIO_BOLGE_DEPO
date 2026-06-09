@@ -17,6 +17,7 @@
 		"start-variants-management": "fiori run --open \"preview.html?sap-client=100&sap-ui-xx-viewCache=false&fiori-tools-rta-mode=true&sap-ui-rta-skip-flex-validation=true#preview-app\"",
 		"build": "ui5 build -a --clean-dest --include-task=generateCachebusterInfo",
 		"deploy": "npx nwabap upload",
+		"deploy:image": "npx nwabap upload --files \"images/login-bg.jpg\" --preserve_unselected",
 		"deploy-config": "fiori add deploy-config"
 	},
 	"devDependencies": {

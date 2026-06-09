@@ -171,7 +171,7 @@ sap.ui.define([
                         ),
                         PlasiyerName: oHeader.PlasiyerName,
                         expanded: false,
-                        selectAll: false,
+                        selectionScope: "ALL",
                         Waybills: [],
                         Items: []
                     };
@@ -258,15 +258,26 @@ sap.ui.define([
                 });
 
                 if (aWaybills.length) {
+                    var aSelectedItems = [];
+
+                    aWaybills.forEach(function(oWaybill) {
+                        oWaybill.selected = true;
+                        if (oWaybill.ToItems) {
+                            aSelectedItems = aSelectedItems.concat(
+                                oWaybill.ToItems.results || []
+                            );
+                        }
+                    });
+
                     aVisibleGroups.push({
                         Plasiyer: oGroup.Plasiyer,
                         PlasiyerDisplay: oGroup.PlasiyerDisplay,
                         PlasiyerName: oGroup.PlasiyerName,
                         expanded: false,
-                        selectAll: false,
+                        selectionScope: "ALL",
                         isCompleted: sStatus === "completed",
                         Waybills: aWaybills,
-                        Items: []
+                        Items: aSelectedItems
                     });
                 }
             });
@@ -285,16 +296,22 @@ sap.ui.define([
             return sCode || "0";
         },
 
-        onSelectAllWaybills: function(oEvent) {
-            var bSelected = oEvent.getParameter("selected");
-            var oContext = oEvent.getSource()
+        onSelectionScopeSelect: function(oEvent) {
+            var oSource = oEvent.getSource();
+            var sSelectionScope = oSource.data("selectionScope");
+            var oContext = oSource
                 .getBindingContext("returnCountModel");
             var oGroup = oContext.getObject();
 
+            if (!oEvent.getParameter("selected") &&
+                oGroup.selectionScope === sSelectionScope) {
+                oSource.setSelected(true);
+                return;
+            }
+
             oGroup.Waybills.forEach(function(oWaybill) {
-                oWaybill.selected = oWaybill.ReturnType === "P"
-                    ? false
-                    : bSelected;
+                oWaybill.selected = sSelectionScope === "ALL" ||
+                    oWaybill.ReturnType === sSelectionScope;
             });
             this._refreshGroupItems(oContext);
         },
@@ -325,9 +342,6 @@ sap.ui.define([
             var sGroupPath = oGroupContext.getPath();
             var oGroup = oGroupContext.getObject();
             var aItems = [];
-            var aStandardWaybills = oGroup.Waybills.filter(function(oWaybill) {
-                return oWaybill.ReturnType !== "P";
-            });
 
             oGroup.Waybills.forEach(function(oWaybill) {
                 if (oWaybill.selected && oWaybill.ToItems) {
@@ -337,16 +351,51 @@ sap.ui.define([
 
             oModel.setProperty(sGroupPath + "/Items", aItems);
             oModel.setProperty(
-                sGroupPath + "/selectAll",
-                aStandardWaybills.length > 0 &&
-                aStandardWaybills.every(function(oWaybill) {
-                    return oWaybill.selected;
-                })
+                sGroupPath + "/selectionScope",
+                this._getSelectionScope(oGroup.Waybills)
             );
             oModel.refresh(true);
         },
 
-        onCountLiveChange: function(oEvent) {
+        _getSelectionScope: function(aWaybills) {
+            var aPlasiyerWaybills = aWaybills.filter(function(oWaybill) {
+                return oWaybill.ReturnType === "P";
+            });
+            var aCustomerWaybills = aWaybills.filter(function(oWaybill) {
+                return oWaybill.ReturnType === "M";
+            });
+            var bAllPlasiyerSelected = aPlasiyerWaybills.length > 0 &&
+                aPlasiyerWaybills.every(function(oWaybill) {
+                    return oWaybill.selected;
+                });
+            var bAllCustomersSelected = aCustomerWaybills.length > 0 &&
+                aCustomerWaybills.every(function(oWaybill) {
+                    return oWaybill.selected;
+                });
+            var bAnyPlasiyerSelected = aPlasiyerWaybills.some(
+                function(oWaybill) {
+                    return oWaybill.selected;
+                }
+            );
+            var bAnyCustomerSelected = aCustomerWaybills.some(
+                function(oWaybill) {
+                    return oWaybill.selected;
+                }
+            );
+
+            if (bAllPlasiyerSelected && bAllCustomersSelected) {
+                return "ALL";
+            }
+            if (bAllPlasiyerSelected && !bAnyCustomerSelected) {
+                return "P";
+            }
+            if (bAllCustomersSelected && !bAnyPlasiyerSelected) {
+                return "M";
+            }
+            return "";
+        },
+
+        onCountChange: function(oEvent) {
             var oInput = oEvent.getSource();
             var oContext = oInput.getBindingContext("returnCountModel");
             var oItem = oContext.getObject();
@@ -394,6 +443,15 @@ sap.ui.define([
                 this._buildDeepInsertPayload.bind(this)
             );
 
+            if (aPayloads.some(function(oPayload) {
+                return !oPayload.IrsTar;
+            })) {
+                MessageBox.error(
+                    "İrsaliye tarihi geçersiz. Tarihi yeniden seçip tekrar deneyin."
+                );
+                return;
+            }
+
             MessageBox.confirm(
                 aPayloads.length + " irsaliyenin sayımı onaylanacak.",
                 {
@@ -411,12 +469,14 @@ sap.ui.define([
             var aItems = oHeader.ToItems && oHeader.ToItems.results
                 ? oHeader.ToItems.results
                 : [];
+            var oIrsTar = this._toODataDate(oHeader.IrsTar) ||
+                this._getSelectedReturnDate();
 
             return {
                 LogUid: oHeader.LogUid || "",
                 VbelnVa: oHeader.VbelnVa || "",
                 IrsNo: oHeader.IrsNo || "",
-                IrsTar: oHeader.IrsTar || null,
+                IrsTar: oIrsTar,
                 Lgort: oHeader.Lgort || "",
                 Plasiyer: oHeader.Plasiyer || "",
                 PlasiyerName: oHeader.PlasiyerName || "",
@@ -440,6 +500,47 @@ sap.ui.define([
                     };
                 }.bind(this))
             };
+        },
+
+        _getSelectedReturnDate: function() {
+            var oFilterModel = this.getOwnerComponent().getModel("filterModel");
+            var sSelectedDate = oFilterModel
+                ? oFilterModel.getProperty("/selectedDate")
+                : "";
+
+            return this._toODataDate(sSelectedDate);
+        },
+
+        _toODataDate: function(vValue) {
+            var oDate;
+            var aDateParts;
+            var aODataDate;
+
+            if (vValue instanceof Date) {
+                oDate = new Date(vValue.getTime());
+            } else if (typeof vValue === "number") {
+                oDate = vValue > 0 ? new Date(vValue) : null;
+            } else if (typeof vValue === "string") {
+                aODataDate = /^\/Date\((\d+)(?:[+-]\d{4})?\)\/$/
+                    .exec(vValue);
+                if (aODataDate) {
+                    oDate = Number(aODataDate[1]) > 0
+                        ? new Date(Number(aODataDate[1]))
+                        : null;
+                } else {
+                    aDateParts = /^(\d{4})-?(\d{2})-?(\d{2})/
+                        .exec(vValue);
+                    if (aDateParts) {
+                        oDate = new Date(Date.UTC(
+                            Number(aDateParts[1]),
+                            Number(aDateParts[2]) - 1,
+                            Number(aDateParts[3])
+                        ));
+                    }
+                }
+            }
+
+            return oDate && !isNaN(oDate.getTime()) ? oDate : null;
         },
 
         _submitPayloads: function(aPayloads) {

@@ -94,9 +94,29 @@
                                         class="sapUiTinyMarginBegin"/>
                                     <ToolbarSpacer/>
                                     <CheckBox
-                                        text="Tümü"
-                                        selected="{returnCountModel>selectAll}"
-                                        select="onSelectAllWaybills"/>
+                                        text="Plasiyerleri seç"
+                                        selected="{= ${returnCountModel>selectionScope} === 'P' }"
+                                        select="onSelectionScopeSelect">
+                                        <customData>
+                                            <core:CustomData key="selectionScope" value="P"/>
+                                        </customData>
+                                    </CheckBox>
+                                    <CheckBox
+                                        text="Müşterileri seç"
+                                        selected="{= ${returnCountModel>selectionScope} === 'M' }"
+                                        select="onSelectionScopeSelect">
+                                        <customData>
+                                            <core:CustomData key="selectionScope" value="M"/>
+                                        </customData>
+                                    </CheckBox>
+                                    <CheckBox
+                                        text="Hepsini seç"
+                                        selected="{= ${returnCountModel>selectionScope} === 'ALL' }"
+                                        select="onSelectionScopeSelect">
+                                        <customData>
+                                            <core:CustomData key="selectionScope" value="ALL"/>
+                                        </customData>
+                                    </CheckBox>
                                     <Button
                                         icon="sap-icon://accept"
                                         text="Sayımı Onayla"
@@ -174,21 +194,21 @@
                                                         width="100%"
                                                         textAlign="End"
                                                         editable="{= !${returnCountModel>_completed} }"
-                                                        liveChange="onCountLiveChange"/>
+                                                        change="onCountChange"/>
                                                     <Input
                                                         value="{returnCountModel>MengeKalite}"
                                                         type="Number"
                                                         width="100%"
                                                         textAlign="End"
                                                         editable="{= !${returnCountModel>_completed} }"
-                                                        liveChange="onCountLiveChange"/>
+                                                        change="onCountChange"/>
                                                     <Input
                                                         value="{returnCountModel>MengeSatilab}"
                                                         type="Number"
                                                         width="100%"
                                                         textAlign="End"
                                                         editable="{= !${returnCountModel>_completed} }"
-                                                        liveChange="onCountLiveChange"/>
+                                                        change="onCountChange"/>
                                                 </cells>
                                             </ColumnListItem>
                                         </items>
