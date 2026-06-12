@@ -1,0 +1,68 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+    <Dialog
+        id="idReturnDepositAddDialog"
+        title="Depozito Ekle"
+        contentWidth="95%"
+        stretch="{device>/isPhone}"
+        verticalScrolling="true"
+        horizontalScrolling="false">
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <MessageStrip
+                    text="Eklemek istediğiniz depozito malzemelerinin miktarını girin. Son ZDAI siparişinden gelen malzemeler değiştirilemez."
+                    type="Information"
+                    showIcon="true"
+                    class="sapUiSmallMarginBottom"/>
+                <Table
+                    items="{
+                        path: 'returnDepositAddModel>/items',
+                        templateShareable: false
+                    }"
+                    growing="false"
+                    noDataText="Depozito malzemesi bulunamadı"
+                    fixedLayout="true">
+                    <columns>
+                        <Column width="65%">
+                            <Text text="MALZEME"/>
+                        </Column>
+                        <Column width="35%" hAlign="Center">
+                            <Text text="MİKTAR"/>
+                        </Column>
+                    </columns>
+                    <items>
+                        <ColumnListItem
+                            highlight="{= ${returnDepositAddModel>IsExisting} ? 'None' : 'Information' }">
+                            <cells>
+                                <ObjectIdentifier
+                                    title="{returnDepositAddModel>Maktx}"
+                                    text="{returnDepositAddModel>Matnr}"/>
+                                <StepInput
+                                    value="{returnDepositAddModel>Quantity}"
+                                    min="0"
+                                    max="999"
+                                    step="1"
+                                    width="100%"
+                                    displayValuePrecision="0"
+                                    textAlign="Center"
+                                    enabled="{= !${returnDepositAddModel>IsExisting} }"
+                                    change="onReturnDepositQuantityChange"/>
+                            </cells>
+                        </ColumnListItem>
+                    </items>
+                </Table>
+            </VBox>
+        </content>
+        <buttons>
+            <Button
+                text="Ekle"
+                type="Emphasized"
+                press="onReturnDepositAddSave"/>
+            <Button
+                text="İptal"
+                type="Transparent"
+                press="onReturnDepositAddCancel"/>
+        </buttons>
+    </Dialog>
+</core:FragmentDefinition>

@@ -76,7 +76,10 @@
 
             <List
                 id="idReturnRepresentativeList"
-                items="{returnCountModel>/visibleGroups}"
+                items="{
+                    path: 'returnCountModel>/visibleGroups',
+                    templateShareable: false
+                }"
                 noDataText="Seçilen tarih ve depo için iade kaydı bulunamadı">
                 <items>
                     <CustomListItem>
@@ -95,43 +98,53 @@
                                         level="H3"
                                         class="sapUiTinyMarginBegin"/>
                                     <ToolbarSpacer/>
-                                    <CheckBox
-                                        text="Plasiyerleri seç"
-                                        selected="{= ${returnCountModel>selectionScope} === 'P' }"
-                                        select="onSelectionScopeSelect">
-                                        <customData>
-                                            <core:CustomData key="selectionScope" value="P"/>
-                                        </customData>
-                                    </CheckBox>
-                                    <CheckBox
-                                        text="Müşterileri seç"
-                                        selected="{= ${returnCountModel>selectionScope} === 'M' }"
-                                        select="onSelectionScopeSelect">
-                                        <customData>
-                                            <core:CustomData key="selectionScope" value="M"/>
-                                        </customData>
-                                    </CheckBox>
-                                    <CheckBox
-                                        text="Hepsini seç"
-                                        selected="{= ${returnCountModel>selectionScope} === 'ALL' }"
-                                        select="onSelectionScopeSelect">
-                                        <customData>
-                                            <core:CustomData key="selectionScope" value="ALL"/>
-                                        </customData>
-                                    </CheckBox>
                                     <Button
                                         icon="sap-icon://accept"
                                         text="Sayımı Onayla"
                                         type="Emphasized"
                                         press="onApproveCountPress"
+                                        enabled="{returnCountModel>canApprove}"
                                         visible="{= !${returnCountModel>isCompleted} }"
                                         class="sapUiTinyMarginBegin"/>
                                 </OverflowToolbar>
                             </headerToolbar>
                             <content>
                                 <VBox>
+                                    <HBox
+                                        wrap="Wrap"
+                                        alignItems="Center"
+                                        visible="{= !${returnCountModel>isCompleted} }"
+                                        class="returnCountSelectionBar">
+                                        <CheckBox
+                                            text="Plasiyerleri seç"
+                                            selected="{= ${returnCountModel>selectionScope} === 'P' }"
+                                            select="onSelectionScopeSelect">
+                                            <customData>
+                                                <core:CustomData key="selectionScope" value="P"/>
+                                            </customData>
+                                        </CheckBox>
+                                        <CheckBox
+                                            text="Müşterileri seç"
+                                            selected="{= ${returnCountModel>selectionScope} === 'M' }"
+                                            select="onSelectionScopeSelect">
+                                            <customData>
+                                                <core:CustomData key="selectionScope" value="M"/>
+                                            </customData>
+                                        </CheckBox>
+                                        <CheckBox
+                                            text="Hepsini seç"
+                                            selected="{= ${returnCountModel>selectionScope} === 'ALL' }"
+                                            select="onSelectionScopeSelect">
+                                            <customData>
+                                                <core:CustomData key="selectionScope" value="ALL"/>
+                                            </customData>
+                                        </CheckBox>
+                                    </HBox>
                                     <List
-                                        items="{returnCountModel>Waybills}"
+                                        items="{
+                                            path: 'returnCountModel>Waybills',
+                                            templateShareable: false
+                                        }"
                                         noDataText="İrsaliye bulunamadı">
                                         <items>
                                             <CustomListItem>
@@ -152,69 +165,171 @@
                                         </items>
                                     </List>
 
-                                    <Table
-                                        items="{returnCountModel>Items}"
-                                        inset="false"
-                                        fixedLayout="true"
-                                        growing="true"
-                                        growingThreshold="50"
-                                        width="100%"
-                                        noDataText="Sayım için en az bir irsaliye seçin"
-                                        class="sapUiSmallMarginTop returnCountTable">
-                                        <columns>
-                                            <Column width="40%">
-                                                <Text text="ÜRÜN"/>
-                                            </Column>
-                                            <Column width="12%" hAlign="End">
-                                                <Text text="TOPLAM"/>
-                                            </Column>
-                                            <Column width="16%" hAlign="End">
-                                                <Text text="FİRE"/>
-                                            </Column>
-                                            <Column width="16%" hAlign="End">
-                                                <Text text="KALİTE"/>
-                                            </Column>
-                                            <Column width="16%" hAlign="End">
-                                                <Text text="SATILABİLİR"/>
-                                            </Column>
-                                        </columns>
-                                        <items>
-                                            <ColumnListItem
-                                                highlight="{= ${returnCountModel>MengeSayim} !== ${returnCountModel>MengeSiparis} ? 'Error' : 'None' }">
-                                                <cells>
-                                                    <ObjectIdentifier
-                                                        title="{returnCountModel>Maktx}"
-                                                        text="{returnCountModel>MaterialDisplayCode}"
-                                                        class="returnCountMaterial"/>
-                                                    <ObjectNumber
-                                                        number="{returnCountModel>MengeSayim}"
-                                                        unit="{returnCountModel>Meins}"
-                                                        state="{= ${returnCountModel>MengeSayim} !== ${returnCountModel>MengeSiparis} ? 'Error' : 'None' }"/>
-                                                    <Input
-                                                        value="{returnCountModel>MengeFire}"
-                                                        type="Number"
-                                                        width="100%"
-                                                        textAlign="End"
-                                                        editable="{= !${returnCountModel>_completed} }"
-                                                        change="onCountChange"/>
-                                                    <Input
-                                                        value="{returnCountModel>MengeKalite}"
-                                                        type="Number"
-                                                        width="100%"
-                                                        textAlign="End"
-                                                        editable="{= !${returnCountModel>_completed} }"
-                                                        change="onCountChange"/>
-                                                    <Input
-                                                        value="{returnCountModel>MengeSatilab}"
-                                                        type="Number"
-                                                        width="100%"
-                                                        textAlign="End"
-                                                        editable="{= !${returnCountModel>_completed} }"
-                                                        change="onCountChange"/>
-                                                </cells>
-                                            </ColumnListItem>
-                                        </items>
-                                    </Table>
+                                    <Panel
+                                        expandable="true"
+                                        expanded="true"
+                                        class="sapUiSmallMarginTop returnProductPanel">
+                                        <headerToolbar>
+                                            <OverflowToolbar>
+                                                <core:Icon
+                                                    src="sap-icon://product"
+                                                    size="1.2rem"/>
+                                                <Title text="Ürünler" level="H4"/>
+                                                <ObjectNumber
+                                                    number="{returnCountModel>ProductCount}"/>
+                                            </OverflowToolbar>
+                                        </headerToolbar>
+                                        <content>
+                                            <Table
+                                                items="{
+                                                    path: 'returnCountModel>ProductItems',
+                                                    templateShareable: false
+                                                }"
+                                                inset="false"
+                                                fixedLayout="true"
+                                                growing="true"
+                                                growingThreshold="50"
+                                                width="100%"
+                                                noDataText="Sayım için ürün bulunamadı"
+                                                class="returnCountTable">
+                                                <columns>
+                                                    <Column width="34%">
+                                                        <Text text="ÜRÜN"/>
+                                                    </Column>
+                                                    <Column width="11%" hAlign="End">
+                                                        <Text text="TOPLAM"/>
+                                                    </Column>
+                                                    <Column width="13%" hAlign="End">
+                                                        <Text text="FİRE"/>
+                                                    </Column>
+                                                    <Column width="13%" hAlign="End">
+                                                        <Text text="KALİTE"/>
+                                                    </Column>
+                                                    <Column width="15%" hAlign="End">
+                                                        <Text text="SATILABİLİR"/>
+                                                    </Column>
+                                                    <Column width="14%" hAlign="Center">
+                                                        <Text text="TAMAM"/>
+                                                    </Column>
+                                                </columns>
+                                                <items>
+                                                    <ColumnListItem
+                                                        highlight="{= ${returnCountModel>MengeSayim} !== ${returnCountModel>MengeSiparis} ? 'Error' : 'None' }">
+                                                        <cells>
+                                                            <ObjectIdentifier
+                                                                title="{returnCountModel>Maktx}"
+                                                                text="{returnCountModel>MaterialDisplayCode}"
+                                                                class="returnCountMaterial"/>
+                                                            <ObjectNumber
+                                                                number="{returnCountModel>MengeSayim}"
+                                                                unit="{returnCountModel>Meins}"
+                                                                state="{= ${returnCountModel>MengeSayim} !== ${returnCountModel>MengeSiparis} ? 'Error' : 'None' }"/>
+                                                            <Input
+                                                                value="{returnCountModel>MengeFire}"
+                                                                type="Number"
+                                                                width="100%"
+                                                                textAlign="End"
+                                                                class="returnCountQuantityInput"
+                                                                editable="{= !${returnCountModel>_completed} }"
+                                                                change="onCountChange"/>
+                                                            <Input
+                                                                value="{returnCountModel>MengeKalite}"
+                                                                type="Number"
+                                                                width="100%"
+                                                                textAlign="End"
+                                                                class="returnCountQuantityInput"
+                                                                editable="{= !${returnCountModel>_completed} }"
+                                                                change="onCountChange"/>
+                                                            <Input
+                                                                value="{returnCountModel>MengeSatilab}"
+                                                                type="Number"
+                                                                width="100%"
+                                                                textAlign="End"
+                                                                class="returnCountQuantityInput"
+                                                                editable="{= !${returnCountModel>_completed} }"
+                                                                change="onCountChange"/>
+                                                            <CheckBox
+                                                                selected="{returnCountModel>_countConfirmed}"
+                                                                enabled="{= !${returnCountModel>_completed} }"
+                                                                tooltip="Bu kalemin fiziksel sayımı tamamlandı"
+                                                                select="onCountConfirmed"/>
+                                                        </cells>
+                                                    </ColumnListItem>
+                                                </items>
+                                            </Table>
+                                        </content>
+                                    </Panel>
+
+                                    <Panel
+                                        expandable="true"
+                                        expanded="true"
+                                        class="sapUiSmallMarginTop returnDepositPanel">
+                                        <headerToolbar>
+                                            <OverflowToolbar>
+                                                <core:Icon
+                                                    src="sap-icon://inventory-deposit"
+                                                    size="1.2rem"/>
+                                                <Title text="Depozito" level="H4"/>
+                                                <ObjectNumber
+                                                    number="{returnCountModel>DepositCount}"/>
+                                                <ToolbarSpacer/>
+                                                <Button
+                                                    text="Depozito Ekle"
+                                                    icon="sap-icon://add"
+                                                    type="Transparent"
+                                                    press="onReturnDepositAddPress"
+                                                    visible="{= !${returnCountModel>isCompleted} }"/>
+                                            </OverflowToolbar>
+                                        </headerToolbar>
+                                        <content>
+                                            <Table
+                                                items="{
+                                                    path: 'returnCountModel>DepositItems',
+                                                    templateShareable: false
+                                                }"
+                                                inset="false"
+                                                fixedLayout="true"
+                                                growing="true"
+                                                growingThreshold="50"
+                                                width="100%"
+                                                noDataText="Son ZDAI siparişinde depozito bulunamadı"
+                                                class="returnCountTable returnDepositTable">
+                                                <columns>
+                                                    <Column width="55%">
+                                                        <Text text="DEPOZİTO"/>
+                                                    </Column>
+                                                    <Column width="30%" hAlign="End">
+                                                        <Text text="SAYIM"/>
+                                                    </Column>
+                                                    <Column width="15%" hAlign="Center">
+                                                        <Text text="TAMAM"/>
+                                                    </Column>
+                                                </columns>
+                                                <items>
+                                                    <ColumnListItem>
+                                                        <cells>
+                                                            <ObjectIdentifier
+                                                                title="{returnCountModel>Maktx}"
+                                                                text="{returnCountModel>MaterialDisplayCode}"/>
+                                                            <Input
+                                                                value="{returnCountModel>MengeSayim}"
+                                                                type="Number"
+                                                                width="100%"
+                                                                textAlign="End"
+                                                                class="returnCountQuantityInput"
+                                                                editable="{= !${returnCountModel>_completed} }"
+                                                                change="onDepositCountChange"/>
+                                                            <CheckBox
+                                                                selected="{returnCountModel>_countConfirmed}"
+                                                                enabled="{= !${returnCountModel>_completed} }"
+                                                                tooltip="Bu depozitonun fiziksel sayımı tamamlandı"
+                                                                select="onCountConfirmed"/>
+                                                        </cells>
+                                                    </ColumnListItem>
+                                                </items>
+                                            </Table>
+                                        </content>
+                                    </Panel>
                                 </VBox>
                             </content>
                         </Panel>

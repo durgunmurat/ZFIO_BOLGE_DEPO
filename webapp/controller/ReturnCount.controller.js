@@ -16,6 +16,11 @@ sap.ui.define([
     "use strict";
 
     return BaseController.extend("com.sut.bolgeyonetim.controller.ReturnCount", {
+        _returnDepositListCache: null,
+        _oReturnDepositDialog: null,
+        _oReturnDepositGroupContext: null,
+        _returnDepositDraftQueue: null,
+
         onInit: function() {
             var oReturnCountModel = new JSONModel({
                 groups: [],
@@ -33,6 +38,33 @@ sap.ui.define([
             this.getRouter()
                 .getRoute("returnCount")
                 .attachPatternMatched(this._onRouteMatched, this);
+        },
+
+        onAfterRendering: function() {
+            var $View = this.getView().$();
+
+            $View.off(".returnCountZeroSelect");
+            $View.on(
+                "focusin.returnCountZeroSelect",
+                ".returnCountQuantityInput input",
+                function(oEvent) {
+                    var oInput = oEvent.currentTarget;
+
+                    if (this._toNumber(oInput.value) === 0) {
+                        setTimeout(function() {
+                            oInput.select();
+                        }, 0);
+                    }
+                }.bind(this)
+            );
+        },
+
+        onExit: function() {
+            this.getView().$().off(".returnCountZeroSelect");
+            if (this._oReturnDepositDialog) {
+                this._oReturnDepositDialog.destroy();
+                this._oReturnDepositDialog = null;
+            }
         },
 
         _onRouteMatched: function() {
@@ -109,10 +141,31 @@ sap.ui.define([
                 urlParameters: {
                     "$expand": "ToItems"
                 },
-                success: function(oData) {
-                    oODataModel.setUseBatch(true);
-                    sap.ui.core.BusyIndicator.hide();
-                    this._setReturnCountData(oData.results || []);
+                success: function(oExpandedData) {
+                    oODataModel.read("/ReturnHeaderSet", {
+                        filters: aFilters,
+                        urlParameters: {
+                            "$select": "LogUid,Status"
+                        },
+                        success: function(oStatusData) {
+                            var aHeaders = this._mergeReturnHeaderStatuses(
+                                oExpandedData.results || [],
+                                oStatusData.results || []
+                            );
+
+                            oODataModel.setUseBatch(true);
+                            sap.ui.core.BusyIndicator.hide();
+                            this._setReturnCountData(aHeaders);
+                        }.bind(this),
+                        error: function(oError) {
+                            oODataModel.setUseBatch(true);
+                            sap.ui.core.BusyIndicator.hide();
+                            MessageBox.error(this._getErrorMessage(
+                                oError,
+                                "İade durum bilgileri yüklenemedi."
+                            ));
+                        }.bind(this)
+                    });
                 }.bind(this),
                 error: function(oError) {
                     oODataModel.setUseBatch(true);
@@ -122,6 +175,21 @@ sap.ui.define([
                         "İade sayım verileri yüklenemedi."
                     ));
                 }.bind(this)
+            });
+        },
+
+        _mergeReturnHeaderStatuses: function(aExpandedHeaders, aStatusHeaders) {
+            var mStatusByLogUid = {};
+
+            aStatusHeaders.forEach(function(oHeader) {
+                mStatusByLogUid[oHeader.LogUid] = String(
+                    oHeader.Status || ""
+                ).trim().toUpperCase();
+            });
+
+            return aExpandedHeaders.map(function(oHeader) {
+                oHeader.Status = mStatusByLogUid[oHeader.LogUid] || "";
+                return oHeader;
             });
         },
 
@@ -136,13 +204,14 @@ sap.ui.define([
                 oHeader.ShipmentType = String(
                     oHeader.ShipmentType || ""
                 ).toUpperCase();
+                oHeader.Status = String(
+                    oHeader.Status || ""
+                ).trim().toUpperCase();
                 var sGroupKey = oHeader.Plasiyer || "";
-                var sStatusKey = this._getStatusKey(oHeader);
                 var aItems = oHeader.ToItems && oHeader.ToItems.results
                     ? oHeader.ToItems.results
                     : (oHeader.ToItems || []);
 
-                oHeader._statusKey = sStatusKey;
                 oHeader.selected = false;
                 oHeader.ReturnTypeText = oHeader.ReturnType === "P"
                     ? "Plasiyer iade irsaliyesi"
@@ -157,7 +226,8 @@ sap.ui.define([
                     oItem.MaterialDisplayCode = this._formatMaterialCode(
                         oItem.Matnr
                     );
-                    oItem._completed = sStatusKey === "completed";
+                    oItem._completed = oHeader.Status === "S";
+                    oItem._countConfirmed = oHeader.Status === "S";
                     oItem.MengeSayim = oItem.MengeFire +
                         oItem.MengeKalite +
                         oItem.MengeSatilab;
@@ -172,8 +242,13 @@ sap.ui.define([
                         PlasiyerName: oHeader.PlasiyerName,
                         expanded: false,
                         selectionScope: "ALL",
+                        canApprove: false,
                         Waybills: [],
-                        Items: []
+                        ProductItems: [],
+                        DepositItems: [],
+                        ExternalDeposits: [],
+                        ProductCount: 0,
+                        DepositCount: 0
                     };
                     aGroups.push(mGroups[sGroupKey]);
                 }
@@ -207,17 +282,6 @@ sap.ui.define([
             return Object.assign({}, oIncludedHeader, oHeader);
         },
 
-        _getStatusKey: function(oHeader) {
-            var sStatus = String(
-                oHeader.Status || oHeader.CountStatus || ""
-            ).toUpperCase();
-            return sStatus === "X" ||
-                sStatus === "1" ||
-                sStatus === "COMPLETED"
-                ? "completed"
-                : "pending";
-        },
-
         onStatusFilterSelect: function(oEvent) {
             this.getView().getModel("returnCountModel")
                 .setProperty("/selectedStatus", oEvent.getParameter("key"));
@@ -236,6 +300,7 @@ sap.ui.define([
             var oModel = this.getView().getModel("returnCountModel");
             var sType = oModel.getProperty("/selectedType");
             var sStatus = oModel.getProperty("/selectedStatus");
+            var sBackendStatus = sStatus === "completed" ? "S" : "N";
             var aGroups = oModel.getProperty("/groups") || [];
             var aVisibleGroups = [];
             var iPendingCount = 0;
@@ -246,28 +311,40 @@ sap.ui.define([
                     return oWaybill.ShipmentType === sType;
                 });
                 var aWaybills = aTypeWaybills.filter(function(oWaybill) {
-                    return oWaybill._statusKey === sStatus;
+                    return oWaybill.Status === sBackendStatus;
                 });
 
                 aTypeWaybills.forEach(function(oWaybill) {
-                    if (oWaybill._statusKey === "completed") {
+                    if (oWaybill.Status === "S") {
                         iCompletedCount++;
-                    } else {
+                    } else if (oWaybill.Status === "N") {
                         iPendingCount++;
                     }
                 });
 
                 if (aWaybills.length) {
-                    var aSelectedItems = [];
+                    var aProductItems = [];
+                    var aDepositItems = [];
+                    var mDepositItems = {};
 
                     aWaybills.forEach(function(oWaybill) {
                         oWaybill.selected = true;
                         if (oWaybill.ToItems) {
-                            aSelectedItems = aSelectedItems.concat(
-                                oWaybill.ToItems.results || []
+                            (oWaybill.ToItems.results || []).forEach(
+                                function(oItem) {
+                                    if (oItem.IsDepozito === true) {
+                                        this._addUniqueDepositItem(
+                                            aDepositItems,
+                                            mDepositItems,
+                                            oItem
+                                        );
+                                    } else {
+                                        aProductItems.push(oItem);
+                                    }
+                                }.bind(this)
                             );
                         }
-                    });
+                    }.bind(this));
 
                     aVisibleGroups.push({
                         Plasiyer: oGroup.Plasiyer,
@@ -275,12 +352,17 @@ sap.ui.define([
                         PlasiyerName: oGroup.PlasiyerName,
                         expanded: false,
                         selectionScope: "ALL",
+                        canApprove: false,
                         isCompleted: sStatus === "completed",
                         Waybills: aWaybills,
-                        Items: aSelectedItems
+                        ProductItems: aProductItems,
+                        DepositItems: aDepositItems,
+                        ExternalDeposits: [],
+                        ProductCount: aProductItems.length,
+                        DepositCount: aDepositItems.length
                     });
                 }
-            });
+            }.bind(this));
 
             oModel.setProperty("/pendingCount", iPendingCount);
             oModel.setProperty("/completedCount", iCompletedCount);
@@ -341,20 +423,94 @@ sap.ui.define([
             var oModel = oGroupContext.getModel();
             var sGroupPath = oGroupContext.getPath();
             var oGroup = oGroupContext.getObject();
-            var aItems = [];
+            var aProductItems = [];
+            var aDepositItems = [];
+            var mDepositItems = {};
 
             oGroup.Waybills.forEach(function(oWaybill) {
                 if (oWaybill.selected && oWaybill.ToItems) {
-                    aItems = aItems.concat(oWaybill.ToItems.results || []);
+                    (oWaybill.ToItems.results || []).forEach(function(oItem) {
+                        if (oItem.IsDepozito === true) {
+                            this._addUniqueDepositItem(
+                                aDepositItems,
+                                mDepositItems,
+                                oItem
+                            );
+                        } else {
+                            aProductItems.push(oItem);
+                        }
+                    }.bind(this));
                 }
-            });
+            }.bind(this));
 
-            oModel.setProperty(sGroupPath + "/Items", aItems);
+            (oGroup.ExternalDeposits || []).forEach(function(oItem) {
+                this._addUniqueDepositItem(
+                    aDepositItems,
+                    mDepositItems,
+                    oItem
+                );
+            }.bind(this));
+            oModel.setProperty(sGroupPath + "/ProductItems", aProductItems);
+            oModel.setProperty(sGroupPath + "/DepositItems", aDepositItems);
+            oModel.setProperty(
+                sGroupPath + "/ProductCount",
+                aProductItems.length
+            );
+            oModel.setProperty(
+                sGroupPath + "/DepositCount",
+                aDepositItems.length
+            );
             oModel.setProperty(
                 sGroupPath + "/selectionScope",
                 sSelectionScope || this._getSelectionScope(oGroup.Waybills)
             );
+            this._updateGroupApprovalState(oModel, sGroupPath);
             oModel.refresh(true);
+        },
+
+        _updateGroupApprovalState: function(oModel, sGroupPath) {
+            var oGroup = oModel.getProperty(sGroupPath);
+            var aWaybills = oGroup && oGroup.Waybills
+                ? oGroup.Waybills
+                : [];
+            var bAllWaybillsSelected = aWaybills.length > 0 &&
+                aWaybills.every(function(oWaybill) {
+                    return oWaybill.selected;
+                });
+            var bAllItemsConfirmed = aWaybills.length > 0 &&
+                aWaybills.every(function(oWaybill) {
+                    var aItems = oWaybill.ToItems &&
+                        oWaybill.ToItems.results
+                        ? oWaybill.ToItems.results
+                        : [];
+                    var aProductItems = aItems.filter(function(oItem) {
+                        return oItem.IsDepozito !== true;
+                    });
+                    return aProductItems.every(function(oItem) {
+                            return oItem._countConfirmed === true;
+                        });
+                });
+            var bAllDepositsConfirmed = (
+                oGroup.DepositItems || []
+            ).every(function(oItem) {
+                return oItem._countConfirmed === true;
+            });
+
+            oModel.setProperty(
+                sGroupPath + "/canApprove",
+                bAllWaybillsSelected &&
+                    bAllItemsConfirmed &&
+                    bAllDepositsConfirmed
+            );
+        },
+
+        _addUniqueDepositItem: function(aDepositItems, mDepositItems, oItem) {
+            var sKey = this._normalizeMaterialNumber(oItem.Matnr);
+
+            if (!mDepositItems[sKey]) {
+                mDepositItems[sKey] = true;
+                aDepositItems.push(oItem);
+            }
         },
 
         _getSelectionScope: function(aWaybills) {
@@ -419,11 +575,419 @@ sap.ui.define([
                 oItem[sQuantityPath] = fNewValue;
             }
 
+            oModel.setProperty(sPath + "/_countConfirmed", false);
             var fTotal = this._toNumber(oItem.MengeFire) +
                 this._toNumber(oItem.MengeKalite) +
                 this._toNumber(oItem.MengeSatilab);
 
             oModel.setProperty(sPath + "/MengeSayim", fTotal);
+            this._updateApprovalStateForItemContext(oContext);
+        },
+
+        onCountConfirmed: function(oEvent) {
+            var oContext = oEvent.getSource()
+                .getBindingContext("returnCountModel");
+            var bSelected = oEvent.getParameter("selected");
+            oContext.getModel().setProperty(
+                oContext.getPath() + "/_countConfirmed",
+                bSelected
+            );
+            this._updateApprovalStateForItemContext(oContext);
+
+            if (oContext.getProperty("IsDepozito") === true) {
+                this._saveReturnDepositDraftItem(oContext, false)
+                    .catch(function(oError) {
+                        MessageBox.error(this._getErrorMessage(
+                            oError,
+                            "Depozito onayı taslağa kaydedilemedi."
+                        ));
+                    }.bind(this));
+            }
+        },
+
+        onDepositCountChange: function(oEvent) {
+            var oInput = oEvent.getSource();
+            var oContext = oInput.getBindingContext("returnCountModel");
+            var oModel = oContext.getModel();
+            var sPath = oContext.getPath();
+            var oItem = oContext.getObject();
+            var fQuantity = this._toNumber(oEvent.getParameter("value"));
+
+            if (fQuantity < 0) {
+                fQuantity = 0;
+                oInput.setValue("0");
+                oInput.setValueState("Error");
+                oInput.setValueStateText("Negatif miktar girilemez.");
+            } else {
+                oInput.setValueState("None");
+            }
+
+            oItem.MengeSayim = fQuantity;
+            oItem.MengeSatilab = fQuantity;
+            oItem._countConfirmed = false;
+            oModel.setProperty(sPath + "/MengeSayim", fQuantity);
+            oModel.setProperty(sPath + "/MengeSatilab", fQuantity);
+            oModel.setProperty(sPath + "/_countConfirmed", false);
+            this._updateApprovalStateForItemContext(oContext);
+            this._saveReturnDepositDraftItem(oContext, false)
+                .catch(function(oError) {
+                    MessageBox.error(this._getErrorMessage(
+                        oError,
+                        "Depozito miktarı taslağa kaydedilemedi."
+                    ));
+                }.bind(this));
+        },
+
+        onReturnDepositAddPress: function(oEvent) {
+            var oContext = oEvent.getSource()
+                .getBindingContext("returnCountModel");
+
+            if (!oContext) {
+                MessageBox.error("Depozito grubu bulunamadı.");
+                return;
+            }
+
+            this._oReturnDepositGroupContext = oContext;
+            this._loadReturnDepositCatalog();
+        },
+
+        _loadReturnDepositCatalog: function() {
+            if (this._returnDepositListCache) {
+                this._showReturnDepositDialog(
+                    this._prepareReturnDepositCatalog(
+                        this._returnDepositListCache
+                    )
+                );
+                return;
+            }
+
+            var oODataModel = this.getOwnerComponent().getModel();
+            sap.ui.core.BusyIndicator.show(0);
+            oODataModel.read("/DepositGISet", {
+                success: function(oData) {
+                    sap.ui.core.BusyIndicator.hide();
+                    this._returnDepositListCache = JSON.parse(
+                        JSON.stringify(oData.results || [])
+                    );
+                    this._showReturnDepositDialog(
+                        this._prepareReturnDepositCatalog(
+                            this._returnDepositListCache
+                        )
+                    );
+                }.bind(this),
+                error: function(oError) {
+                    sap.ui.core.BusyIndicator.hide();
+                    MessageBox.error(this._getErrorMessage(
+                        oError,
+                        "Depozito listesi yüklenemedi."
+                    ));
+                }.bind(this)
+            });
+        },
+
+        _prepareReturnDepositCatalog: function(aCatalogItems) {
+            var oGroup = this._oReturnDepositGroupContext.getObject();
+            var mExistingDeposits = {};
+            var mExternalDeposits = {};
+
+            (oGroup.DepositItems || []).forEach(function(oItem) {
+                var sMatnr = this._normalizeMaterialNumber(oItem.Matnr);
+                if (oItem._isExternalDeposit) {
+                    mExternalDeposits[sMatnr] = oItem;
+                } else {
+                    mExistingDeposits[sMatnr] = true;
+                }
+            }.bind(this));
+
+            return aCatalogItems.map(function(oCatalogItem) {
+                var sMatnr = this._normalizeMaterialNumber(
+                    oCatalogItem.Matnr
+                );
+                var oExternalItem = mExternalDeposits[sMatnr];
+
+                return {
+                    Matnr: oCatalogItem.Matnr,
+                    Maktx: oCatalogItem.Maktx,
+                    Meins: oCatalogItem.Meins || "ADT",
+                    Quantity: oExternalItem
+                        ? this._toNumber(oExternalItem.MengeSayim)
+                        : 0,
+                    IsExisting: mExistingDeposits[sMatnr] === true
+                };
+            }.bind(this));
+        },
+
+        _showReturnDepositDialog: function(aItems) {
+            this.getView().setModel(new JSONModel({
+                items: aItems
+            }), "returnDepositAddModel");
+
+            if (!this._oReturnDepositDialog) {
+                this._oReturnDepositDialog = sap.ui.xmlfragment(
+                    "returnDepositAdd",
+                    "com.sut.bolgeyonetim.view.ReturnDepositAddDialog",
+                    this
+                );
+                this.getView().addDependent(this._oReturnDepositDialog);
+            }
+
+            this._oReturnDepositDialog.open();
+        },
+
+        onReturnDepositQuantityChange: function(oEvent) {
+            var oInput = oEvent.getSource();
+            var fQuantity = this._toNumber(oEvent.getParameter("value"));
+
+            if (fQuantity < 0) {
+                oInput.setValue("0");
+                oInput.setValueState("Error");
+                oInput.setValueStateText("Negatif miktar girilemez.");
+            } else {
+                oInput.setValueState("None");
+            }
+        },
+
+        onReturnDepositAddSave: function() {
+            var oDialogModel = this.getView().getModel(
+                "returnDepositAddModel"
+            );
+            var aCatalogItems = oDialogModel.getProperty("/items") || [];
+            var oGroupContext = this._oReturnDepositGroupContext;
+            var oGroup = oGroupContext.getObject();
+            var oModel = oGroupContext.getModel();
+            var sGroupPath = oGroupContext.getPath();
+            var aPreviousExternalDeposits = (
+                oGroup.ExternalDeposits || []
+            ).slice();
+            var aExternalDeposits = aCatalogItems.filter(function(oItem) {
+                return !oItem.IsExisting &&
+                    this._toNumber(oItem.Quantity) > 0;
+            }.bind(this)).map(function(oItem, iIndex) {
+                var fQuantity = this._toNumber(oItem.Quantity);
+                return {
+                    LogUid: "",
+                    Posnr: String(900001 + iIndex),
+                    Matnr: oItem.Matnr || "",
+                    Maktx: oItem.Maktx || "",
+                    Meins: oItem.Meins || "ADT",
+                    MengeSiparis: 0,
+                    MengeSayim: fQuantity,
+                    MengeFire: 0,
+                    MengeKalite: 0,
+                    MengeSatilab: fQuantity,
+                    IsDepozito: true,
+                    MaterialDisplayCode: this._formatMaterialCode(
+                        oItem.Matnr
+                    ),
+                    _completed: false,
+                    _countConfirmed: false,
+                    _isExternalDeposit: true
+                };
+            }.bind(this));
+            var aBackendDeposits = (oGroup.DepositItems || []).filter(
+                function(oItem) {
+                    return !oItem._isExternalDeposit;
+                }
+            );
+            var mSelectedMaterials = {};
+            aExternalDeposits.forEach(function(oItem) {
+                mSelectedMaterials[
+                    this._normalizeMaterialNumber(oItem.Matnr)
+                ] = true;
+            }.bind(this));
+            var aDeletedDeposits = aPreviousExternalDeposits.filter(
+                function(oItem) {
+                    return !mSelectedMaterials[
+                        this._normalizeMaterialNumber(oItem.Matnr)
+                    ];
+                }.bind(this)
+            );
+
+            oModel.setProperty(
+                sGroupPath + "/ExternalDeposits",
+                aExternalDeposits
+            );
+            oModel.setProperty(
+                sGroupPath + "/DepositItems",
+                aBackendDeposits.concat(aExternalDeposits)
+            );
+            oModel.setProperty(
+                sGroupPath + "/DepositCount",
+                aBackendDeposits.length + aExternalDeposits.length
+            );
+            this._updateGroupApprovalState(oModel, sGroupPath);
+            oModel.refresh(true);
+
+            sap.ui.core.BusyIndicator.show(0);
+            Promise.all(aExternalDeposits.map(function(oItem) {
+                return this._saveReturnDepositDraftObject(
+                    oGroupContext,
+                    oItem,
+                    false
+                );
+            }.bind(this)).concat(aDeletedDeposits.map(function(oItem) {
+                return this._saveReturnDepositDraftObject(
+                    oGroupContext,
+                    oItem,
+                    true
+                );
+            }.bind(this)))).then(function() {
+                this._oReturnDepositDialog.close();
+                MessageToast.show("Depozito taslağı güncellendi.");
+            }.bind(this)).catch(function(oError) {
+                MessageBox.error(this._getErrorMessage(
+                    oError,
+                    "Depozito taslağı kaydedilemedi."
+                ));
+            }.bind(this)).finally(function() {
+                sap.ui.core.BusyIndicator.hide();
+            });
+        },
+
+        onReturnDepositAddCancel: function() {
+            this._oReturnDepositDialog.close();
+        },
+
+        _normalizeMaterialNumber: function(sMatnr) {
+            return String(sMatnr || "").replace(/^0+/, "");
+        },
+
+        _updateApprovalStateForItemContext: function(oItemContext) {
+            var oGroupContext = this._getGroupContextForItemContext(
+                oItemContext
+            );
+
+            if (oGroupContext) {
+                this._updateGroupApprovalState(
+                    oItemContext.getModel(),
+                    oGroupContext.getPath()
+                );
+            }
+        },
+
+        _getGroupContextForItemContext: function(oItemContext) {
+            var sPath = oItemContext.getPath();
+            var aItemSegments = [
+                "/ProductItems/",
+                "/DepositItems/"
+            ];
+            var iItemsSegment = -1;
+
+            aItemSegments.some(function(sSegment) {
+                iItemsSegment = sPath.lastIndexOf(sSegment);
+                return iItemsSegment >= 0;
+            });
+            var sGroupPath = iItemsSegment >= 0
+                ? sPath.substring(0, iItemsSegment)
+                : "";
+
+            return sGroupPath
+                ? oItemContext.getModel().getContext(sGroupPath)
+                : null;
+        },
+
+        _saveReturnDepositDraftItem: function(oItemContext, bDeleted) {
+            var oGroupContext = this._getGroupContextForItemContext(
+                oItemContext
+            );
+
+            if (!oGroupContext) {
+                return Promise.reject(new Error(
+                    "Depozito grubu bulunamadı."
+                ));
+            }
+
+            return this._saveReturnDepositDraftObject(
+                oGroupContext,
+                oItemContext.getObject(),
+                bDeleted
+            );
+        },
+
+        _saveReturnDepositDraftObject: function(
+            oGroupContext,
+            oItem,
+            bDeleted
+        ) {
+            this._returnDepositDraftQueue = (
+                this._returnDepositDraftQueue || Promise.resolve()
+            ).catch(function() {
+                // Önceki kayıt hatası sonraki kullanıcı işlemini engellemesin.
+            }).then(function() {
+                return this._executeReturnDepositDraftSave(
+                    oGroupContext,
+                    oItem,
+                    bDeleted
+                );
+            }.bind(this));
+
+            return this._returnDepositDraftQueue;
+        },
+
+        _executeReturnDepositDraftSave: function(
+            oGroupContext,
+            oItem,
+            bDeleted
+        ) {
+            var oGroup = oGroupContext.getObject();
+            var oDraftHeader = this._getReturnDepositDraftHeader(oGroup);
+            var sLogUid = oDraftHeader && oDraftHeader.LogUid;
+
+            if (!sLogUid) {
+                return Promise.reject(new Error(
+                    "Depozito taslağı için LogUid bulunamadı."
+                ));
+            }
+
+            return new Promise(function(resolve, reject) {
+                this.getOwnerComponent().getModel().callFunction(
+                    "/SaveReturnDepositDraft",
+                    {
+                        method: "POST",
+                        urlParameters: {
+                            LogUid: sLogUid,
+                            Plasiyer: oGroup.Plasiyer || "",
+                            Lgort: oDraftHeader.Lgort || "",
+                            Matnr: oItem.Matnr || "",
+                            Meins: oItem.Meins || "",
+                            MengeSiparis: this._toODataDecimal(
+                                oItem.MengeSiparis
+                            ),
+                            MengeSayim: this._toODataDecimal(
+                                oItem.MengeSayim
+                            ),
+                            IsExternal: oItem._isExternalDeposit === true,
+                            IsConfirmed: oItem._countConfirmed === true,
+                            IsDeleted: bDeleted === true
+                        },
+                        success: resolve,
+                        error: reject
+                    }
+                );
+            }.bind(this));
+        },
+
+        _getReturnDepositDraftHeader: function(oGroup) {
+            var aWaybills = oGroup && oGroup.Waybills
+                ? oGroup.Waybills
+                : [];
+
+            return aWaybills.find(function(oWaybill) {
+                return oWaybill.selected;
+            }) || aWaybills[0];
+        },
+
+        _syncReturnDepositDraft: function(oGroupContext) {
+            var oGroup = oGroupContext.getObject();
+            var aDeposits = oGroup.DepositItems || [];
+
+            return Promise.all(aDeposits.map(function(oItem) {
+                return this._saveReturnDepositDraftObject(
+                    oGroupContext,
+                    oItem,
+                    false
+                );
+            }.bind(this)));
         },
 
         onApproveCountPress: function(oEvent) {
@@ -439,9 +1003,20 @@ sap.ui.define([
                 return;
             }
 
-            var aPayloads = aSelectedWaybills.map(
-                this._buildDeepInsertPayload.bind(this)
-            );
+            if (!oGroup.canApprove) {
+                MessageBox.warning(
+                    "Tüm irsaliyelerdeki tüm kalemlerin sayımını tamamlayıp " +
+                    "\"Tamam\" alanını işaretleyin."
+                );
+                return;
+            }
+
+            var aPayloads = aSelectedWaybills.map(function(oHeader, iIndex) {
+                return this._buildDeepInsertPayload(
+                    oHeader,
+                    iIndex === 0 ? oGroup.DepositItems || [] : []
+                );
+            }.bind(this));
 
             if (aPayloads.some(function(oPayload) {
                 return !oPayload.IrsTar;
@@ -458,17 +1033,35 @@ sap.ui.define([
                     title: "Sayımı Onayla",
                     onClose: function(sAction) {
                         if (sAction === MessageBox.Action.OK) {
-                            this._submitPayloads(aPayloads);
+                            sap.ui.core.BusyIndicator.show(0);
+                            this._syncReturnDepositDraft(oGroupContext)
+                                .then(function() {
+                                    return this._returnDepositDraftQueue;
+                                }.bind(this))
+                                .then(function() {
+                                    sap.ui.core.BusyIndicator.hide();
+                                    this._submitPayloads(aPayloads);
+                                }.bind(this))
+                                .catch(function(oError) {
+                                    sap.ui.core.BusyIndicator.hide();
+                                    MessageBox.error(this._getErrorMessage(
+                                        oError,
+                                        "Depozito taslağı onay öncesinde kaydedilemedi."
+                                    ));
+                                }.bind(this));
                         }
                     }.bind(this)
                 }
             );
         },
 
-        _buildDeepInsertPayload: function(oHeader) {
+        _buildDeepInsertPayload: function(oHeader, aDepositItems) {
             var aItems = oHeader.ToItems && oHeader.ToItems.results
                 ? oHeader.ToItems.results
                 : [];
+            aItems = aItems.filter(function(oItem) {
+                return oItem.IsDepozito !== true;
+            }).concat(aDepositItems || []);
             var oIrsTar = this._toODataDate(oHeader.IrsTar) ||
                 this._getSelectedReturnDate();
 
@@ -481,22 +1074,28 @@ sap.ui.define([
                 Plasiyer: oHeader.Plasiyer || "",
                 PlasiyerName: oHeader.PlasiyerName || "",
                 Kunnr: oHeader.Kunnr || "",
+                KunnrName: oHeader.KunnrName || "",
                 ShipmentType: oHeader.ShipmentType || "",
                 ReturnType: oHeader.ReturnType || "",
-                ToItems: aItems.map(function(oItem) {
+                ToItems: aItems.map(function(oItem, iIndex) {
                     return {
-                        LogUid: oItem.LogUid || "",
-                        Posnr: oItem.Posnr || "",
+                        LogUid: oItem.LogUid || oHeader.LogUid || "",
+                        Posnr: oItem.Posnr ||
+                            String(900001 + iIndex),
                         Matnr: oItem.Matnr || "",
                         Maktx: oItem.Maktx || "",
                         Meins: oItem.Meins || "",
-                        MengeSiparis: this._toNumber(oItem.MengeSiparis),
-                        MengeSayim: this._toNumber(oItem.MengeSayim),
-                        MengeFire: this._toNumber(oItem.MengeFire),
-                        MengeKalite: this._toNumber(oItem.MengeKalite),
-                        MengeSatilab: this._toNumber(oItem.MengeSatilab),
-                        IsDepozito: oItem.IsDepozito === true ||
-                            oItem.IsDepozito === "X"
+                        // OData V2 represents Edm.Decimal values as strings.
+                        MengeSiparis: this._toODataDecimal(
+                            oItem.MengeSiparis
+                        ),
+                        MengeSayim: this._toODataDecimal(oItem.MengeSayim),
+                        MengeFire: this._toODataDecimal(oItem.MengeFire),
+                        MengeKalite: this._toODataDecimal(oItem.MengeKalite),
+                        MengeSatilab: this._toODataDecimal(
+                            oItem.MengeSatilab
+                        ),
+                        IsDepozito: oItem.IsDepozito === true
                     };
                 }.bind(this))
             };
@@ -546,6 +1145,7 @@ sap.ui.define([
         _submitPayloads: function(aPayloads) {
             var oODataModel = this.getOwnerComponent().getModel();
             sap.ui.core.BusyIndicator.show(0);
+            oODataModel.setUseBatch(false);
 
             Promise.all(aPayloads.map(function(oPayload) {
                 return new Promise(function(resolve, reject) {
@@ -555,11 +1155,13 @@ sap.ui.define([
                     });
                 });
             })).then(function() {
+                oODataModel.setUseBatch(true);
                 sap.ui.core.BusyIndicator.hide();
                 MessageToast.show("İade sayımları başarıyla onaylandı.");
                 this.refreshDashboardData();
                 this._loadReturnCountData();
             }.bind(this)).catch(function(oError) {
+                oODataModel.setUseBatch(true);
                 sap.ui.core.BusyIndicator.hide();
                 MessageBox.error(this._getErrorMessage(
                     oError,
@@ -571,6 +1173,10 @@ sap.ui.define([
         _toNumber: function(vValue) {
             var fValue = parseFloat(vValue);
             return isNaN(fValue) ? 0 : fValue;
+        },
+
+        _toODataDecimal: function(vValue) {
+            return String(this._toNumber(vValue));
         },
 
         _getErrorMessage: function(oError, sFallback) {

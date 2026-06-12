@@ -367,6 +367,13 @@
     margin-top: -0.5rem;
 }
 
+.returnCountSelectionBar {
+    gap: 0.25rem 1rem;
+    padding: 0.35rem 0.75rem;
+    background-color: #f5f6f7;
+    border-bottom: 1px solid #d9d9d9;
+}
+
 .returnCountTable {
     width: 100% !important;
 }
@@ -396,6 +403,37 @@
 
 .returnCountTable .sapMLIBHighlightError .sapMLIBHighlight {
     background-color: #bb0000 !important;
+    width: 5px !important;
+}
+
+.returnProductPanel > .sapMPanelHdr,
+.returnProductPanel .sapMTB {
+    background-color: #107e3e !important;
+}
+
+.returnDepositPanel > .sapMPanelHdr,
+.returnDepositPanel .sapMTB {
+    background-color: #0a6ed1 !important;
+}
+
+.returnProductPanel .sapMTB .sapMTitle,
+.returnProductPanel .sapMTB .sapUiIcon,
+.returnProductPanel .sapMTB .sapMObjectNumberText,
+.returnDepositPanel .sapMTB .sapMTitle,
+.returnDepositPanel .sapMTB .sapUiIcon,
+.returnDepositPanel .sapMTB .sapMObjectNumberText,
+.returnDepositPanel .sapMTB .sapMBtnIcon,
+.returnDepositPanel .sapMTB .sapMBtnContent {
+    color: #ffffff !important;
+}
+
+.returnProductPanel .sapMPanelContent,
+.returnDepositPanel .sapMPanelContent {
+    padding: 0.5rem 1rem 1rem !important;
+}
+
+.returnDepositTable .sapMLIBHighlightWarning .sapMLIBHighlight {
+    background-color: #e9730c !important;
     width: 5px !important;
 }
 
