@@ -129,6 +129,11 @@
                     "pattern": "returnCount",
                     "name": "returnCount",
                     "target": "returnCount"
+                },
+                {
+                    "pattern": "returnFactoryShipment",
+                    "name": "returnFactoryShipment",
+                    "target": "returnFactoryShipment"
                 }
             ],
             "targets": {
@@ -162,6 +167,10 @@
                 },
                 "returnCount": {
                     "viewName": "ReturnCount",
+                    "viewLevel": 2
+                },
+                "returnFactoryShipment": {
+                    "viewName": "ReturnFactoryShipment",
                     "viewLevel": 2
                 },
                 "passwordResetVerify": {

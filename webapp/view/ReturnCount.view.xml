@@ -99,6 +99,28 @@
                                         class="sapUiTinyMarginBegin"/>
                                     <ToolbarSpacer/>
                                     <Button
+                                        icon="sap-icon://multiselect-all"
+                                        text="Tümünü Tamamla"
+                                        type="Transparent"
+                                        press="onConfirmAllCountsPress"
+                                        enabled="{= (${returnCountModel>ProductCount} + ${returnCountModel>DepositCount}) > 0 }"
+                                        visible="{= !${returnCountModel>isCompleted} }"
+                                        class="sapUiTinyMarginBegin">
+                                        <customData>
+                                            <core:CustomData key="confirmed" value="true"/>
+                                        </customData>
+                                    </Button>
+                                    <Button
+                                        icon="sap-icon://clear-all"
+                                        text="Temizle"
+                                        type="Transparent"
+                                        press="onConfirmAllCountsPress"
+                                        visible="{= !${returnCountModel>isCompleted} }">
+                                        <customData>
+                                            <core:CustomData key="confirmed" value="false"/>
+                                        </customData>
+                                    </Button>
+                                    <Button
                                         icon="sap-icon://accept"
                                         text="Sayımı Onayla"
                                         type="Emphasized"

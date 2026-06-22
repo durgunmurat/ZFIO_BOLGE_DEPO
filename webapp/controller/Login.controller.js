@@ -110,7 +110,11 @@ sap.ui.define([
                 pendingReturnCount: oLoginPayload.PendingReturnCount ||
                     oLoginPayload.Pendingreturncount ||
                     oLoginPayload.pendingReturnCount ||
-                    oLoginPayload.pendingreturncount || 0
+                    oLoginPayload.pendingreturncount || 0,
+                pendingReturnFactoryShipment: oLoginPayload.PendingReturnFactoryShipment ||
+                    oLoginPayload.Pendingreturnfactoryshipment ||
+                    oLoginPayload.pendingReturnFactoryShipment ||
+                    oLoginPayload.pendingreturnfactoryshipment || 0
             };
             if (!oDashboardModel) {
                 oDashboardModel = new JSONModel(oDashboardPayload);

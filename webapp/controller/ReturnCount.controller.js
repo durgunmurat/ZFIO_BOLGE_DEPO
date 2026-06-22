@@ -662,6 +662,71 @@ sap.ui.define(
           }
         },
 
+        onConfirmAllCountsPress: function (oEvent) {
+          var oGroupContext = oEvent
+            .getSource()
+            .getBindingContext("returnCountModel");
+
+          if (!oGroupContext) {
+            MessageBox.error("Sayım grubu bulunamadı.");
+            return;
+          }
+
+          var bConfirmed = oEvent.getSource().data("confirmed") === "true";
+          var oModel = oGroupContext.getModel();
+          var sGroupPath = oGroupContext.getPath();
+          var oGroup = oGroupContext.getObject();
+          var aProductItems = oGroup.ProductItems || [];
+          var aDepositItems = oGroup.DepositItems || [];
+
+          aProductItems.forEach(function (oItem, iIndex) {
+            oItem._countConfirmed = bConfirmed;
+            oModel.setProperty(
+              sGroupPath + "/ProductItems/" + iIndex + "/_countConfirmed",
+              bConfirmed,
+            );
+          });
+          aDepositItems.forEach(function (oItem, iIndex) {
+            oItem._countConfirmed = bConfirmed;
+            oModel.setProperty(
+              sGroupPath + "/DepositItems/" + iIndex + "/_countConfirmed",
+              bConfirmed,
+            );
+          });
+
+          this._updateGroupApprovalState(oModel, sGroupPath);
+          oModel.refresh(true);
+
+          Promise.all(
+            aDepositItems.map(
+              function (oItem) {
+                return this._saveReturnDepositDraftObject(
+                  oGroupContext,
+                  oItem,
+                  false,
+                );
+              }.bind(this),
+            ),
+          )
+            .then(function () {
+              MessageToast.show(
+                bConfirmed
+                  ? "Tüm kalemler tamamlandı."
+                  : "Tamam işaretleri temizlendi.",
+              );
+            })
+            .catch(
+              function (oError) {
+                MessageBox.error(
+                  this._getErrorMessage(
+                    oError,
+                    "Depozito onayları taslağa kaydedilemedi.",
+                  ),
+                );
+              }.bind(this),
+            );
+        },
+
         onDepositCountChange: function (oEvent) {
           var oInput = oEvent.getSource();
           var oContext = oInput.getBindingContext("returnCountModel");

@@ -437,20 +437,78 @@
     width: 5px !important;
 }
 
+/* Return Factory Shipment - compact blind count flow */
+.returnFactoryActionBar {
+    border-bottom: 1px solid #d9d9d9;
+}
+
+.returnFactoryTable {
+    width: 100% !important;
+}
+
+.returnFactoryTable .sapMListTblHeaderCell,
+.returnFactoryTable .sapMListTblCell {
+    padding-left: 0.35rem !important;
+    padding-right: 0.35rem !important;
+}
+
+.returnFactoryTable .sapMInputBaseInner {
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+    font-size: 1rem;
+}
+
+.returnFactoryTable .sapMObjectIdentifierTitle,
+.returnFactoryTable .sapMObjectIdentifierText {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.returnFactoryTable .sapMListTblRow.sapMLIBHighlightError {
+    background-color: rgba(187, 0, 0, 0.10) !important;
+}
+
+.returnFactoryTable .sapMLIBHighlightError .sapMLIBHighlight {
+    background-color: #bb0000 !important;
+    width: 5px !important;
+}
+
+.returnFactoryProductPanel > .sapMPanelHdr,
+.returnFactoryProductPanel .sapMTB {
+    background-color: #107e3e !important;
+}
+
+.returnFactoryProductPanel .sapMTB .sapMTitle,
+.returnFactoryProductPanel .sapMTB .sapUiIcon,
+.returnFactoryProductPanel .sapMTB .sapMObjectNumberText {
+    color: #ffffff !important;
+}
+
+.returnFactoryProductPanel .sapMPanelContent {
+    padding: 0.5rem 1rem 1rem !important;
+}
+
 @media (max-width: 1024px) {
     .returnCountTable .sapMListTblHeaderCell,
-    .returnCountTable .sapMListTblCell {
+    .returnCountTable .sapMListTblCell,
+    .returnFactoryTable .sapMListTblHeaderCell,
+    .returnFactoryTable .sapMListTblCell {
         padding-left: 0.2rem !important;
         padding-right: 0.2rem !important;
     }
 
     .returnCountTable .sapMLabel,
-    .returnCountTable .sapMText {
+    .returnCountTable .sapMText,
+    .returnFactoryTable .sapMLabel,
+    .returnFactoryTable .sapMText {
         font-size: 0.75rem;
     }
 
     .returnCountTable .sapMObjectIdentifierTitle .sapMText,
-    .returnCountTable .sapMObjectIdentifierText {
+    .returnCountTable .sapMObjectIdentifierText,
+    .returnFactoryTable .sapMObjectIdentifierTitle .sapMText,
+    .returnFactoryTable .sapMObjectIdentifierText {
         font-size: 0.8rem;
     }
 }

@@ -1,0 +1,177 @@
+<mvc:View
+    controllerName="com.sut.bolgeyonetim.controller.ReturnFactoryShipment"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+    <Page
+        title="İade Gönderimi"
+        showNavButton="true"
+        navButtonPress="onNavBack">
+        <customHeader>
+            <Toolbar>
+                <Button
+                    icon="sap-icon://nav-back"
+                    type="Transparent"
+                    press="onNavBack"/>
+                <Title text="İade Gönderimi"/>
+                <ToolbarSpacer/>
+                <DatePicker
+                    visible="false"
+                    value="{filterModel>/selectedDate}"
+                    displayFormat="dd.MM.yyyy"
+                    valueFormat="yyyy-MM-dd"
+                    change="onDateChange"
+                    width="10rem"/>
+                <Label
+                    visible="false"
+                    text="{sessionModel>/Login/WarehouseNum}"/>
+            </Toolbar>
+        </customHeader>
+        <content>
+            <VBox class="sapUiResponsiveContentPadding">
+                <OverflowToolbar class="returnFactoryActionBar">
+                    <core:Icon
+                        src="sap-icon://shipping-status"
+                        size="1.25rem"
+                        color="#0854A0"/>
+                    <Label text="Plaka"/>
+                    <Select
+                        width="18rem"
+                        selectedKey="{returnFactoryShipmentModel>/selectedVehicleKey}"
+                        change="onVehicleChange"
+                        items="{
+                            path: 'returnFactoryShipmentModel>/vehicles',
+                            templateShareable: false
+                        }">
+                        <core:Item
+                            key="{returnFactoryShipmentModel>VehicleKey}"
+                            text="{returnFactoryShipmentModel>VehicleText}"/>
+                    </Select>
+                    <ToolbarSpacer/>
+                    <Button
+                        text="Tümünü Tamamla"
+                        icon="sap-icon://multiselect-all"
+                        type="Transparent"
+                        enabled="{= ${returnFactoryShipmentModel>/totalItemCount} > 0 }"
+                        press="onConfirmAllCountsPress">
+                        <customData>
+                            <core:CustomData key="confirmed" value="true"/>
+                        </customData>
+                    </Button>
+                    <Button
+                        text="Temizle"
+                        icon="sap-icon://clear-all"
+                        type="Transparent"
+                        enabled="{= ${returnFactoryShipmentModel>/confirmedItemCount} > 0 }"
+                        press="onConfirmAllCountsPress">
+                        <customData>
+                            <core:CustomData key="confirmed" value="false"/>
+                        </customData>
+                    </Button>
+                    <ObjectStatus
+                        text="{returnFactoryShipmentModel>/confirmedItemCount}/{returnFactoryShipmentModel>/totalItemCount}"
+                        state="None"/>
+                    <Button
+                        text="Gönderimi Onayla"
+                        icon="sap-icon://accept"
+                        type="Emphasized"
+                        enabled="{returnFactoryShipmentModel>/canSubmit}"
+                        press="onSubmitPress"/>
+                </OverflowToolbar>
+
+                <Panel
+                    expandable="false"
+                    class="sapUiSmallMarginTop returnFactoryProductPanel">
+                    <headerToolbar>
+                        <OverflowToolbar>
+                            <core:Icon
+                                src="sap-icon://product"
+                                size="1.2rem"/>
+                            <Title text="Ürünler" level="H4"/>
+                            <ObjectNumber number="{returnFactoryShipmentModel>/totalItemCount}"/>
+                        </OverflowToolbar>
+                    </headerToolbar>
+                    <content>
+                        <Table
+                            items="{
+                                path: 'returnFactoryShipmentModel>/items',
+                                templateShareable: false
+                            }"
+                            inset="false"
+                            fixedLayout="true"
+                            growing="true"
+                            growingThreshold="50"
+                            width="100%"
+                            noDataText="Seçilen tarih ve depo için iade depo stoğu bulunamadı"
+                            class="returnFactoryTable">
+                            <columns>
+                                <Column width="34%">
+                                    <Text text="ÜRÜN"/>
+                                </Column>
+                                <Column width="12%" hAlign="End">
+                                    <Text text="TOPLAM"/>
+                                </Column>
+                                <Column width="13%" hAlign="End">
+                                    <Text text="FİRE"/>
+                                </Column>
+                                <Column width="13%" hAlign="End">
+                                    <Text text="KALITE"/>
+                                </Column>
+                                <Column width="14%" hAlign="End">
+                                    <Text text="LANSMAN"/>
+                                </Column>
+                                <Column width="14%" hAlign="Center">
+                                    <Text text="TAMAM"/>
+                                </Column>
+                            </columns>
+                            <items>
+                                <ColumnListItem highlight="{returnFactoryShipmentModel>RowHighlight}">
+                                    <cells>
+                                        <VBox>
+                                            <ObjectIdentifier
+                                                title="{returnFactoryShipmentModel>Maktx}"
+                                                text="{returnFactoryShipmentModel>MaterialDisplayCode}"
+                                                class="returnFactoryMaterial"/>
+                                            <ObjectStatus
+                                                visible="{= !!${returnFactoryShipmentModel>RowStateText} }"
+                                                text="{returnFactoryShipmentModel>RowStateText}"
+                                                state="Error"/>
+                                        </VBox>
+                                        <ObjectNumber
+                                            number="{returnFactoryShipmentModel>MengeSayim}"
+                                            unit="{returnFactoryShipmentModel>Meins}"/>
+                                        <Input
+                                            value="{returnFactoryShipmentModel>MengeFire}"
+                                            type="Number"
+                                            width="100%"
+                                            textAlign="End"
+                                            class="returnFactoryQuantityInput"
+                                            change="onCountChange"/>
+                                        <Input
+                                            value="{returnFactoryShipmentModel>MengeKalite}"
+                                            type="Number"
+                                            width="100%"
+                                            textAlign="End"
+                                            class="returnFactoryQuantityInput"
+                                            change="onCountChange"/>
+                                        <Input
+                                            value="{returnFactoryShipmentModel>MengeLansman}"
+                                            type="Number"
+                                            width="100%"
+                                            textAlign="End"
+                                            class="returnFactoryQuantityInput"
+                                            change="onCountChange"/>
+                                        <CheckBox
+                                            selected="{returnFactoryShipmentModel>_countConfirmed}"
+                                            tooltip="Bu kalemin fiziksel sayımı tamamlandı"
+                                            select="onCountConfirmed"/>
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </content>
+                </Panel>
+            </VBox>
+        </content>
+    </Page>
+</mvc:View>
