@@ -132,8 +132,14 @@ sap.ui.define(
               function (aResults) {
                 var aVehicles = aResults[0];
                 var aItems = aResults[1];
+                var oSelectedVehicle = aVehicles[0] || null;
 
                 oViewModel.setProperty("/vehicles", aVehicles);
+                oViewModel.setProperty(
+                  "/selectedVehicleKey",
+                  oSelectedVehicle ? oSelectedVehicle.VehicleKey : "",
+                );
+                oViewModel.setProperty("/selectedVehicle", oSelectedVehicle);
                 oViewModel.setProperty("/items", aItems);
                 oViewModel.setProperty("/totalItemCount", aItems.length);
                 this._recalculateSubmitState();
@@ -214,7 +220,14 @@ sap.ui.define(
         },
 
         onVehicleChange: function (oEvent) {
-          var sSelectedKey = oEvent.getSource().getSelectedKey();
+          var oSelect = oEvent.getSource();
+          var sSelectedKey = oSelect.getSelectedKey();
+          var oSelectedItem = oSelect.getSelectedItem();
+
+          if (!sSelectedKey && oSelectedItem) {
+            sSelectedKey = oSelectedItem.getKey();
+          }
+
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
           var aVehicles = oModel.getProperty("/vehicles") || [];
           var oVehicle =
@@ -277,7 +290,8 @@ sap.ui.define(
         },
 
         onConfirmAllCountsPress: function (oEvent) {
-          var bConfirmed = oEvent.getSource().data("confirmed") === "true";
+          var vConfirmed = oEvent.getSource().data("confirmed");
+          var bConfirmed = vConfirmed === true || vConfirmed === "true";
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
           var aItems = oModel.getProperty("/items") || [];
 
@@ -289,6 +303,7 @@ sap.ui.define(
             );
           });
           this._recalculateSubmitState();
+          oModel.refresh(true);
         },
 
         _updateItemState: function (oModel, sPath, oItem) {
@@ -313,8 +328,14 @@ sap.ui.define(
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
           var aItems = oModel.getProperty("/items") || [];
           var sSelectedVehicleKey = oModel.getProperty("/selectedVehicleKey");
+          var oSelectedVehicle = oModel.getProperty("/selectedVehicle");
           var iConfirmed = 0;
           var bHasStockExceeded = false;
+
+          if (!sSelectedVehicleKey && oSelectedVehicle) {
+            sSelectedVehicleKey = oSelectedVehicle.VehicleKey || "";
+            oModel.setProperty("/selectedVehicleKey", sSelectedVehicleKey);
+          }
 
           aItems.forEach(
             function (oItem, iIndex) {

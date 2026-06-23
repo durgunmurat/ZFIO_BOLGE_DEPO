@@ -354,25 +354,175 @@ ENDMETHOD.
 " 4) UB siparisi ve mal hareketi dokumanlari form ciktilarina baglanir.
 " 5) Iade imha tutanagi ve iade irsaliyeleri icin spool/form ciktisi alinir.
 "
-" Projedeki mevcut mal cikisi ve form wrapper metotlari varsa burada onlar
-" kullanilmalidir; BAPI imzalari sistemdeki hareket tiplerine gore
-" doldurulacagi icin iskelet tutulmustur.
+" Su an stok farki hareketleri olusturulur. UB siparisi, fabrikaya cikis ve
+" form/spool taraflari belge tasarimi netlestiginde bu metodun basindaki
+" kategori gruplama noktasina eklenebilir.
 " ----------------------------------------------------------------------
 
 METHOD post_return_factory_shipment.
-  LOOP AT is_deep-toitems ASSIGNING FIELD-SYMBOL(<item>)
-    WHERE mengesayim > 0.
-    " TODO: UB siparis kalemi: <item>-mengesayim
-    " TODO: Fabrikaya cikis: <item>-mengefire / mengekalite / mengelansman
-  ENDLOOP.
+  DATA:
+    ls_head       TYPE bapi2017_gm_head_01,
+    ls_code       TYPE bapi2017_gm_code,
+    lt_item       TYPE STANDARD TABLE OF bapi2017_gm_item_create
+                    WITH EMPTY KEY,
+    lt_return     TYPE STANDARD TABLE OF bapiret2
+                  WITH EMPTY KEY,
+    lv_mblnr      TYPE mblnr,
+    lv_mjahr      TYPE mjahr,
+    lv_message    TYPE string,
+    lv_bapi_message TYPE string.
 
-  LOOP AT is_deep-toitems ASSIGNING <item>
-    WHERE sapstock > mengesayim.
+  FIELD-SYMBOLS:
+    <return> TYPE bapiret2.
+
+  IF is_deep-sourcelgort IS INITIAL OR is_deep-lgort IS INITIAL.
+    RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+      EXPORTING
+        textid  = /iwbep/cx_mgw_busi_exception=>business_error
+        message = 'Kaynak ve hedef depo yeri belirlenemedi'.
+  ENDIF.
+
+  "UB siparisi/form tasarimi: ileride bu noktada MengeFire, MengeKalite ve
+  "MengeLansman ayri kalem/kategori olarak gruplanip belge numaralari
+  "response'a veya izleme tablosuna yazilabilir. Su an yalniz stok farki
+  "hareketleri olusturulur.
+
+  ls_head-pstng_date = sy-datum.
+  ls_head-doc_date   = sy-datum.
+  ls_head-pr_uname   = sy-uname.
+  ls_head-ref_doc_no = is_deep-plakano.
+
+  LOOP AT is_deep-toitems ASSIGNING FIELD-SYMBOL(<item>).
+    IF <item>-sapstock <= <item>-mengesayim.
+      CONTINUE.
+    ENDIF.
+
     DATA(lv_difference) = <item>-sapstock - <item>-mengesayim.
-    " TODO: 311 hareketi, iv_werks / is_deep-sourcelgort -> is_deep-lgort
-    "       miktar lv_difference.
-    " TODO: 702 hareketi, iv_werks / is_deep-lgort, miktar lv_difference.
-  ENDLOOP.
 
-  " TODO: BAPI_TRANSACTION_COMMIT wait = abap_true.
+    IF lv_difference <= 0.
+      CONTINUE.
+    ENDIF.
+
+    CLEAR:
+      ls_code,
+      lt_item,
+      lt_return,
+      lv_mblnr,
+      lv_mjahr.
+
+    ls_code-gm_code = '04'.
+
+    APPEND VALUE #(
+      material   = <item>-matnr
+      plant      = iv_werks
+      stge_loc   = is_deep-sourcelgort
+      move_plant = iv_werks
+      move_stloc = is_deep-lgort
+      move_type  = gc_stock_transfer_bwart
+      entry_qnt  = lv_difference
+      entry_uom  = <item>-meins )
+      TO lt_item.
+
+    CALL FUNCTION 'BAPI_GOODSMVT_CREATE'
+      EXPORTING
+        goodsmvt_header = ls_head
+        goodsmvt_code   = ls_code
+      IMPORTING
+        materialdocument = lv_mblnr
+        matdocumentyear  = lv_mjahr
+      TABLES
+        goodsmvt_item   = lt_item
+        return          = lt_return.
+
+    CLEAR lv_message.
+    LOOP AT lt_return ASSIGNING <return> WHERE type CA 'EAX'.
+      MESSAGE ID <return>-id
+        TYPE <return>-type
+        NUMBER <return>-number
+        WITH <return>-message_v1 <return>-message_v2
+             <return>-message_v3 <return>-message_v4
+        INTO lv_bapi_message.
+      IF lv_message IS INITIAL.
+        lv_message = lv_bapi_message.
+      ELSE.
+        lv_message = |{ lv_message } { lv_bapi_message }|.
+      ENDIF.
+    ENDLOOP.
+
+    IF lv_message IS NOT INITIAL OR lv_mblnr IS INITIAL.
+      CALL FUNCTION 'BAPI_TRANSACTION_ROLLBACK'.
+      IF lv_message IS INITIAL.
+        lv_message =
+          |{ <item>-matnr ALPHA = OUT }: 311 transfer hareketi olusturulamadi|.
+      ENDIF.
+      RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+        EXPORTING
+          textid  = /iwbep/cx_mgw_busi_exception=>business_error
+          message = lv_message.
+    ENDIF.
+
+    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+      EXPORTING
+        wait = abap_true.
+
+    CLEAR:
+      ls_code,
+      lt_item,
+      lt_return,
+      lv_mblnr,
+      lv_mjahr.
+
+    ls_code-gm_code = '03'.
+
+    APPEND VALUE #(
+      material  = <item>-matnr
+      plant     = iv_werks
+      stge_loc  = is_deep-lgort
+      move_type = gc_inv_diff_bwart
+      entry_qnt = lv_difference
+      entry_uom = <item>-meins )
+      TO lt_item.
+
+    CALL FUNCTION 'BAPI_GOODSMVT_CREATE'
+      EXPORTING
+        goodsmvt_header = ls_head
+        goodsmvt_code   = ls_code
+      IMPORTING
+        materialdocument = lv_mblnr
+        matdocumentyear  = lv_mjahr
+      TABLES
+        goodsmvt_item   = lt_item
+        return          = lt_return.
+
+    CLEAR lv_message.
+    LOOP AT lt_return ASSIGNING <return> WHERE type CA 'EAX'.
+      MESSAGE ID <return>-id
+        TYPE <return>-type
+        NUMBER <return>-number
+        WITH <return>-message_v1 <return>-message_v2
+             <return>-message_v3 <return>-message_v4
+        INTO lv_bapi_message.
+      IF lv_message IS INITIAL.
+        lv_message = lv_bapi_message.
+      ELSE.
+        lv_message = |{ lv_message } { lv_bapi_message }|.
+      ENDIF.
+    ENDLOOP.
+
+    IF lv_message IS NOT INITIAL OR lv_mblnr IS INITIAL.
+      CALL FUNCTION 'BAPI_TRANSACTION_ROLLBACK'.
+      IF lv_message IS INITIAL.
+        lv_message =
+          |{ <item>-matnr ALPHA = OUT }: 702 sayim farki hareketi olusturulamadi|.
+      ENDIF.
+      RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+        EXPORTING
+          textid  = /iwbep/cx_mgw_busi_exception=>business_error
+          message = lv_message.
+    ENDIF.
+
+    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+      EXPORTING
+        wait = abap_true.
+  ENDLOOP.
 ENDMETHOD.

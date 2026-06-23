@@ -672,7 +672,8 @@ sap.ui.define(
             return;
           }
 
-          var bConfirmed = oEvent.getSource().data("confirmed") === "true";
+          var vConfirmed = oEvent.getSource().data("confirmed");
+          var bConfirmed = vConfirmed === true || vConfirmed === "true";
           var oModel = oGroupContext.getModel();
           var sGroupPath = oGroupContext.getPath();
           var oGroup = oGroupContext.getObject();
