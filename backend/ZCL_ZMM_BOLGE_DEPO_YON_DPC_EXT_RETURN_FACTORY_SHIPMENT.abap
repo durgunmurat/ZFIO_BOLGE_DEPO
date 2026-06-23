@@ -60,22 +60,11 @@ CONSTANTS:
   gc_inv_diff_bwart       TYPE bwart   VALUE '702'.
 
 TYPES:
-  BEGIN OF ty_s_return_factory_item,
-    lgort        TYPE lgort_d,
-    irstar       TYPE timestampl,
-    plakano      TYPE zflo_m_sefer-plaka_no,
-    posnr        TYPE posnr,
-    matnr        TYPE matnr,
-    maktx        TYPE maktx,
-    meins        TYPE meins,
-    sapstock     TYPE labst,
-    mengesayim   TYPE labst,
-    mengefire    TYPE labst,
-    mengekalite  TYPE labst,
-    mengelansman TYPE labst,
-  END OF ty_s_return_factory_item,
-  ty_t_return_factory_item TYPE STANDARD TABLE OF ty_s_return_factory_item
-    WITH EMPTY KEY,
+  ty_s_return_factory_item TYPE
+    zcl_zmm_bolge_depo_yon_mpc_ext=>ts_returnfactoryshipmentitem,
+  ty_t_return_factory_item TYPE STANDARD TABLE OF
+    zcl_zmm_bolge_depo_yon_mpc_ext=>ts_returnfactoryshipmentitem
+    WITH DEFAULT KEY,
 
   BEGIN OF ty_s_return_factory_deep,
     lgort       TYPE lgort_d,
