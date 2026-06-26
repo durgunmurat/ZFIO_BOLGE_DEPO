@@ -392,16 +392,19 @@ sap.ui.define(
 
         _submitShipment: function (oVehicle, aItems) {
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
+          var sShipmentDate = this._toODataJsonDate(
+            oModel.getProperty("/selectedDate"),
+          );
           var oPayload = {
             Lgort: oModel.getProperty("/warehouse"),
             SourceLgort: oModel.getProperty("/sourceWarehouse"),
-            IrsTar: this._toODataDate(oModel.getProperty("/selectedDate")),
+            IrsTar: sShipmentDate,
             PlakaNo: oVehicle.PlakaNo || "",
             ToItems: aItems.map(
               function (oItem, iIndex) {
                 return {
                   Lgort: oModel.getProperty("/warehouse"),
-                  IrsTar: this._toODataDate(oModel.getProperty("/selectedDate")),
+                  IrsTar: sShipmentDate,
                   PlakaNo: oVehicle.PlakaNo || "",
                   Posnr: oItem.Posnr || String((iIndex + 1) * 10).padStart(6, "0"),
                   Matnr: oItem.Matnr || "",
@@ -419,23 +422,38 @@ sap.ui.define(
           var oODataModel = this.getOwnerComponent().getModel();
 
           sap.ui.core.BusyIndicator.show(0);
-          oODataModel.setUseBatch(false);
-          oODataModel.create("/ReturnFactoryShipmentSet", oPayload, {
+          jQuery.ajax({
+            url: this._buildODataUrl(oODataModel, "/ReturnFactoryShipmentSet"),
+            method: "POST",
+            contentType: "application/json",
+            dataType: "json",
+            headers: {
+              Accept: "application/json",
+              "X-CSRF-Token": oODataModel.getSecurityToken(),
+            },
+            data: JSON.stringify(oPayload),
             success: function () {
-              oODataModel.setUseBatch(true);
               sap.ui.core.BusyIndicator.hide();
               MessageToast.show("İade gönderimi başarıyla oluşturuldu.");
               this.refreshDashboardData();
               this._loadData();
             }.bind(this),
             error: function (oError) {
-              oODataModel.setUseBatch(true);
               sap.ui.core.BusyIndicator.hide();
               MessageBox.error(
                 this._getErrorMessage(oError, "İade gönderimi oluşturulamadı."),
               );
             }.bind(this),
           });
+        },
+
+        _buildODataUrl: function (oODataModel, sPath) {
+          var sServiceUrl = oODataModel.sServiceUrl || "";
+          var aParts = sServiceUrl.split("?");
+          var sBaseUrl = aParts[0].replace(/\/$/, "");
+          var sQuery = aParts[1] ? "?" + aParts[1] : "";
+
+          return sBaseUrl + sPath + sQuery;
         },
 
         _deriveReturnWarehouse: function (sWarehouseNum) {
@@ -477,6 +495,12 @@ sap.ui.define(
               Number(aDateParts[3]),
             ),
           );
+        },
+
+        _toODataJsonDate: function (vValue) {
+          var oDate = this._toODataDate(vValue);
+
+          return oDate ? "/Date(" + oDate.getTime() + ")/" : null;
         },
 
         _getErrorMessage: function (oError, sFallback) {
