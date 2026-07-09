@@ -47,28 +47,39 @@ sap.ui.define(
         onAfterRendering: function () {
           var $View = this.getView().$();
 
-          $View.off(".returnCountZeroSelect");
-          $View.on(
-            "focusin.returnCountZeroSelect",
+          this._attachSelectAllInputEvents(
+            $View,
             ".returnCountQuantityInput input",
-            function (oEvent) {
-              var oInput = oEvent.currentTarget;
-
-              if (this._toNumber(oInput.value) === 0) {
-                setTimeout(function () {
-                  oInput.select();
-                }, 0);
-              }
-            }.bind(this),
+            ".returnCountSelectAll",
           );
         },
 
         onExit: function () {
-          this.getView().$().off(".returnCountZeroSelect");
+          this.getView().$().off(".returnCountSelectAll");
+          if (this._oReturnDepositDialog) {
+            this._oReturnDepositDialog.$().off(".returnDepositSelectAll");
+          }
           if (this._oReturnDepositDialog) {
             this._oReturnDepositDialog.destroy();
             this._oReturnDepositDialog = null;
           }
+        },
+
+        _attachSelectAllInputEvents: function ($Root, sSelector, sNamespace) {
+          $Root.off(sNamespace);
+          $Root.on(
+            "focusin" + sNamespace + " click" + sNamespace,
+            sSelector,
+            function (oEvent) {
+              var oInput = oEvent.currentTarget;
+
+              setTimeout(function () {
+                if (oInput && oInput.select) {
+                  oInput.select();
+                }
+              }, 0);
+            },
+          );
         },
 
         _onRouteMatched: function () {
@@ -614,6 +625,13 @@ sap.ui.define(
           var sQuantityPath = oValueBinding && oValueBinding.getPath();
           var fNewValue = this._toNumber(oEvent.getParameter("value"));
 
+          if (oItem._completed || oItem._countConfirmed) {
+            if (sQuantityPath) {
+              oInput.setValue(oItem[sQuantityPath]);
+            }
+            return;
+          }
+
           if (fNewValue < 0) {
             fNewValue = 0;
             oInput.setValue("0");
@@ -736,6 +754,11 @@ sap.ui.define(
           var oItem = oContext.getObject();
           var fQuantity = this._toNumber(oEvent.getParameter("value"));
 
+          if (oItem._completed || oItem._countConfirmed) {
+            oInput.setValue(oItem.MengeSayim);
+            return;
+          }
+
           if (fQuantity < 0) {
             fQuantity = 0;
             oInput.setValue("0");
@@ -789,6 +812,7 @@ sap.ui.define(
           var oODataModel = this.getOwnerComponent().getModel();
           sap.ui.core.BusyIndicator.show(0);
           oODataModel.read("/DepositGISet", {
+            filters: [new Filter("All", FilterOperator.EQ, "X")],
             success: function (oData) {
               sap.ui.core.BusyIndicator.hide();
               this._returnDepositListCache = JSON.parse(
@@ -830,6 +854,9 @@ sap.ui.define(
 
               return {
                 Matnr: oCatalogItem.Matnr,
+                MaterialDisplayCode: this._formatMaterialCode(
+                  oCatalogItem.Matnr,
+                ),
                 Maktx: oCatalogItem.Maktx,
                 Meins: oCatalogItem.Meins || "ADT",
                 Quantity: oExternalItem
@@ -856,9 +883,21 @@ sap.ui.define(
               this,
             );
             this.getView().addDependent(this._oReturnDepositDialog);
+            this._oReturnDepositDialog.attachAfterOpen(
+              this._attachReturnDepositDialogInputEvents,
+              this,
+            );
           }
 
           this._oReturnDepositDialog.open();
+        },
+
+        _attachReturnDepositDialogInputEvents: function () {
+          this._attachSelectAllInputEvents(
+            this._oReturnDepositDialog.$(),
+            ".returnDepositQuantityStepInput input",
+            ".returnDepositSelectAll",
+          );
         },
 
         onReturnDepositQuantityChange: function (oEvent) {

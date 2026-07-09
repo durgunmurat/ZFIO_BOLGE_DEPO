@@ -37,7 +37,7 @@
                             <cells>
                                 <ObjectIdentifier
                                     title="{returnDepositAddModel>Maktx}"
-                                    text="{returnDepositAddModel>Matnr}"/>
+                                    text="{returnDepositAddModel>MaterialDisplayCode}"/>
                                 <StepInput
                                     value="{returnDepositAddModel>Quantity}"
                                     min="0"
@@ -46,6 +46,7 @@
                                     width="100%"
                                     displayValuePrecision="0"
                                     textAlign="Center"
+                                    class="returnDepositQuantityStepInput"
                                     enabled="{= !${returnDepositAddModel>IsExisting} }"
                                     change="onReturnDepositQuantityChange"/>
                             </cells>

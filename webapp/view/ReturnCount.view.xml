@@ -252,7 +252,7 @@
                                                                 width="100%"
                                                                 textAlign="End"
                                                                 class="returnCountQuantityInput"
-                                                                editable="{= !${returnCountModel>_completed} }"
+                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} }"
                                                                 change="onCountChange"/>
                                                             <Input
                                                                 value="{returnCountModel>MengeKalite}"
@@ -260,7 +260,7 @@
                                                                 width="100%"
                                                                 textAlign="End"
                                                                 class="returnCountQuantityInput"
-                                                                editable="{= !${returnCountModel>_completed} }"
+                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} }"
                                                                 change="onCountChange"/>
                                                             <Input
                                                                 value="{returnCountModel>MengeSatilab}"
@@ -268,7 +268,7 @@
                                                                 width="100%"
                                                                 textAlign="End"
                                                                 class="returnCountQuantityInput"
-                                                                editable="{= !${returnCountModel>_completed} }"
+                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} }"
                                                                 change="onCountChange"/>
                                                             <CheckBox
                                                                 selected="{returnCountModel>_countConfirmed}"
@@ -339,7 +339,7 @@
                                                                 width="100%"
                                                                 textAlign="End"
                                                                 class="returnCountQuantityInput"
-                                                                editable="{= !${returnCountModel>_completed} }"
+                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} }"
                                                                 change="onDepositCountChange"/>
                                                             <CheckBox
                                                                 selected="{returnCountModel>_countConfirmed}"

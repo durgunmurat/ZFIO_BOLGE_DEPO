@@ -23,9 +23,11 @@ sap.ui.define(
         onInit: function () {
           var oModel = new JSONModel({
             vehicles: [],
+            plants: this._getPlantOptions(),
             items: [],
             selectedVehicleKey: "",
             selectedVehicle: null,
+            selectedPlantKey: "",
             warehouse: "",
             sourceWarehouse: "",
             selectedDate: "",
@@ -111,9 +113,11 @@ sap.ui.define(
           oViewModel.setData(
             Object.assign({}, oViewModel.getData(), {
               vehicles: [],
+              plants: this._getPlantOptions(),
               items: [],
               selectedVehicleKey: "",
               selectedVehicle: null,
+              selectedPlantKey: "",
               warehouse: sWarehouseNum,
               sourceWarehouse: sSourceWarehouse,
               selectedDate: sSelectedDate,
@@ -240,6 +244,21 @@ sap.ui.define(
           this._recalculateSubmitState();
         },
 
+        onPlantChange: function (oEvent) {
+          var oSelect = oEvent.getSource();
+          var sSelectedKey = oSelect.getSelectedKey();
+          var oSelectedItem = oSelect.getSelectedItem();
+
+          if (!sSelectedKey && oSelectedItem) {
+            sSelectedKey = oSelectedItem.getKey();
+          }
+
+          this.getView()
+            .getModel("returnFactoryShipmentModel")
+            .setProperty("/selectedPlantKey", sSelectedKey);
+          this._recalculateSubmitState();
+        },
+
         onCountChange: function (oEvent) {
           var oInput = oEvent.getSource();
           var oContext = oInput.getBindingContext("returnFactoryShipmentModel");
@@ -249,6 +268,13 @@ sap.ui.define(
           var oValueBinding = oInput.getBinding("value");
           var sQuantityPath = oValueBinding && oValueBinding.getPath();
           var fNewValue = this._toNumber(oEvent.getParameter("value"));
+
+          if (oItem._countConfirmed) {
+            if (sQuantityPath) {
+              oInput.setValue(oItem[sQuantityPath]);
+            }
+            return;
+          }
 
           if (fNewValue < 0) {
             fNewValue = 0;
@@ -329,6 +355,7 @@ sap.ui.define(
           var aItems = oModel.getProperty("/items") || [];
           var sSelectedVehicleKey = oModel.getProperty("/selectedVehicleKey");
           var oSelectedVehicle = oModel.getProperty("/selectedVehicle");
+          var sSelectedPlantKey = oModel.getProperty("/selectedPlantKey");
           var iConfirmed = 0;
           var bHasStockExceeded = false;
 
@@ -354,6 +381,7 @@ sap.ui.define(
           oModel.setProperty(
             "/canSubmit",
             Boolean(sSelectedVehicleKey) &&
+              Boolean(sSelectedPlantKey) &&
               aItems.length > 0 &&
               iConfirmed === aItems.length &&
               !bHasStockExceeded,
@@ -364,9 +392,15 @@ sap.ui.define(
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
           var aItems = oModel.getProperty("/items") || [];
           var oVehicle = oModel.getProperty("/selectedVehicle");
+          var sSelectedPlantKey = oModel.getProperty("/selectedPlantKey");
 
           if (!oVehicle) {
             MessageBox.warning("Gönderim yapılacak plakayı seçin.");
+            return;
+          }
+
+          if (!sSelectedPlantKey) {
+            MessageBox.warning("\u00dcretim yeri se\u00e7in.");
             return;
           }
 
@@ -392,6 +426,7 @@ sap.ui.define(
 
         _submitShipment: function (oVehicle, aItems) {
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
+          var sSelectedPlantKey = oModel.getProperty("/selectedPlantKey");
           var sShipmentDate = this._toODataJsonDate(
             oModel.getProperty("/selectedDate"),
           );
@@ -400,6 +435,7 @@ sap.ui.define(
             SourceLgort: oModel.getProperty("/sourceWarehouse"),
             IrsTar: sShipmentDate,
             PlakaNo: oVehicle.PlakaNo || "",
+            Werks: sSelectedPlantKey,
             ToItems: aItems.map(
               function (oItem, iIndex) {
                 return {
@@ -409,7 +445,7 @@ sap.ui.define(
                   Posnr: oItem.Posnr || String((iIndex + 1) * 10).padStart(6, "0"),
                   Matnr: oItem.Matnr || "",
                   Maktx: oItem.Maktx || "",
-                  Meins: oItem.Meins || "",
+                  Meins: this._toSapUnit(oItem.Meins),
                   SapStock: this._toODataDecimal(oItem.SapStock),
                   MengeSayim: this._toODataDecimal(oItem.MengeSayim),
                   MengeFire: this._toODataDecimal(oItem.MengeFire),
@@ -447,6 +483,16 @@ sap.ui.define(
           });
         },
 
+        _getPlantOptions: function () {
+          return [
+            { PlantKey: "", PlantText: "Se\u00e7iniz" },
+            { PlantKey: "1100", PlantText: "1100 - Karacabey" },
+            { PlantKey: "1200", PlantText: "1200 - Aksaray" },
+            { PlantKey: "1300", PlantText: "1300 - Tire" },
+            { PlantKey: "1400", PlantText: "1400 - Bing\u00f6l" },
+          ];
+        },
+
         _buildODataUrl: function (oODataModel, sPath) {
           var sServiceUrl = oODataModel.sServiceUrl || "";
           var aParts = sServiceUrl.split("?");
@@ -476,6 +522,12 @@ sap.ui.define(
 
         _toODataDecimal: function (vValue) {
           return String(this._toNumber(vValue));
+        },
+
+        _toSapUnit: function (sUnit) {
+          var sNormalizedUnit = String(sUnit || "").toUpperCase();
+
+          return sNormalizedUnit === "ADT" ? "ST" : sNormalizedUnit;
         },
 
         _toODataDate: function (vValue) {

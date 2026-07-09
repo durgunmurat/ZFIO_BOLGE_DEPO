@@ -31,6 +31,8 @@ sap.ui.define(
       _sSelectedPackingNumber: null, // PackingNumber of selected package
       _oCurrentPhotoContext: null, // Photo dialog context
       _sCurrentPhotoId: null, // Current photo ID (PackingNumber + Date)
+      _mPackageItemsLoading: {}, // Prevent duplicate item reads per package
+      _bPostingGoodsIssue: false,
       
       // --- PERFORMANCE OPTIMIZATION ---
       _iRenderDebounceTimer: null,
@@ -267,7 +269,6 @@ sap.ui.define(
       },
 
       _loadPackageItems: function (sPackingNumber, iIndex) {
-        // Data already loaded with $expand in _loadGoodsIssueData - use model directly
         var oIssuePackagesModel = this.getView().getModel("issuePackagesModel");
         var aPackages = oIssuePackagesModel.getData();
         var oPackage = aPackages[iIndex];
@@ -279,16 +280,63 @@ sap.ui.define(
 
         oPackage.expanded = true;
 
-        // Set binding context on detail panel
         var oDetailPanel = this.byId("idGIDetailPanel");
         oDetailPanel.setBindingContext(
           oIssuePackagesModel.createBindingContext("/" + iIndex),
           "issuePackagesModel"
         );
 
-        // Show detail view and render items
         this._showDetailView();
-        this._calculateAndRenderItems(sPackingNumber);
+
+        if (oPackage._itemsLoaded && oPackage.ToItems && oPackage.ToItems.results) {
+          this._calculateAndRenderItems(sPackingNumber);
+          return;
+        }
+
+        if (this._mPackageItemsLoading[sPackingNumber]) {
+          return;
+        }
+
+        this._mPackageItemsLoading[sPackingNumber] = true;
+        oDetailPanel.setBusy(true);
+
+        var oModel = this.getOwnerComponent().getModel();
+        var fnFinishLoading = function () {
+          delete this._mPackageItemsLoading[sPackingNumber];
+          oDetailPanel.setBusy(false);
+        }.bind(this);
+
+        oModel.read("/IssuePackageSet", {
+          filters: [new Filter("PackingNumber", FilterOperator.EQ, sPackingNumber)],
+          urlParameters: { $expand: "ToItems" },
+          success: function (oData) {
+            var oLoadedPackage =
+              oData.results && oData.results.length > 0 ? oData.results[0] : null;
+
+            if (!oLoadedPackage) {
+              MessageBox.error("Paket kalemleri bulunamadı.");
+              fnFinishLoading();
+              return;
+            }
+
+            oLoadedPackage.expanded = true;
+            oLoadedPackage._itemsLoaded = true;
+            oLoadedPackage._refreshTrigger = (oPackage._refreshTrigger || 0) + 1;
+            aPackages[iIndex] = Object.assign({}, oPackage, oLoadedPackage);
+            oIssuePackagesModel.refresh(true);
+
+            oDetailPanel.setBindingContext(
+              oIssuePackagesModel.createBindingContext("/" + iIndex),
+              "issuePackagesModel"
+            );
+            this._calculateAndRenderItems(sPackingNumber);
+            fnFinishLoading();
+          }.bind(this),
+          error: function () {
+            MessageBox.error("Paket kalemleri yüklenemedi.");
+            fnFinishLoading();
+          },
+        });
       },
 
       onBackToPackageList: function () {
@@ -480,6 +528,8 @@ sap.ui.define(
         this._mItemsCache = {};
         this._mMalCikisCache = {};
         this._mTableGrowingState = {};
+        this._mPackageItemsLoading = {};
+        this._bPostingGoodsIssue = false;
         this._iSelectedPackageIndex = null;
         this._sSelectedPackingNumber = null;
         
@@ -555,6 +605,10 @@ sap.ui.define(
             aResults.forEach(function (oItem) {
               oItem.expanded = false;
               oItem._refreshTrigger = 0;
+              oItem._itemsLoaded = !!(
+                oItem.ToItems &&
+                oItem.ToItems.results
+              );
             });
 
             var oIssuePackagesModel = new JSONModel(aResults);
@@ -2227,6 +2281,11 @@ sap.ui.define(
       },
 
       _executePostGoodsIssue: function (sPackingNumber) {
+        if (this._bPostingGoodsIssue) {
+          return;
+        }
+
+        this._bPostingGoodsIssue = true;
         var oModel = this.getOwnerComponent().getModel();
         var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
         var sUserId = oSessionModel
@@ -2280,16 +2339,18 @@ sap.ui.define(
             Warehouse: sWarehouseNum,
           },
           success: function (oData, oResponse) {
+            this._bPostingGoodsIssue = false;
             sap.ui.core.BusyIndicator.hide();
+            this._markGoodsIssueCompletedLocally(sPackingNumber);
+            this._decrementPendingGoodsIssueCount();
             MessageBox.success("Mal çıkış işlemi başarıyla tamamlandı!", {
               onClose: function () {
-                // Refresh dashboard data to update pending counts after user closes dialog
-                this.refreshDashboardData();
-                this._loadGoodsIssueData();
+                this._showMasterView();
               }.bind(this),
             });
           }.bind(this),
           error: function (oError) {
+            this._bPostingGoodsIssue = false;
             sap.ui.core.BusyIndicator.hide();
             var sErrorMsg = "Mal çıkış işlemi başarısız.";
             if (oError && oError.responseText) {
@@ -2307,6 +2368,56 @@ sap.ui.define(
             MessageBox.error(sErrorMsg);
           }.bind(this),
         });
+      },
+
+      _markGoodsIssueCompletedLocally: function (sPackingNumber) {
+        var oIssuePackagesModel = this.getView().getModel("issuePackagesModel");
+        if (!oIssuePackagesModel) return;
+
+        var aPackages = oIssuePackagesModel.getData() || [];
+        var iPkgIndex = aPackages.findIndex(function (oPackage) {
+          return oPackage.PackingNumber === sPackingNumber;
+        });
+
+        if (iPkgIndex < 0) return;
+
+        var oPackage = aPackages[iPkgIndex];
+        oPackage.Status = "X";
+        oPackage._refreshTrigger = (oPackage._refreshTrigger || 0) + 1;
+
+        if (oPackage.ToItems && oPackage.ToItems.results) {
+          oPackage.ToItems.results.forEach(function (oItem) {
+            oItem.Status = "X";
+            oItem.Approved = "X";
+            oItem.LocalStatus = "COMPLETED";
+          });
+        }
+
+        oIssuePackagesModel.setProperty("/" + iPkgIndex + "/Status", "X");
+        oIssuePackagesModel.setProperty(
+          "/" + iPkgIndex + "/_refreshTrigger",
+          oPackage._refreshTrigger
+        );
+        oIssuePackagesModel.refresh(true);
+        this._updateStatusFilterCounts();
+
+        var oStatusFilterBar = this.byId("idGIStatusFilterBar");
+        var sSelectedStatus = oStatusFilterBar
+          ? oStatusFilterBar.getSelectedKey()
+          : "pending";
+        this._applyStatusFilter(sSelectedStatus);
+      },
+
+      _decrementPendingGoodsIssueCount: function () {
+        var oDashboardModel = this.getOwnerComponent().getModel("dashboardData");
+        if (!oDashboardModel) return;
+
+        var iPendingDeliveries =
+          parseInt(oDashboardModel.getProperty("/pendingDeliveries"), 10) || 0;
+        oDashboardModel.setProperty(
+          "/pendingDeliveries",
+          Math.max(iPendingDeliveries - 1, 0)
+        );
       },
 
       onPackageExpand: function (oEvent) {

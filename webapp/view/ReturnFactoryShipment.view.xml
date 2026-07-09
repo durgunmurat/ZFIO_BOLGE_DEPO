@@ -47,6 +47,19 @@
                             key="{returnFactoryShipmentModel>VehicleKey}"
                             text="{returnFactoryShipmentModel>VehicleText}"/>
                     </Select>
+                    <Label text="&#220;retim Yeri"/>
+                    <Select
+                        width="14rem"
+                        selectedKey="{returnFactoryShipmentModel>/selectedPlantKey}"
+                        change="onPlantChange"
+                        items="{
+                            path: 'returnFactoryShipmentModel>/plants',
+                            templateShareable: false
+                        }">
+                        <core:Item
+                            key="{returnFactoryShipmentModel>PlantKey}"
+                            text="{returnFactoryShipmentModel>PlantText}"/>
+                    </Select>
                     <ToolbarSpacer/>
                     <Button
                         text="Tümünü Tamamla"
@@ -146,6 +159,7 @@
                                             width="100%"
                                             textAlign="End"
                                             class="returnFactoryQuantityInput"
+                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} }"
                                             change="onCountChange"/>
                                         <Input
                                             value="{returnFactoryShipmentModel>MengeKalite}"
@@ -153,6 +167,7 @@
                                             width="100%"
                                             textAlign="End"
                                             class="returnFactoryQuantityInput"
+                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} }"
                                             change="onCountChange"/>
                                         <Input
                                             value="{returnFactoryShipmentModel>MengeLansman}"
@@ -160,6 +175,7 @@
                                             width="100%"
                                             textAlign="End"
                                             class="returnFactoryQuantityInput"
+                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} }"
                                             change="onCountChange"/>
                                         <CheckBox
                                             selected="{returnFactoryShipmentModel>_countConfirmed}"
