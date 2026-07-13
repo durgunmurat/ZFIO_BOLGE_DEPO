@@ -215,20 +215,23 @@
                                                 noDataText="Sayım için ürün bulunamadı"
                                                 class="returnCountTable">
                                                 <columns>
-                                                    <Column width="34%">
+                                                    <Column width="30%">
                                                         <Text text="ÜRÜN"/>
                                                     </Column>
-                                                    <Column width="11%" hAlign="End">
+                                                    <Column width="10%" hAlign="End">
                                                         <Text text="TOPLAM"/>
                                                     </Column>
-                                                    <Column width="13%" hAlign="End">
-                                                        <Text text="FİRE"/>
+                                                    <Column width="11%" hAlign="End">
+                                                        <Text text="F"/>
+                                                    </Column>
+                                                    <Column width="11%" hAlign="End">
+                                                        <Text text="Ü"/>
+                                                    </Column>
+                                                    <Column width="11%" hAlign="End">
+                                                        <Text text="L"/>
                                                     </Column>
                                                     <Column width="13%" hAlign="End">
-                                                        <Text text="KALİTE"/>
-                                                    </Column>
-                                                    <Column width="15%" hAlign="End">
-                                                        <Text text="SATILABİLİR"/>
+                                                        <Text text="S"/>
                                                     </Column>
                                                     <Column width="14%" hAlign="Center">
                                                         <Text text="TAMAM"/>
@@ -256,6 +259,14 @@
                                                                 change="onCountChange"/>
                                                             <Input
                                                                 value="{returnCountModel>MengeKalite}"
+                                                                type="Number"
+                                                                width="100%"
+                                                                textAlign="End"
+                                                                class="returnCountQuantityInput"
+                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} }"
+                                                                change="onCountChange"/>
+                                                            <Input
+                                                                value="{returnCountModel>MengeLansman}"
                                                                 type="Number"
                                                                 width="100%"
                                                                 textAlign="End"

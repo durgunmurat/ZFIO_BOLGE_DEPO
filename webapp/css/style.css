@@ -437,6 +437,24 @@
     width: 5px !important;
 }
 
+.returnDepositAddDialog .sapMDialogScrollCont {
+    height: 100% !important;
+    box-sizing: border-box;
+}
+
+.returnDepositAddContent {
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.returnDepositAddTable {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
 /* Return Factory Shipment - compact blind count flow */
 .returnFactoryActionBar {
     border-bottom: 1px solid #d9d9d9;

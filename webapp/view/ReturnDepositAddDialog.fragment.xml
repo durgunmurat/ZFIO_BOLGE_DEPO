@@ -5,24 +5,36 @@
         id="idReturnDepositAddDialog"
         title="Depozito Ekle"
         contentWidth="95%"
+        contentHeight="600px"
         stretch="{device>/isPhone}"
         verticalScrolling="true"
-        horizontalScrolling="false">
+        horizontalScrolling="false"
+        class="returnDepositAddDialog">
         <content>
-            <VBox class="sapUiSmallMargin">
+            <VBox class="sapUiSmallMargin returnDepositAddContent">
                 <MessageStrip
                     text="Eklemek istediğiniz depozito malzemelerinin miktarını girin. Son ZDAI siparişinden gelen malzemeler değiştirilemez."
                     type="Information"
                     showIcon="true"
                     class="sapUiSmallMarginBottom"/>
+                <SearchField
+                    id="idReturnDepositSearchField"
+                    width="100%"
+                    placeholder="Ürün adı veya ürün kodu ara"
+                    liveChange="onReturnDepositSearch"
+                    search="onReturnDepositSearch"
+                    class="sapUiSmallMarginBottom"/>
                 <Table
+                    id="idReturnDepositAddTable"
                     items="{
                         path: 'returnDepositAddModel>/items',
                         templateShareable: false
                     }"
                     growing="false"
+                    sticky="ColumnHeaders"
                     noDataText="Depozito malzemesi bulunamadı"
-                    fixedLayout="true">
+                    fixedLayout="true"
+                    class="returnDepositAddTable">
                     <columns>
                         <Column width="65%">
                             <Text text="MALZEME"/>

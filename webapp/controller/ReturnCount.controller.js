@@ -252,14 +252,14 @@ sap.ui.define(
                   oItem.MengeSiparis = this._toNumber(oItem.MengeSiparis);
                   oItem.MengeFire = this._toNumber(oItem.MengeFire);
                   oItem.MengeKalite = this._toNumber(oItem.MengeKalite);
+                  oItem.MengeLansman = this._toNumber(oItem.MengeLansman);
                   oItem.MengeSatilab = this._toNumber(oItem.MengeSatilab);
                   oItem.MaterialDisplayCode = this._formatMaterialCode(
                     oItem.Matnr,
                   );
                   oItem._completed = oHeader.Status === "S";
                   oItem._countConfirmed = oHeader.Status === "S";
-                  oItem.MengeSayim =
-                    oItem.MengeFire + oItem.MengeKalite + oItem.MengeSatilab;
+                  oItem.MengeSayim = this._getProductCountTotal(oItem);
                 }.bind(this),
               );
 
@@ -647,13 +647,19 @@ sap.ui.define(
           }
 
           oModel.setProperty(sPath + "/_countConfirmed", false);
-          var fTotal =
-            this._toNumber(oItem.MengeFire) +
-            this._toNumber(oItem.MengeKalite) +
-            this._toNumber(oItem.MengeSatilab);
+          var fTotal = this._getProductCountTotal(oItem);
 
           oModel.setProperty(sPath + "/MengeSayim", fTotal);
           this._updateApprovalStateForItemContext(oContext);
+        },
+
+        _getProductCountTotal: function (oItem) {
+          return (
+            this._toNumber(oItem.MengeFire) +
+            this._toNumber(oItem.MengeKalite) +
+            this._toNumber(oItem.MengeLansman) +
+            this._toNumber(oItem.MengeSatilab)
+          );
         },
 
         onCountConfirmed: function (oEvent) {
@@ -697,6 +703,35 @@ sap.ui.define(
           var oGroup = oGroupContext.getObject();
           var aProductItems = oGroup.ProductItems || [];
           var aDepositItems = oGroup.DepositItems || [];
+
+          if (bConfirmed) {
+            this._confirmProductCountMismatch(oGroup, function () {
+              this._setAllCountsConfirmed(
+                oGroupContext,
+                bConfirmed,
+                aProductItems,
+                aDepositItems,
+              );
+            });
+            return;
+          }
+
+          this._setAllCountsConfirmed(
+            oGroupContext,
+            bConfirmed,
+            aProductItems,
+            aDepositItems,
+          );
+        },
+
+        _setAllCountsConfirmed: function (
+          oGroupContext,
+          bConfirmed,
+          aProductItems,
+          aDepositItems,
+        ) {
+          var oModel = oGroupContext.getModel();
+          var sGroupPath = oGroupContext.getPath();
 
           aProductItems.forEach(function (oItem, iIndex) {
             oItem._countConfirmed = bConfirmed;
@@ -744,6 +779,38 @@ sap.ui.define(
                 );
               }.bind(this),
             );
+        },
+
+        _confirmProductCountMismatch: function (oGroup, fnContinue) {
+          if (!this._hasProductCountMismatch(oGroup)) {
+            fnContinue.call(this);
+            return;
+          }
+
+          MessageBox.confirm(
+            "Sipariş miktarı ile sayım miktarı uyuşmayan kalemler var. Yine de devam etmek istiyor musunuz?",
+            {
+              title: "Miktar Uyumsuzluğu",
+              actions: [MessageBox.Action.YES, MessageBox.Action.NO],
+              emphasizedAction: MessageBox.Action.NO,
+              onClose: function (sAction) {
+                if (sAction === MessageBox.Action.YES) {
+                  fnContinue.call(this);
+                }
+              }.bind(this),
+            },
+          );
+        },
+
+        _hasProductCountMismatch: function (oGroup) {
+          return (oGroup.ProductItems || []).some(
+            function (oItem) {
+              return (
+                this._toNumber(oItem.MengeSayim) !==
+                this._toNumber(oItem.MengeSiparis)
+              );
+            }.bind(this),
+          );
         },
 
         onDepositCountChange: function (oEvent) {
@@ -889,7 +956,27 @@ sap.ui.define(
             );
           }
 
+          this._resetReturnDepositSearch();
           this._oReturnDepositDialog.open();
+        },
+
+        _resetReturnDepositSearch: function () {
+          var oSearchField = sap.ui.core.Fragment.byId(
+            "returnDepositAdd",
+            "idReturnDepositSearchField",
+          );
+          var oTable = sap.ui.core.Fragment.byId(
+            "returnDepositAdd",
+            "idReturnDepositAddTable",
+          );
+          var oBinding = oTable && oTable.getBinding("items");
+
+          if (oSearchField) {
+            oSearchField.setValue("");
+          }
+          if (oBinding) {
+            oBinding.filter([]);
+          }
         },
 
         _attachReturnDepositDialogInputEvents: function () {
@@ -898,6 +985,41 @@ sap.ui.define(
             ".returnDepositQuantityStepInput input",
             ".returnDepositSelectAll",
           );
+        },
+
+        onReturnDepositSearch: function (oEvent) {
+          var sQuery = String(
+            oEvent.getParameter("newValue") || oEvent.getParameter("query") || "",
+          ).trim();
+          var oTable = sap.ui.core.Fragment.byId(
+            "returnDepositAdd",
+            "idReturnDepositAddTable",
+          );
+          var oBinding = oTable && oTable.getBinding("items");
+
+          if (!oBinding) {
+            return;
+          }
+
+          if (!sQuery) {
+            oBinding.filter([]);
+            return;
+          }
+
+          oBinding.filter([
+            new Filter({
+              filters: [
+                new Filter("Maktx", FilterOperator.Contains, sQuery),
+                new Filter(
+                  "MaterialDisplayCode",
+                  FilterOperator.Contains,
+                  sQuery,
+                ),
+                new Filter("Matnr", FilterOperator.Contains, sQuery),
+              ],
+              and: false,
+            }),
+          ]);
         },
 
         onReturnDepositQuantityChange: function (oEvent) {
@@ -942,6 +1064,7 @@ sap.ui.define(
                   MengeSayim: fQuantity,
                   MengeFire: 0,
                   MengeKalite: 0,
+                  MengeLansman: 0,
                   MengeSatilab: fQuantity,
                   IsDepozito: true,
                   MaterialDisplayCode: this._formatMaterialCode(oItem.Matnr),
@@ -1214,6 +1337,12 @@ sap.ui.define(
             return;
           }
 
+          this._confirmProductCountMismatch(oGroup, function () {
+            this._confirmApproveCount(oGroupContext, aPayloads);
+          });
+        },
+
+        _confirmApproveCount: function (oGroupContext, aPayloads) {
           MessageBox.confirm(
             aPayloads.length + " irsaliyenin sayımı onaylanacak.",
             {
@@ -1288,6 +1417,7 @@ sap.ui.define(
                   MengeSayim: this._toODataDecimal(oItem.MengeSayim),
                   MengeFire: this._toODataDecimal(oItem.MengeFire),
                   MengeKalite: this._toODataDecimal(oItem.MengeKalite),
+                  MengeLansman: this._toODataDecimal(oItem.MengeLansman),
                   MengeSatilab: this._toODataDecimal(oItem.MengeSatilab),
                   IsDepozito: oItem.IsDepozito === true,
                 };
