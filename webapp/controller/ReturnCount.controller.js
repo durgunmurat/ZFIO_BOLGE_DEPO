@@ -254,6 +254,7 @@ sap.ui.define(
                   oItem.MengeKalite = this._toNumber(oItem.MengeKalite);
                   oItem.MengeLansman = this._toNumber(oItem.MengeLansman);
                   oItem.MengeSatilab = this._toNumber(oItem.MengeSatilab);
+                  oItem.NoLansman = this._normalizeUpperText(oItem.NoLansman);
                   oItem.MaterialDisplayCode = this._formatMaterialCode(
                     oItem.Matnr,
                   );
@@ -405,6 +406,13 @@ sap.ui.define(
                   }.bind(this),
                 );
 
+                var aAggregatedProductItems = this._aggregateReturnProductItems(
+                  aProductItems,
+                );
+                var aAggregatedDepositItems = this._aggregateReturnDepositItems(
+                  aDepositItems,
+                );
+
                 aVisibleGroups.push({
                   Plasiyer: oGroup.Plasiyer,
                   PlasiyerDisplay: oGroup.PlasiyerDisplay,
@@ -414,11 +422,13 @@ sap.ui.define(
                   canApprove: false,
                   isCompleted: sStatus === "completed",
                   Waybills: aWaybills,
-                  ProductItems: aProductItems,
-                  DepositItems: aDepositItems,
+                  ProductItems: aAggregatedProductItems,
+                  ProductItemsSource: aProductItems,
+                  DepositItems: aAggregatedDepositItems,
+                  DepositItemsSource: aDepositItems,
                   ExternalDeposits: [],
-                  ProductCount: aProductItems.length,
-                  DepositCount: aDepositItems.length,
+                  ProductCount: aAggregatedProductItems.length,
+                  DepositCount: aAggregatedDepositItems.length,
                 });
               }
             }.bind(this),
@@ -514,15 +524,24 @@ sap.ui.define(
               this._addUniqueDepositItem(aDepositItems, mDepositItems, oItem);
             }.bind(this),
           );
-          oModel.setProperty(sGroupPath + "/ProductItems", aProductItems);
-          oModel.setProperty(sGroupPath + "/DepositItems", aDepositItems);
+          var aAggregatedProductItems = this._aggregateReturnProductItems(
+            aProductItems,
+          );
+          var aAggregatedDepositItems = this._aggregateReturnDepositItems(
+            aDepositItems,
+          );
+
+          oModel.setProperty(sGroupPath + "/ProductItemsSource", aProductItems);
+          oModel.setProperty(sGroupPath + "/DepositItemsSource", aDepositItems);
+          oModel.setProperty(sGroupPath + "/ProductItems", aAggregatedProductItems);
+          oModel.setProperty(sGroupPath + "/DepositItems", aAggregatedDepositItems);
           oModel.setProperty(
             sGroupPath + "/ProductCount",
-            aProductItems.length,
+            aAggregatedProductItems.length,
           );
           oModel.setProperty(
             sGroupPath + "/DepositCount",
-            aDepositItems.length,
+            aAggregatedDepositItems.length,
           );
           oModel.setProperty(
             sGroupPath + "/selectionScope",
@@ -573,6 +592,259 @@ sap.ui.define(
             mDepositItems[sKey] = true;
             aDepositItems.push(oItem);
           }
+        },
+
+        _getReturnItemGroupKey: function (oItem) {
+          return [
+            this._normalizeMaterialNumber(oItem.Matnr),
+            String(oItem.Meins || "").trim(),
+            this._normalizeUpperText(oItem.NoLansman),
+          ].join("|");
+        },
+
+        _aggregateReturnProductItems: function (aItems) {
+          var mGroups = {};
+          var aAggregated = [];
+
+          aItems.forEach(
+            function (oItem) {
+              var sKey = this._getReturnItemGroupKey(oItem);
+              if (!mGroups[sKey]) {
+                mGroups[sKey] = Object.assign({}, oItem, {
+                  sourceItems: [],
+                  MengeSiparis: this._toNumber(oItem.MengeSiparis),
+                  MengeFire: this._toNumber(oItem.MengeFire),
+                  MengeKalite: this._toNumber(oItem.MengeKalite),
+                  MengeLansman: this._toNumber(oItem.MengeLansman),
+                  MengeSatilab: this._toNumber(oItem.MengeSatilab),
+                  _countConfirmed: oItem._countConfirmed === true,
+                  _completed: oItem._completed === true,
+                });
+                mGroups[sKey].sourceItems = [];
+                aAggregated.push(mGroups[sKey]);
+              } else {
+                mGroups[sKey].MengeSiparis += this._toNumber(oItem.MengeSiparis);
+                mGroups[sKey].MengeFire += this._toNumber(oItem.MengeFire);
+                mGroups[sKey].MengeKalite += this._toNumber(oItem.MengeKalite);
+                mGroups[sKey].MengeLansman += this._toNumber(oItem.MengeLansman);
+                mGroups[sKey].MengeSatilab += this._toNumber(oItem.MengeSatilab);
+                mGroups[sKey]._countConfirmed =
+                  mGroups[sKey]._countConfirmed && oItem._countConfirmed === true;
+                mGroups[sKey]._completed =
+                  mGroups[sKey]._completed && oItem._completed === true;
+              }
+
+              mGroups[sKey].sourceItems.push(oItem);
+            }.bind(this),
+          );
+
+          aAggregated.forEach(
+            function (oItem) {
+              oItem.MengeSayim = this._getProductCountTotal(oItem);
+            }.bind(this),
+          );
+
+          return aAggregated;
+        },
+
+        _aggregateReturnDepositItems: function (aItems) {
+          var mGroups = {};
+          var aAggregated = [];
+
+          aItems.forEach(
+            function (oItem) {
+              var sKey = this._getReturnItemGroupKey(oItem);
+              if (!mGroups[sKey]) {
+                mGroups[sKey] = Object.assign({}, oItem, {
+                  sourceItems: [],
+                  MengeSayim: this._toNumber(oItem.MengeSayim),
+                  _countConfirmed: oItem._countConfirmed === true,
+                  _completed: oItem._completed === true,
+                });
+                mGroups[sKey].sourceItems = [];
+                aAggregated.push(mGroups[sKey]);
+              } else {
+                mGroups[sKey].MengeSayim += this._toNumber(oItem.MengeSayim);
+                mGroups[sKey]._countConfirmed =
+                  mGroups[sKey]._countConfirmed && oItem._countConfirmed === true;
+                mGroups[sKey]._completed =
+                  mGroups[sKey]._completed && oItem._completed === true;
+              }
+
+              mGroups[sKey].sourceItems.push(oItem);
+            }.bind(this),
+          );
+
+          return aAggregated;
+        },
+
+        _distributeReturnItemCounts: function (aAggregatedItems, aRawItems) {
+          var oDistributionMap = new WeakMap();
+          var mItemGroups = {};
+
+          aRawItems.forEach(
+            function (oItem) {
+              var sKey = this._getReturnItemGroupKey(oItem);
+              if (!mItemGroups[sKey]) {
+                mItemGroups[sKey] = [];
+              }
+              mItemGroups[sKey].push(oItem);
+            }.bind(this),
+          );
+
+          aAggregatedItems.forEach(
+            function (oAggregatedItem) {
+              var sKey = this._getReturnItemGroupKey(oAggregatedItem);
+              var aGroupItems = mItemGroups[sKey] || [];
+
+              if (!aGroupItems.length) {
+                return;
+              }
+
+              var aCategories = [
+                "MengeFire",
+                "MengeKalite",
+                "MengeLansman",
+                "MengeSatilab",
+              ];
+              var aAssignments = this._buildCapacityFirstReturnAssignments(
+                oAggregatedItem,
+                aGroupItems,
+                aCategories,
+              );
+
+              aAssignments.forEach(function (oAssignment) {
+                var oCounts = oAssignment.counts;
+
+                oCounts.MengeSayim =
+                  oCounts.MengeFire +
+                  oCounts.MengeKalite +
+                  oCounts.MengeLansman +
+                  oCounts.MengeSatilab;
+                oCounts._countConfirmed =
+                  oAggregatedItem._countConfirmed === true;
+                oCounts._completed = oAggregatedItem._completed === true;
+                oDistributionMap.set(oAssignment.item, oCounts);
+              });
+            }.bind(this),
+          );
+
+          return oDistributionMap;
+        },
+
+        _buildCapacityFirstReturnAssignments: function (
+          oAggregatedItem,
+          aGroupItems,
+          aCategories,
+        ) {
+          var aAssignments = aGroupItems.map(
+            function (oItem) {
+              return {
+                item: oItem,
+                remainingCapacity: Math.max(
+                  0,
+                  Math.round(this._toNumber(oItem.MengeSiparis)),
+                ),
+                counts: {
+                  MengeFire: 0,
+                  MengeKalite: 0,
+                  MengeLansman: 0,
+                  MengeSatilab: 0,
+                },
+              };
+            }.bind(this),
+          );
+
+          aCategories.forEach(
+            function (sCategory) {
+              var iRemainingTotal = Math.round(
+                this._toNumber(oAggregatedItem[sCategory]),
+              );
+
+              aAssignments.forEach(function (oAssignment) {
+                if (iRemainingTotal <= 0) {
+                  return;
+                }
+
+                var iValue = Math.min(
+                  oAssignment.remainingCapacity,
+                  iRemainingTotal,
+                );
+                oAssignment.counts[sCategory] += iValue;
+                oAssignment.remainingCapacity -= iValue;
+                iRemainingTotal -= iValue;
+              });
+
+              if (iRemainingTotal > 0 && aAssignments.length) {
+                aAssignments[aAssignments.length - 1].counts[sCategory] +=
+                  iRemainingTotal;
+              }
+            }.bind(this),
+          );
+
+          return aAssignments;
+        },
+
+        _syncAggregatedCountsToRawItems: function (oAggregatedItem, aSourceItems) {
+          if (!oAggregatedItem || !aSourceItems || !aSourceItems.length) {
+            return;
+          }
+
+          if (
+            aSourceItems[0].MengeFire === undefined &&
+            aSourceItems[0].MengeKalite === undefined &&
+            aSourceItems[0].MengeLansman === undefined &&
+            aSourceItems[0].MengeSatilab === undefined
+          ) {
+            var iRemainingTotal = Math.round(
+              this._toNumber(oAggregatedItem.MengeSayim),
+            );
+
+            aSourceItems.forEach(function (oItem) {
+              var iValue = 0;
+
+              if (iRemainingTotal > 0) {
+                iValue = Math.min(
+                  Math.max(0, Math.round(this._toNumber(oItem.MengeSiparis))),
+                  iRemainingTotal,
+                );
+              }
+
+              iRemainingTotal -= iValue;
+
+              oItem.MengeSayim = iValue;
+              oItem.MengeSatilab = iValue;
+              oItem._countConfirmed = oAggregatedItem._countConfirmed === true;
+              oItem._completed = oAggregatedItem._completed === true;
+            }, this);
+
+            if (iRemainingTotal > 0) {
+              aSourceItems[aSourceItems.length - 1].MengeSayim +=
+                iRemainingTotal;
+              aSourceItems[aSourceItems.length - 1].MengeSatilab +=
+                iRemainingTotal;
+            }
+            return;
+          }
+
+          var oDistributionMap = this._distributeReturnItemCounts(
+            [oAggregatedItem],
+            aSourceItems,
+          );
+
+          aSourceItems.forEach(function (oItem) {
+            var oCounts = oDistributionMap.get(oItem);
+            if (!oCounts) {
+              return;
+            }
+            oItem.MengeFire = oCounts.MengeFire;
+            oItem.MengeKalite = oCounts.MengeKalite;
+            oItem.MengeLansman = oCounts.MengeLansman;
+            oItem.MengeSatilab = oCounts.MengeSatilab;
+            oItem.MengeSayim = oCounts.MengeSayim;
+            oItem._countConfirmed = oCounts._countConfirmed;
+            oItem._completed = oCounts._completed;
+          });
         },
 
         _getSelectionScope: function (aWaybills) {
@@ -650,6 +922,11 @@ sap.ui.define(
           var fTotal = this._getProductCountTotal(oItem);
 
           oModel.setProperty(sPath + "/MengeSayim", fTotal);
+
+          if (oItem.sourceItems && oItem.sourceItems.length) {
+            this._syncAggregatedCountsToRawItems(oItem, oItem.sourceItems);
+          }
+
           this._updateApprovalStateForItemContext(oContext);
         },
 
@@ -667,9 +944,19 @@ sap.ui.define(
             .getSource()
             .getBindingContext("returnCountModel");
           var bSelected = oEvent.getParameter("selected");
-          oContext
-            .getModel()
-            .setProperty(oContext.getPath() + "/_countConfirmed", bSelected);
+          var oModel = oContext.getModel();
+          var sPath = oContext.getPath();
+          var oItem = oContext.getObject();
+
+          oModel.setProperty(sPath + "/_countConfirmed", bSelected);
+          oItem._countConfirmed = bSelected;
+
+          if (oItem.sourceItems && oItem.sourceItems.length) {
+            oItem.sourceItems.forEach(function (oSourceItem) {
+              oSourceItem._countConfirmed = bSelected;
+            });
+          }
+
           this._updateApprovalStateForItemContext(oContext);
 
           if (oContext.getProperty("IsDepozito") === true) {
@@ -732,6 +1019,7 @@ sap.ui.define(
         ) {
           var oModel = oGroupContext.getModel();
           var sGroupPath = oGroupContext.getPath();
+          var oGroup = oGroupContext.getObject();
 
           aProductItems.forEach(function (oItem, iIndex) {
             oItem._countConfirmed = bConfirmed;
@@ -739,6 +1027,11 @@ sap.ui.define(
               sGroupPath + "/ProductItems/" + iIndex + "/_countConfirmed",
               bConfirmed,
             );
+            if (oItem.sourceItems && oItem.sourceItems.length) {
+              oItem.sourceItems.forEach(function (oSourceItem) {
+                oSourceItem._countConfirmed = bConfirmed;
+              });
+            }
           });
           aDepositItems.forEach(function (oItem, iIndex) {
             oItem._countConfirmed = bConfirmed;
@@ -746,6 +1039,18 @@ sap.ui.define(
               sGroupPath + "/DepositItems/" + iIndex + "/_countConfirmed",
               bConfirmed,
             );
+            if (oItem.sourceItems && oItem.sourceItems.length) {
+              oItem.sourceItems.forEach(function (oSourceItem) {
+                oSourceItem._countConfirmed = bConfirmed;
+              });
+            }
+          });
+
+          (oGroup.ProductItemsSource || []).forEach(function (oSourceItem) {
+            oSourceItem._countConfirmed = bConfirmed;
+          });
+          (oGroup.DepositItemsSource || []).forEach(function (oSourceItem) {
+            oSourceItem._countConfirmed = bConfirmed;
           });
 
           this._updateGroupApprovalState(oModel, sGroupPath);
@@ -841,6 +1146,15 @@ sap.ui.define(
           oModel.setProperty(sPath + "/MengeSayim", fQuantity);
           oModel.setProperty(sPath + "/MengeSatilab", fQuantity);
           oModel.setProperty(sPath + "/_countConfirmed", false);
+
+          if (oItem.sourceItems && oItem.sourceItems.length) {
+            oItem.sourceItems.forEach(function (oSourceItem) {
+              oSourceItem.MengeSayim = fQuantity;
+              oSourceItem.MengeSatilab = fQuantity;
+              oSourceItem._countConfirmed = false;
+            });
+          }
+
           this._updateApprovalStateForItemContext(oContext);
           this._saveReturnDepositDraftItem(oContext, false).catch(
             function (oError) {
@@ -1317,6 +1631,19 @@ sap.ui.define(
             return;
           }
 
+          (oGroup.ProductItems || []).forEach(function (oAggregatedItem) {
+            this._syncAggregatedCountsToRawItems(
+              oAggregatedItem,
+              oAggregatedItem.sourceItems || [],
+            );
+          }, this);
+          (oGroup.DepositItems || []).forEach(function (oAggregatedItem) {
+            this._syncAggregatedCountsToRawItems(
+              oAggregatedItem,
+              oAggregatedItem.sourceItems || [],
+            );
+          }, this);
+
           var aPayloads = aSelectedWaybills.map(
             function (oHeader, iIndex) {
               return this._buildDeepInsertPayload(
@@ -1419,6 +1746,7 @@ sap.ui.define(
                   MengeKalite: this._toODataDecimal(oItem.MengeKalite),
                   MengeLansman: this._toODataDecimal(oItem.MengeLansman),
                   MengeSatilab: this._toODataDecimal(oItem.MengeSatilab),
+                  NoLansman: this._normalizeUpperText(oItem.NoLansman),
                   IsDepozito: oItem.IsDepozito === true,
                 };
               }.bind(this),
@@ -1501,6 +1829,10 @@ sap.ui.define(
                 );
               }.bind(this),
             );
+        },
+
+        _normalizeUpperText: function (vValue) {
+          return String(vValue || "").trim().toUpperCase();
         },
 
         _toNumber: function (vValue) {

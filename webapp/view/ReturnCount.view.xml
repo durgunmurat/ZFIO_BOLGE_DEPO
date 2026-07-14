@@ -271,7 +271,7 @@
                                                                 width="100%"
                                                                 textAlign="End"
                                                                 class="returnCountQuantityInput"
-                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} }"
+                                                                editable="{= ${returnCountModel>NoLansman} === 'X' ? false : (!${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed}) }"
                                                                 change="onCountChange"/>
                                                             <Input
                                                                 value="{returnCountModel>MengeSatilab}"
