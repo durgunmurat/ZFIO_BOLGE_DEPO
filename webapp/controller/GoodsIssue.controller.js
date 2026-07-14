@@ -2042,6 +2042,7 @@ sap.ui.define(
         sap.ui.core.BusyIndicator.show(0);
 
         oModel.read("/DepositGISet", {
+          filters: [new Filter("All", FilterOperator.EQ, "")],
           success: function (oData) {
             sap.ui.core.BusyIndicator.hide();
             var aItems = oData.results || [];
