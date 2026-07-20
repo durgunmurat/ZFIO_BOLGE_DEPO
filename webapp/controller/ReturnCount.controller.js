@@ -1652,6 +1652,7 @@ sap.ui.define(
               );
             }.bind(this),
           );
+          this._rebalanceReturnPayloadItems(aPayloads);
 
           if (
             aPayloads.some(function (oPayload) {
@@ -1752,6 +1753,89 @@ sap.ui.define(
               }.bind(this),
             ),
           };
+        },
+
+        _rebalanceReturnPayloadItems: function (aPayloads) {
+          var mGroups = {};
+          var aCategories = [
+            "MengeFire",
+            "MengeKalite",
+            "MengeLansman",
+            "MengeSatilab",
+          ];
+
+          (aPayloads || []).forEach(
+            function (oPayload) {
+              (oPayload.ToItems || []).forEach(
+                function (oItem) {
+                  var sKey;
+
+                  if (oItem.IsDepozito === true) {
+                    return;
+                  }
+
+                  sKey = this._getReturnItemGroupKey(oItem);
+                  if (!mGroups[sKey]) {
+                    mGroups[sKey] = [];
+                  }
+                  mGroups[sKey].push(oItem);
+                }.bind(this),
+              );
+            }.bind(this),
+          );
+
+          Object.keys(mGroups).forEach(
+            function (sKey) {
+              var aItems = mGroups[sKey];
+              var oAggregatedItem = {
+                MengeFire: 0,
+                MengeKalite: 0,
+                MengeLansman: 0,
+                MengeSatilab: 0,
+              };
+              var aAssignments;
+
+              aItems.forEach(
+                function (oItem) {
+                  aCategories.forEach(
+                    function (sCategory) {
+                      oAggregatedItem[sCategory] += this._toNumber(
+                        oItem[sCategory],
+                      );
+                    }.bind(this),
+                  );
+                }.bind(this),
+              );
+
+              aAssignments = this._buildCapacityFirstReturnAssignments(
+                oAggregatedItem,
+                aItems,
+                aCategories,
+              );
+
+              aAssignments.forEach(
+                function (oAssignment) {
+                  var oItem = oAssignment.item;
+                  var oCounts = oAssignment.counts;
+
+                  oItem.MengeFire = this._toODataDecimal(oCounts.MengeFire);
+                  oItem.MengeKalite = this._toODataDecimal(oCounts.MengeKalite);
+                  oItem.MengeLansman = this._toODataDecimal(
+                    oCounts.MengeLansman,
+                  );
+                  oItem.MengeSatilab = this._toODataDecimal(
+                    oCounts.MengeSatilab,
+                  );
+                  oItem.MengeSayim = this._toODataDecimal(
+                    oCounts.MengeFire +
+                      oCounts.MengeKalite +
+                      oCounts.MengeLansman +
+                      oCounts.MengeSatilab,
+                  );
+                }.bind(this),
+              );
+            }.bind(this),
+          );
         },
 
         _getSelectedReturnDate: function () {
