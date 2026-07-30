@@ -72,6 +72,9 @@
             "css": [
                 {
                     "uri": "css/style.css"
+                },
+                {
+                    "uri": "css/returnFactoryShipment.restore.css"
                 }
             ]
         },

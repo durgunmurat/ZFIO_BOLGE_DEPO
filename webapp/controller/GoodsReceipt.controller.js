@@ -227,6 +227,10 @@ sap.ui.define(
         // --- LIFECYCLE METHODS ---
 
         onInit: function () {
+          // The SAP GR header does not exist before final posting. Retain notes
+          // per license plate so they can be persisted after the header is created.
+          this._mPendingNotesByLpId = {};
+
           var oItemsModel = new JSONModel([]);
           oItemsModel.setDefaultBindingMode(sap.ui.model.BindingMode.OneWay);
           oItemsModel.setSizeLimit(9999);
@@ -2380,9 +2384,14 @@ sap.ui.define(
             filters: aFilters,
             success: function (oData) {
               sap.ui.core.BusyIndicator.hide();
-              // var aNotes = oData.results || [];
-              // oNoteDialogModel.setProperty("/notes", aNotes);
-              var sRawNote = oData.results[0].Note || "";
+              var aNotes = oData.results || [];
+              var sRawNote = this._mPendingNotesByLpId[sLpId];
+
+              // Prefer the value staged in the dialog over the value in SAP.
+              if (sRawNote === undefined) {
+                sRawNote = aNotes.length > 0 ? aNotes[0].Note || "" : "";
+              }
+
               // Parse [AIS:xx.xx] prefix for Araç İçi Sıcaklık
               var rAIS = /^\[AIS:(-?[\d.]+)\]\s?/;
               var aMatch = sRawNote.match(rAIS);
@@ -2397,6 +2406,24 @@ sap.ui.define(
             }.bind(this),
             error: function (oError) {
               sap.ui.core.BusyIndicator.hide();
+
+              // Keep a staged note visible even when SAP cannot read NoteGRSet
+              // yet because the goods receipt header has not been created.
+              var sPendingNote = this._mPendingNotesByLpId[sLpId];
+              if (sPendingNote !== undefined) {
+                var rAIS = /^\[AIS:(-?[\d.]+)\]\s?/;
+                var aMatch = sPendingNote.match(rAIS);
+                if (aMatch) {
+                  oNoteDialogModel.setProperty(
+                    "/aracSicaklik",
+                    parseFloat(aMatch[1])
+                  );
+                  sPendingNote = sPendingNote.replace(rAIS, "");
+                }
+                oNoteDialogModel.setProperty("/newNote", sPendingNote);
+                return;
+              }
+
               console.error("Failed to load notes:", oError);
               MessageBox.error("Notlar yüklenirken hata oluştu.");
             }.bind(this),
@@ -2407,6 +2434,7 @@ sap.ui.define(
           var oNoteDialogModel = this.getView().getModel("noteDialogModel");
           var sNewNote = (oNoteDialogModel.getProperty("/newNote") || "").trim();
           var fAracSicaklik = parseFloat(oNoteDialogModel.getProperty("/aracSicaklik") || 0);
+          var sLpId = this._sCurrentNoteLpId;
 
           // En az biri girilmiş olmalı
           if (!sNewNote && fAracSicaklik === 0) {
@@ -2430,47 +2458,98 @@ sap.ui.define(
             return;
           }
 
-          var oModel = this.getOwnerComponent().getModel();
+          var oLicensePlate = this._oCurrentNoteContext
+            ? this._oCurrentNoteContext.getObject()
+            : null;
+          var bGoodsReceiptCompleted =
+            oLicensePlate && oLicensePlate.Status === "X";
+
+          // // There is no GR header in SAP before final posting. Stage the value
+          // // for a second save after PostGoodsReceipt creates the header. Still
+          // // call SaveNoteGR now so the note table can retain the pending value.
+          // if (!bGoodsReceiptCompleted) {
+          //   this._mPendingNotesByLpId[sLpId] = sFinalNote;
+          //   sap.ui.core.BusyIndicator.show(0);
+          //   this._saveNoteToBackend(sLpId, sFinalNote)
+          //     .then(function () {
+          //       sap.ui.core.BusyIndicator.hide();
+          //       MessageToast.show(
+          //         "Not kaydedildi; sıcaklık Mal Kabul tamamlandığında aktarılacak."
+          //       );
+          //     })
+          //     .catch(function () {
+          //       sap.ui.core.BusyIndicator.hide();
+          //       MessageToast.show(
+          //         "Not geçici olarak saklandı ve Mal Kabul sonrasında tekrar gönderilecek."
+          //       );
+          //     });
+          //   return;
+          // }
 
           sap.ui.core.BusyIndicator.show(0);
+          this._saveNoteToBackend(sLpId, sFinalNote)
+            .then(
+              function () {
+                sap.ui.core.BusyIndicator.hide();
+                MessageToast.show("Not başarıyla kaydedildi.");
 
-          oModel.callFunction("/SaveNoteGR", {
-            method: "POST",
-            urlParameters: {
-              LpId: this._sCurrentNoteLpId,
-              Note: sFinalNote,
-            },
-            success: function (oData, oResponse) {
-              sap.ui.core.BusyIndicator.hide();
-              MessageToast.show("Not başarıyla kaydedildi.");
+                oNoteDialogModel.setProperty("/newNote", "");
+                oNoteDialogModel.setProperty("/aracSicaklik", 0);
+                this._loadNotes(sLpId);
+                this.onCloseNoteDialog();
+              }.bind(this)
+            )
+            .catch(
+              function (oError) {
+                sap.ui.core.BusyIndicator.hide();
+                var sErrorMsg = "Not kaydedilemedi.";
 
-              // Clear input
-              oNoteDialogModel.setProperty("/newNote", "");
-              oNoteDialogModel.setProperty("/aracSicaklik", 0);
+                if (oError && oError.responseText) {
+                  try {
+                    var oErrorResponse = JSON.parse(oError.responseText);
+                    if (
+                      oErrorResponse.error &&
+                      oErrorResponse.error.message &&
+                      oErrorResponse.error.message.value
+                    ) {
+                      sErrorMsg = oErrorResponse.error.message.value;
+                    }
+                  } catch (e) {}
+                }
 
-              // Reload notes
-              this._loadNotes(this._sCurrentNoteLpId);
-            }.bind(this),
-            error: function (oError) {
-              sap.ui.core.BusyIndicator.hide();
-              var sErrorMsg = "Not kaydedilemedi.";
+                MessageBox.error(sErrorMsg);
+              }.bind(this)
+            );
+        },
 
-              if (oError && oError.responseText) {
-                try {
-                  var oErrorResponse = JSON.parse(oError.responseText);
-                  if (
-                    oErrorResponse.error &&
-                    oErrorResponse.error.message &&
-                    oErrorResponse.error.message.value
-                  ) {
-                    sErrorMsg = oErrorResponse.error.message.value;
-                  }
-                } catch (e) {}
-              }
+        _saveNoteToBackend: function (sLpId, sNote) {
+          var oModel = this.getOwnerComponent().getModel();
 
-              MessageBox.error(sErrorMsg);
-            }.bind(this),
+          return new Promise(function (resolve, reject) {
+            oModel.callFunction("/SaveNoteGR", {
+              method: "POST",
+              urlParameters: {
+                LpId: sLpId,
+                Note: sNote,
+              },
+              success: resolve,
+              error: reject,
+            });
           });
+        },
+
+        _savePendingNoteAfterGoodsReceipt: function (sLpId) {
+          var sPendingNote = this._mPendingNotesByLpId[sLpId];
+
+          if (sPendingNote === undefined) {
+            return Promise.resolve();
+          }
+
+          return this._saveNoteToBackend(sLpId, sPendingNote).then(
+            function () {
+              delete this._mPendingNotesByLpId[sLpId];
+            }.bind(this)
+          );
         },
 
         onCloseNoteDialog: function () {
@@ -2690,37 +2769,37 @@ sap.ui.define(
                 Status: sStatus
               },
               success: function (oData, oResponse) {
-                sap.ui.core.BusyIndicator.hide();
-
                 // ONLY refresh screen on Status="1" (final goods receipt)
                 // Status="0" (intermediate save) should NOT refresh to preserve user input
                 if (sStatus === "1") {
-                  // Refresh the goods receipt data
-                  this._loadGoodsReceiptData();
-
-                  // Update status filter counts after reload
-                  setTimeout(
-                    function () {
-                      this._updateStatusFilterCounts();
-                      var oStatusFilterBar = this.byId("idStatusFilterBar");
-                      if (oStatusFilterBar) {
-                        var sSelectedKey = oStatusFilterBar.getSelectedKey();
-                        this._applyStatusFilter(sSelectedKey || "pending");
-                      }
-                    }.bind(this),
-                    100
-                  );
-
-                  // Refresh Home dashboard
-                  this._refreshHomeDashboard();
-                  MessageBox.success("Mal kabul işlemi başarıyla tamamlandı!");
+                  this._savePendingNoteAfterGoodsReceipt(sLpId)
+                    .then(
+                      function () {
+                        sap.ui.core.BusyIndicator.hide();
+                        this._handleGoodsReceiptCompleted();
+                        MessageBox.success(
+                          "Mal kabul işlemi başarıyla tamamlandı!"
+                        );
+                        resolve(oData);
+                      }.bind(this)
+                    )
+                    .catch(
+                      function () {
+                        sap.ui.core.BusyIndicator.hide();
+                        this._handleGoodsReceiptCompleted();
+                        MessageBox.warning(
+                          "Mal kabul tamamlandı ancak not ve sıcaklık kaydedilemedi. Lütfen tekrar deneyin."
+                        );
+                        resolve(oData);
+                      }.bind(this)
+                    );
                 } else {
+                  sap.ui.core.BusyIndicator.hide();
                   // Status="0": Intermediate save - refresh ONLY this LpId's data to update ReceivedQuantity
                   this._refreshSingleLicensePlate(sLpId);
                   MessageToast.show("Veriler başarıyla kaydedildi.");
+                  resolve(oData);
                 }
-
-                resolve(oData);
               }.bind(this),
               error: function (oError) {
                 sap.ui.core.BusyIndicator.hide();
@@ -2746,6 +2825,24 @@ sap.ui.define(
               }.bind(this),
             });
           }.bind(this));
+        },
+
+        _handleGoodsReceiptCompleted: function () {
+          this._loadGoodsReceiptData();
+
+          setTimeout(
+            function () {
+              this._updateStatusFilterCounts();
+              var oStatusFilterBar = this.byId("idStatusFilterBar");
+              if (oStatusFilterBar) {
+                var sSelectedKey = oStatusFilterBar.getSelectedKey();
+                this._applyStatusFilter(sSelectedKey || "pending");
+              }
+            }.bind(this),
+            100
+          );
+
+          this._refreshHomeDashboard();
         },
       }
     );

@@ -507,6 +507,65 @@
     padding: 0.5rem 1rem 1rem !important;
 }
 
+.returnFactoryCardList .sapMLIB {
+    margin-bottom: 0.75rem;
+    border: 1px solid #d9e2ec;
+    border-radius: 0.5rem;
+    background: #fff;
+}
+
+.returnFactoryItemCard {
+    width: auto;
+}
+
+.returnFactoryItemHeader {
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e5e9f0;
+}
+
+.returnFactoryStockMetric {
+    min-width: 8rem;
+}
+
+.returnFactoryStockMetric .sapMLabel {
+    color: #52606d;
+    font-size: 0.75rem;
+}
+
+.returnFactoryCategoryGrid {
+    gap: 0.75rem;
+    align-items: flex-end;
+}
+
+.returnFactoryQuantityField {
+    width: 10rem;
+    min-width: 10rem;
+}
+
+.returnFactoryQuantityField .sapMInputBaseInner {
+    min-height: 2.75rem;
+    font-size: 1rem;
+}
+
+.returnFactorySalesFireGroup {
+    flex: 1 1 30rem;
+    min-width: 20rem;
+    padding: 0.65rem;
+    border: 1px solid #c9d7e6;
+    border-radius: 0.4rem;
+    background: #f7fafd;
+}
+
+.returnFactorySalesFireGroup .sapMFlexBox {
+    gap: 0.5rem;
+}
+
+.returnFactorySalesFireField {
+    width: 7rem;
+    min-width: 7rem;
+}
+
 @media (max-width: 1024px) {
     .returnCountTable .sapMListTblHeaderCell,
     .returnCountTable .sapMListTblCell,
@@ -528,5 +587,24 @@
     .returnFactoryTable .sapMObjectIdentifierTitle .sapMText,
     .returnFactoryTable .sapMObjectIdentifierText {
         font-size: 0.8rem;
+    }
+
+    .returnFactoryItemCard {
+        margin: 0.5rem !important;
+    }
+
+    .returnFactoryStockMetric {
+        min-width: 7rem;
+    }
+
+    .returnFactoryQuantityField,
+    .returnFactorySalesFireField {
+        width: calc(50% - 0.4rem);
+        min-width: 8rem;
+        flex: 1 1 calc(50% - 0.4rem);
+    }
+
+    .returnFactorySalesFireGroup {
+        min-width: 100%;
     }
 }

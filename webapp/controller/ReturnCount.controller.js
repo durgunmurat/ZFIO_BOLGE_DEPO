@@ -278,6 +278,7 @@ sap.ui.define(
                   ExternalDeposits: [],
                   ProductCount: 0,
                   DepositCount: 0,
+                  TotalWaybills: 0,
                 };
                 aGroups.push(mGroups[sGroupKey]);
               }
@@ -429,6 +430,7 @@ sap.ui.define(
                   ExternalDeposits: [],
                   ProductCount: aAggregatedProductItems.length,
                   DepositCount: aAggregatedDepositItems.length,
+                  TotalWaybills: aWaybills.length,
                 });
               }
             }.bind(this),

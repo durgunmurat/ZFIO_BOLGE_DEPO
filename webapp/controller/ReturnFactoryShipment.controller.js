@@ -31,6 +31,7 @@ sap.ui.define(
             warehouse: "",
             sourceWarehouse: "",
             selectedDate: "",
+            processId: "",
             totalItemCount: 0,
             confirmedItemCount: 0,
             canSubmit: false,
@@ -121,6 +122,7 @@ sap.ui.define(
               warehouse: sWarehouseNum,
               sourceWarehouse: sSourceWarehouse,
               selectedDate: sSelectedDate,
+              processId: this._createProcessId(),
               totalItemCount: 0,
               confirmedItemCount: 0,
               canSubmit: false,
@@ -136,14 +138,10 @@ sap.ui.define(
               function (aResults) {
                 var aVehicles = aResults[0];
                 var aItems = aResults[1];
-                var oSelectedVehicle = aVehicles[0] || null;
 
                 oViewModel.setProperty("/vehicles", aVehicles);
-                oViewModel.setProperty(
-                  "/selectedVehicleKey",
-                  oSelectedVehicle ? oSelectedVehicle.VehicleKey : "",
-                );
-                oViewModel.setProperty("/selectedVehicle", oSelectedVehicle);
+                oViewModel.setProperty("/selectedVehicleKey", "");
+                oViewModel.setProperty("/selectedVehicle", null);
                 oViewModel.setProperty("/items", aItems);
                 oViewModel.setProperty("/totalItemCount", aItems.length);
                 this._recalculateSubmitState();
@@ -195,9 +193,15 @@ sap.ui.define(
                     MaterialDisplayCode: this._formatMaterialCode(oItem.Matnr),
                     SapStock: this._toNumber(oItem.SapStock || oItem.Labst),
                     MengeSayim: 0,
-                    MengeFire: 0,
-                    MengeKalite: 0,
-                    MengeLansman: 0,
+                    MengeUretimHatali: 0,
+                    MengeFabrikaLojistik: 0,
+                    MengeSatisFireKati: 0,
+                    MengeSatisFireSivi: 0,
+                    MengeSatisFireUht: 0,
+                    MengeSatisFireCam: 0,
+                    DifferenceQuantity: this._toNumber(
+                      oItem.SapStock || oItem.Labst,
+                    ),
                     _countConfirmed: false,
                     RowHighlight: "None",
                     RowStateText: "",
@@ -235,9 +239,11 @@ sap.ui.define(
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
           var aVehicles = oModel.getProperty("/vehicles") || [];
           var oVehicle =
-            aVehicles.find(function (oItem) {
-              return oItem.VehicleKey === sSelectedKey;
-            }) || null;
+            (sSelectedKey &&
+              aVehicles.find(function (oItem) {
+                return oItem.VehicleKey === sSelectedKey;
+              })) ||
+            null;
 
           oModel.setProperty("/selectedVehicleKey", sSelectedKey);
           oModel.setProperty("/selectedVehicle", oVehicle);
@@ -291,9 +297,12 @@ sap.ui.define(
           }
 
           var fTotal =
-            this._toNumber(oItem.MengeFire) +
-            this._toNumber(oItem.MengeKalite) +
-            this._toNumber(oItem.MengeLansman);
+            this._toNumber(oItem.MengeUretimHatali) +
+            this._toNumber(oItem.MengeFabrikaLojistik) +
+            this._toNumber(oItem.MengeSatisFireKati) +
+            this._toNumber(oItem.MengeSatisFireSivi) +
+            this._toNumber(oItem.MengeSatisFireUht) +
+            this._toNumber(oItem.MengeSatisFireCam);
           oModel.setProperty(sPath + "/MengeSayim", fTotal);
           oModel.setProperty(sPath + "/_countConfirmed", false);
           this._updateItemState(oModel, sPath, Object.assign({}, oItem, {
@@ -337,16 +346,22 @@ sap.ui.define(
           var fStock = this._toNumber(oItem.SapStock);
           var bDifferent = fCount !== fStock;
           var bExceeded = fCount > fStock;
+          var fDifference = fStock - fCount;
 
           oModel.setProperty(sPath + "/RowHighlight", bDifferent ? "Error" : "None");
           oModel.setProperty(sPath + "/StockExceeded", bExceeded);
+          oModel.setProperty(sPath + "/DifferenceQuantity", fDifference);
+          oModel.setProperty(
+            sPath + "/RowState",
+            bDifferent ? "Error" : "Success",
+          );
           oModel.setProperty(
             sPath + "/RowStateText",
             bExceeded
               ? "Sayım iade depo stoğundan fazla. Gönderim yapılamaz."
               : bDifferent
-                ? "Sayım iade depo stoğundan farklı."
-                : "",
+                ? "Iade depo stoğundan eksik; gönderime izin verilir."
+                : "Iade depo stoğu ile eşit.",
           );
         },
 
@@ -431,6 +446,7 @@ sap.ui.define(
             oModel.getProperty("/selectedDate"),
           );
           var oPayload = {
+            LogUid: oModel.getProperty("/processId") || this._createProcessId(),
             Lgort: oModel.getProperty("/warehouse"),
             SourceLgort: oModel.getProperty("/sourceWarehouse"),
             IrsTar: sShipmentDate,
@@ -448,9 +464,24 @@ sap.ui.define(
                   Meins: this._toSapUnit(oItem.Meins),
                   SapStock: this._toODataDecimal(oItem.SapStock),
                   MengeSayim: this._toODataDecimal(oItem.MengeSayim),
-                  MengeFire: this._toODataDecimal(oItem.MengeFire),
-                  MengeKalite: this._toODataDecimal(oItem.MengeKalite),
-                  MengeLansman: this._toODataDecimal(oItem.MengeLansman),
+                  MengeUretimHatali: this._toODataDecimal(
+                    oItem.MengeUretimHatali,
+                  ),
+                  MengeFabrikaLojistik: this._toODataDecimal(
+                    oItem.MengeFabrikaLojistik,
+                  ),
+                  MengeSatisFireKati: this._toODataDecimal(
+                    oItem.MengeSatisFireKati,
+                  ),
+                  MengeSatisFireSivi: this._toODataDecimal(
+                    oItem.MengeSatisFireSivi,
+                  ),
+                  MengeSatisFireUht: this._toODataDecimal(
+                    oItem.MengeSatisFireUht,
+                  ),
+                  MengeSatisFireCam: this._toODataDecimal(
+                    oItem.MengeSatisFireCam,
+                  ),
                 };
               }.bind(this),
             ),
@@ -513,6 +544,17 @@ sap.ui.define(
         _formatMaterialCode: function (sMatnr) {
           var sCode = String(sMatnr || "").replace(/^0+/, "");
           return sCode || "0";
+        },
+
+        _createProcessId: function () {
+          var sSeed =
+            Date.now().toString(16) +
+            Math.random().toString(16).slice(2) +
+            Math.random().toString(16).slice(2);
+
+          return (sSeed + "00000000000000000000000000000000")
+            .slice(0, 32)
+            .toUpperCase();
         },
 
         _toNumber: function (vValue) {

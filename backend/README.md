@@ -16,6 +16,12 @@
   - taslak header, idempotency ve ZDAI ilişki tablosu
 - `SE11_ZMM_T_BDY_IRS_DI.md`
   - depozito taslak kalem tablosu
+- `ZCL_ZMM_BOLGE_DEPO_YON_DPC_EXT_RETURN_FACTORY_SHIPMENT.abap`
+  - fabrikaya iade gönderimi kategori, UB, 351/311/702 ve Z tablo log patch'i
+- `SEGW_RETURN_FACTORY_SHIPMENT_STEPS.md`
+  - yeni OData alanları, `ZZGRUND` belge ayrımı ve kabul testleri
+- `SE11_ZMM_T_BDY_FSH.md`
+  - `ZMM_T_BDY_FSH_H/I` işlem tabloları ve `EZMM_T_BDY_FSH` kilit tasarımı
 
 ## Uygulama Sırası
 

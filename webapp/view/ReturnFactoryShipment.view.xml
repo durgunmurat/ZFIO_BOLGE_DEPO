@@ -37,6 +37,7 @@
                     <Label text="Plaka"/>
                     <Select
                         width="18rem"
+                        forceSelection="false"
                         selectedKey="{returnFactoryShipmentModel>/selectedVehicleKey}"
                         change="onVehicleChange"
                         items="{
@@ -105,86 +106,128 @@
                         </OverflowToolbar>
                     </headerToolbar>
                     <content>
-                        <Table
+                        <List
                             items="{
                                 path: 'returnFactoryShipmentModel>/items',
                                 templateShareable: false
                             }"
-                            inset="false"
-                            fixedLayout="true"
                             growing="true"
-                            growingThreshold="50"
-                            width="100%"
+                            growingThreshold="30"
+                            showSeparators="None"
                             noDataText="Seçilen tarih ve depo için iade depo stoğu bulunamadı"
-                            class="returnFactoryTable">
-                            <columns>
-                                <Column width="34%">
-                                    <Text text="ÜRÜN"/>
-                                </Column>
-                                <Column width="12%" hAlign="End">
-                                    <Text text="TOPLAM"/>
-                                </Column>
-                                <Column width="13%" hAlign="End">
-                                    <Text text="FİRE"/>
-                                </Column>
-                                <Column width="13%" hAlign="End">
-                                    <Text text="KALITE"/>
-                                </Column>
-                                <Column width="14%" hAlign="End">
-                                    <Text text="LANSMAN"/>
-                                </Column>
-                                <Column width="14%" hAlign="Center">
-                                    <Text text="TAMAM"/>
-                                </Column>
-                            </columns>
+                            class="returnFactoryCardList">
                             <items>
-                                <ColumnListItem highlight="{returnFactoryShipmentModel>RowHighlight}">
-                                    <cells>
-                                        <VBox>
-                                            <ObjectIdentifier
-                                                title="{returnFactoryShipmentModel>Maktx}"
-                                                text="{returnFactoryShipmentModel>MaterialDisplayCode}"
-                                                class="returnFactoryMaterial"/>
-                                            <ObjectStatus
-                                                visible="{= !!${returnFactoryShipmentModel>RowStateText} }"
-                                                text="{returnFactoryShipmentModel>RowStateText}"
-                                                state="Error"/>
-                                        </VBox>
-                                        <ObjectNumber
-                                            number="{returnFactoryShipmentModel>MengeSayim}"
-                                            unit="{returnFactoryShipmentModel>Meins}"/>
-                                        <Input
-                                            value="{returnFactoryShipmentModel>MengeFire}"
-                                            type="Number"
-                                            width="100%"
-                                            textAlign="End"
-                                            class="returnFactoryQuantityInput"
-                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} }"
-                                            change="onCountChange"/>
-                                        <Input
-                                            value="{returnFactoryShipmentModel>MengeKalite}"
-                                            type="Number"
-                                            width="100%"
-                                            textAlign="End"
-                                            class="returnFactoryQuantityInput"
-                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} }"
-                                            change="onCountChange"/>
-                                        <Input
-                                            value="{returnFactoryShipmentModel>MengeLansman}"
-                                            type="Number"
-                                            width="100%"
-                                            textAlign="End"
-                                            class="returnFactoryQuantityInput"
-                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} }"
-                                            change="onCountChange"/>
-                                        <CheckBox
-                                            selected="{returnFactoryShipmentModel>_countConfirmed}"
-                                            tooltip="Bu kalemin fiziksel sayımı tamamlandı"
-                                            select="onCountConfirmed"/>
-                                    </cells>
-                                </ColumnListItem>
+                                <CustomListItem highlight="{returnFactoryShipmentModel>RowHighlight}">
+                                    <VBox class="returnFactoryItemCard sapUiSmallMargin">
+                                        <HBox
+                                            alignItems="Center"
+                                            justifyContent="SpaceBetween"
+                                            wrap="Wrap"
+                                            class="returnFactoryItemHeader">
+                                            <VBox class="sapUiTinyMarginEnd">
+                                                <ObjectIdentifier
+                                                    title="{returnFactoryShipmentModel>Maktx}"
+                                                    text="{returnFactoryShipmentModel>MaterialDisplayCode}"
+                                                    class="returnFactoryMaterial"/>
+                                            </VBox>
+                                            <HBox alignItems="Center" wrap="Wrap">
+                                                <VBox class="returnFactoryStockMetric sapUiTinyMarginEnd">
+                                                    <Label text="İade depo önerisi"/>
+                                                    <ObjectNumber
+                                                        number="{returnFactoryShipmentModel>SapStock}"
+                                                        unit="{returnFactoryShipmentModel>Meins}"/>
+                                                </VBox>
+                                                <VBox class="returnFactoryStockMetric sapUiTinyMarginEnd">
+                                                    <Label text="Girilen toplam"/>
+                                                    <ObjectNumber
+                                                        number="{returnFactoryShipmentModel>MengeSayim}"
+                                                        unit="{returnFactoryShipmentModel>Meins}"
+                                                        state="{returnFactoryShipmentModel>RowState}"/>
+                                                </VBox>
+                                                <CheckBox
+                                                    text="Tamam"
+                                                    selected="{returnFactoryShipmentModel>_countConfirmed}"
+                                                    tooltip="Bu kalemin fiziksel sayımı tamamlandı"
+                                                    select="onCountConfirmed"/>
+                                            </HBox>
+                                        </HBox>
+
+                                        <ObjectStatus
+                                            text="{returnFactoryShipmentModel>RowStateText}"
+                                            state="{returnFactoryShipmentModel>RowState}"
+                                            class="sapUiTinyMarginTop sapUiTinyMarginBottom"/>
+
+                                        <FlexBox wrap="Wrap" class="returnFactoryCategoryGrid">
+                                            <VBox class="returnFactoryQuantityField">
+                                                <Label text="Üretim Hatalı"/>
+                                                <Input
+                                                    value="{returnFactoryShipmentModel>MengeUretimHatali}"
+                                                    type="Number"
+                                                    textAlign="End"
+                                                    class="returnFactoryQuantityInput"
+                                                    editable="{= !${returnFactoryShipmentModel>_countConfirmed} }"
+                                                    change="onCountChange"/>
+                                            </VBox>
+                                            <VBox class="returnFactoryQuantityField">
+                                                <Label text="Fabrika Lojistik"/>
+                                                <Input
+                                                    value="{returnFactoryShipmentModel>MengeFabrikaLojistik}"
+                                                    type="Number"
+                                                    textAlign="End"
+                                                    class="returnFactoryQuantityInput"
+                                                    editable="{= !${returnFactoryShipmentModel>_countConfirmed} }"
+                                                    change="onCountChange"/>
+                                            </VBox>
+                                            <VBox class="returnFactorySalesFireGroup">
+                                                <Title text="Satış Firesi" level="H6"/>
+                                                <FlexBox wrap="Wrap">
+                                                    <VBox class="returnFactoryQuantityField returnFactorySalesFireField">
+                                                        <Label text="Katı"/>
+                                                        <Input
+                                                            value="{returnFactoryShipmentModel>MengeSatisFireKati}"
+                                                            type="Number"
+                                                            textAlign="End"
+                                                            class="returnFactoryQuantityInput"
+                                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} }"
+                                                            change="onCountChange"/>
+                                                    </VBox>
+                                                    <VBox class="returnFactoryQuantityField returnFactorySalesFireField">
+                                                        <Label text="Sıvı"/>
+                                                        <Input
+                                                            value="{returnFactoryShipmentModel>MengeSatisFireSivi}"
+                                                            type="Number"
+                                                            textAlign="End"
+                                                            class="returnFactoryQuantityInput"
+                                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} }"
+                                                            change="onCountChange"/>
+                                                    </VBox>
+                                                    <VBox class="returnFactoryQuantityField returnFactorySalesFireField">
+                                                        <Label text="UHT"/>
+                                                        <Input
+                                                            value="{returnFactoryShipmentModel>MengeSatisFireUht}"
+                                                            type="Number"
+                                                            textAlign="End"
+                                                            class="returnFactoryQuantityInput"
+                                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} }"
+                                                            change="onCountChange"/>
+                                                    </VBox>
+                                                    <VBox class="returnFactoryQuantityField returnFactorySalesFireField">
+                                                        <Label text="Cam"/>
+                                                        <Input
+                                                            value="{returnFactoryShipmentModel>MengeSatisFireCam}"
+                                                            type="Number"
+                                                            textAlign="End"
+                                                            class="returnFactoryQuantityInput"
+                                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} }"
+                                                            change="onCountChange"/>
+                                                    </VBox>
+                                                </FlexBox>
+                                            </VBox>
+                                        </FlexBox>
+                                    </VBox>
+                                </CustomListItem>
                             </items>
-                        </Table>
+                        </List>
                     </content>
                 </Panel>
             </VBox>

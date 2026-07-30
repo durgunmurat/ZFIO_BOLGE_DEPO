@@ -1,0 +1,169 @@
+/*
+ * ReturnFactoryShipment previous tablet layout.
+ * Kept as a separate resource so deployed clients do not reuse an older
+ * cached style.css response from the abandoned redesign.
+ */
+.returnFactoryActionBar {
+    border-bottom: 1px solid #d9d9d9;
+}
+
+.returnFactoryProductPanel > .sapMPanelHdr,
+.returnFactoryProductPanel > .sapMPanelWrappingDiv > .sapMPanelHdr,
+.returnFactoryProductPanel > .sapMPanelWrappingDivTb,
+.returnFactoryProductPanel > .sapMPanelWrappingDivTb .sapMIBar,
+.returnFactoryProductPanel .sapMTB {
+    background-color: #107e3e !important;
+}
+
+.returnFactoryProductPanel > .sapMPanelWrappingDivTb .sapMTitle,
+.returnFactoryProductPanel > .sapMPanelWrappingDivTb .sapUiIcon,
+.returnFactoryProductPanel > .sapMPanelWrappingDivTb .sapMObjectNumberText,
+.returnFactoryProductPanel .sapMTB .sapMTitle,
+.returnFactoryProductPanel .sapMTB .sapUiIcon,
+.returnFactoryProductPanel .sapMTB .sapMObjectNumberText {
+    color: #ffffff !important;
+}
+
+.returnFactoryProductPanel .sapMPanelContent {
+    padding: 0.5rem 1rem 1rem !important;
+}
+
+.returnFactoryCardList,
+.returnFactoryCardList .sapMListUl {
+    background: transparent !important;
+}
+
+.returnFactoryCardList .sapMLIB {
+    margin: 0 0 0.75rem !important;
+    overflow: hidden;
+    border: 1px solid #d9e2ec;
+    border-radius: 0.5rem;
+    background: #ffffff;
+    box-shadow: none;
+}
+
+.returnFactoryCardList .sapMLIBContent {
+    padding: 0 !important;
+}
+
+.returnFactoryCardList .sapMLIBHighlight {
+    width: 5px !important;
+}
+
+.returnFactoryCardList .sapMLIBHighlightError .sapMLIBHighlight {
+    width: 5px !important;
+    background-color: #bb0000 !important;
+}
+
+.returnFactoryItemCard {
+    width: auto;
+    box-sizing: content-box;
+    padding: 0;
+}
+
+.returnFactoryItemHeader {
+    gap: 0.75rem;
+    padding: 0 0 0.5rem;
+    border-bottom: 1px solid #e5e9f0;
+}
+
+.returnFactoryMaterial .sapMObjectIdentifierTitle .sapMText {
+    color: #32363a;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: normal;
+    white-space: normal;
+}
+
+.returnFactoryMaterial .sapMObjectIdentifierText {
+    margin-top: 0;
+    color: #6a6d70;
+    font-size: 0.875rem;
+}
+
+.returnFactoryConfirmCheck {
+    min-height: 0;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.returnFactoryStockMetric {
+    min-width: 8rem;
+}
+
+.returnFactoryStockMetric .sapMLabel {
+    color: #52606d;
+    font-size: 0.75rem;
+}
+
+.returnFactoryCategoryGrid {
+    gap: 0.75rem;
+    align-items: flex-end;
+}
+
+.returnFactoryQuantityField {
+    width: 10rem;
+    min-width: 10rem;
+    padding: 0;
+    border-left: 0;
+}
+
+.returnFactoryQuantityField > .sapMLabel {
+    margin-bottom: 0;
+    color: #6a6d70;
+    font-weight: 400;
+}
+
+.returnFactoryQuantityField .sapMInputBase,
+.returnFactoryQuantityField .sapMInputBaseContentWrapper {
+    height: auto;
+}
+
+.returnFactoryQuantityField .sapMInputBaseInner {
+    min-height: 2.75rem;
+    height: auto;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+.returnFactorySalesFireGroup {
+    flex: 1 1 30rem;
+    min-width: 20rem;
+    padding: 0.65rem;
+    border: 1px solid #c9d7e6;
+    border-radius: 0.4rem;
+    background: #f7fafd;
+}
+
+.returnFactorySalesFireGroup .sapMFlexBox {
+    gap: 0.5rem;
+}
+
+.returnFactorySalesFireField {
+    width: 7rem;
+    min-width: 7rem;
+}
+
+@media (max-width: 1024px) {
+    .returnFactoryItemCard {
+        margin: 0.5rem !important;
+    }
+
+    .returnFactoryStockMetric {
+        min-width: 7rem;
+    }
+
+    .returnFactoryQuantityField,
+    .returnFactorySalesFireField {
+        width: calc(50% - 0.4rem);
+        min-width: 8rem;
+        flex: 1 1 calc(50% - 0.4rem);
+    }
+
+    .returnFactorySalesFireGroup {
+        min-width: 100%;
+    }
+}
