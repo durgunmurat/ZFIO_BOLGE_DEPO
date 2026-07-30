@@ -54,11 +54,11 @@ sap.ui.define(
             function (oEvent) {
               var oInput = oEvent.currentTarget;
 
-              if (this._toNumber(oInput.value) === 0) {
+              // if (this._toNumber(oInput.value) === 0) {
                 setTimeout(function () {
                   oInput.select();
                 }, 0);
-              }
+              // }
             }.bind(this),
           );
         },
