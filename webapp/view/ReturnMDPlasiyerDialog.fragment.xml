@@ -1,0 +1,21 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+    <SelectDialog
+        id="idReturnMDPlasiyerDialog"
+        title="Plasiyer Seç"
+        noDataText="Plasiyer bulunamadı"
+        search="onMDPlasiyerSearch"
+        liveChange="onMDPlasiyerSearch"
+        confirm="onMDPlasiyerDialogConfirm"
+        items="{
+            path: 'returnCountModel>/mdPlasiyerItems',
+            templateShareable: false
+        }">
+        <StandardListItem
+            title="{returnCountModel>PlasiyerName}"
+            description="{returnCountModel>PlasiyerDisplay}"
+            icon="sap-icon://employee"
+            type="Active" />
+    </SelectDialog>
+</core:FragmentDefinition>

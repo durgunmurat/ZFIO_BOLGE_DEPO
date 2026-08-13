@@ -103,12 +103,12 @@
     height: auto !important;
 }
 
-.sapMNCValue {
+.statusTile .sapMNCValue {
     font-size: 2.25rem !important;
     font-weight: bold !important;
 }
 
-.sapMNCScale {
+.statusTile .sapMNCScale {
     font-size: 0.875rem !important;
     margin-top: 0.5rem !important;
     /* Allow scale text to wrap instead of being truncated to a single short line */
@@ -137,12 +137,12 @@
 }
 
 /* Ensure NumericContent container allows wrapping */
-.sapMNC {
+.statusTile .sapMNC {
     min-height: 80px !important;
     height: auto !important;
 }
 
-.sapMTileCnt {
+.statusTile .sapMTileCnt {
     min-height: 80px !important;
     height: auto !important;
 }
@@ -367,6 +367,14 @@
     margin-top: -0.5rem;
 }
 
+.returnMDPlasiyerBar {
+    margin: 0 1rem 0.5rem;
+    padding: 0.75rem 1rem !important;
+    border: 1px solid #d9d9d9;
+    border-radius: 0.25rem;
+    background-color: #ffffff;
+}
+
 .returnCountSelectionBar {
     gap: 0.25rem 1rem;
     padding: 0.35rem 0.75rem;
@@ -419,6 +427,8 @@
 .returnProductPanel .sapMTB .sapMTitle,
 .returnProductPanel .sapMTB .sapUiIcon,
 .returnProductPanel .sapMTB .sapMObjectNumberText,
+.returnProductPanel .sapMTB .sapMBtnIcon,
+.returnProductPanel .sapMTB .sapMBtnContent,
 .returnDepositPanel .sapMTB .sapMTitle,
 .returnDepositPanel .sapMTB .sapUiIcon,
 .returnDepositPanel .sapMTB .sapMObjectNumberText,

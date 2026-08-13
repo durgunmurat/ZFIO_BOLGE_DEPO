@@ -24,17 +24,26 @@ sap.ui.define(
         _oReturnDepositDialog: null,
         _oReturnDepositGroupContext: null,
         _returnDepositDraftQueue: null,
+        _returnMDProductListCache: null,
+        _oReturnMDProductDialog: null,
+        _oReturnMDProductGroupContext: null,
+        _oReturnMDPlasiyerDialog: null,
 
         onInit: function () {
           var oReturnCountModel = new JSONModel({
             groups: [],
             visibleGroups: [],
-            selectedType: "MD",
+            selectedType: "OP",
             selectedStatus: "pending",
             mdCount: 0,
             opCount: 0,
             pendingCount: 0,
             completedCount: 0,
+            mdPlasiyerItems: [],
+            selectedMDPlasiyerNo: "",
+            selectedMDPlasiyerName: "",
+            selectedMDPlasiyerText: "",
+            mdEntryGroup: null,
           });
           oReturnCountModel.setSizeLimit(9999);
           this.getView().setModel(oReturnCountModel, "returnCountModel");
@@ -63,6 +72,14 @@ sap.ui.define(
             this._oReturnDepositDialog.destroy();
             this._oReturnDepositDialog = null;
           }
+          if (this._oReturnMDProductDialog) {
+            this._oReturnMDProductDialog.destroy();
+            this._oReturnMDProductDialog = null;
+          }
+          if (this._oReturnMDPlasiyerDialog) {
+            this._oReturnMDPlasiyerDialog.destroy();
+            this._oReturnMDPlasiyerDialog = null;
+          }
         },
 
         _attachSelectAllInputEvents: function ($Root, sSelector, sNamespace) {
@@ -83,12 +100,75 @@ sap.ui.define(
         },
 
         _onRouteMatched: function () {
-          this.byId("idReturnTypeFilterBar").setSelectedKey("MD");
+          this.byId("idReturnTypeFilterBar").setSelectedKey("OP");
           this.byId("idReturnStatusFilterBar").setSelectedKey("pending");
           var oModel = this.getView().getModel("returnCountModel");
-          oModel.setProperty("/selectedType", "MD");
+          oModel.setProperty("/selectedType", "OP");
           oModel.setProperty("/selectedStatus", "pending");
+          oModel.setProperty("/selectedMDPlasiyerNo", "");
+          oModel.setProperty("/selectedMDPlasiyerName", "");
+          oModel.setProperty("/selectedMDPlasiyerText", "");
+          oModel.setProperty("/mdEntryGroup", null);
           this._loadReturnCountData();
+        },
+
+        _normalizeSearchText: function (vValue) {
+          var sValue = String(vValue || "").toLocaleLowerCase("tr-TR");
+
+          // Türkçe karakterleri ASCII karşılıklarına indirger. Böylece örneğin
+          // "GÜLBAHAR", "gulbahar" aramasıyla eşleşir.
+          sValue = sValue
+            .replace(/ı/g, "i")
+            .replace(/ç/g, "c")
+            .replace(/ğ/g, "g")
+            .replace(/ö/g, "o")
+            .replace(/ş/g, "s")
+            .replace(/ü/g, "u");
+
+          return sValue.normalize
+            ? sValue.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            : sValue;
+        },
+
+        _isAbapTrue: function (vValue) {
+          return (
+            vValue === true ||
+            ["X", "TRUE", "1"].indexOf(
+              String(vValue === undefined || vValue === null ? "" : vValue)
+                .trim()
+                .toUpperCase(),
+            ) >= 0
+          );
+        },
+
+        _loadReturnMDPlasiyerCatalog: function () {
+          var oODataModel = this.getOwnerComponent().getModel();
+
+          oODataModel.read("/ReturnMDPlasiyerSet", {
+            success: function (oData) {
+              var aItems = (oData.results || []).map(
+                function (oItem) {
+                  return {
+                    PlasiyerNo: oItem.PlasiyerNo || "",
+                    PlasiyerDisplay: this._formatNumericCode(oItem.PlasiyerNo),
+                    PlasiyerName: oItem.PlasiyerName || "",
+                  };
+                }.bind(this),
+              );
+
+              this.getView()
+                .getModel("returnCountModel")
+                .setProperty("/mdPlasiyerItems", aItems);
+            }.bind(this),
+            error: function (oError) {
+              MessageBox.error(
+                this._getErrorMessage(
+                  oError,
+                  "Monodistribütör plasiyer listesi yüklenemedi.",
+                ),
+              );
+            }.bind(this),
+          });
         },
 
         onDateChange: function (oEvent) {
@@ -334,10 +414,187 @@ sap.ui.define(
 
         onTypeFilterSelect: function (oEvent) {
           var oModel = this.getView().getModel("returnCountModel");
-          oModel.setProperty("/selectedType", oEvent.getParameter("key"));
+          var sType = oEvent.getParameter("key");
+          oModel.setProperty("/selectedType", sType);
           oModel.setProperty("/selectedStatus", "pending");
           this.byId("idReturnStatusFilterBar").setSelectedKey("pending");
+          if (
+            sType === "MD" &&
+            !(oModel.getProperty("/mdPlasiyerItems") || []).length
+          ) {
+            this._loadReturnMDPlasiyerCatalog();
+          }
           this._applyStatusFilter();
+        },
+
+        onMDPlasiyerValueHelpRequest: function () {
+          if (!this._oReturnMDPlasiyerDialog) {
+            this._oReturnMDPlasiyerDialog = sap.ui.xmlfragment(
+              "returnMDPlasiyer",
+              "com.sut.bolgeyonetim.view.ReturnMDPlasiyerDialog",
+              this,
+            );
+            this.getView().addDependent(this._oReturnMDPlasiyerDialog);
+          }
+
+          this.onMDPlasiyerSearch({ getParameter: function () { return ""; } });
+          this._oReturnMDPlasiyerDialog.open();
+        },
+
+        onMDPlasiyerSearch: function (oEvent) {
+          var sQuery = this._normalizeSearchText(
+            oEvent.getParameter("value") || "",
+          );
+          var oBinding = oEvent.getSource && oEvent.getSource().getBinding
+            ? oEvent.getSource().getBinding("items")
+            : this._oReturnMDPlasiyerDialog &&
+              this._oReturnMDPlasiyerDialog.getBinding("items");
+
+          if (!oBinding) {
+            return;
+          }
+          if (!sQuery) {
+            oBinding.filter([]);
+            return;
+          }
+
+          oBinding.filter([
+            new Filter({
+              filters: [
+                new Filter({
+                  path: "PlasiyerNo",
+                  test: function (sValue) {
+                    return this._normalizeSearchText(sValue).indexOf(sQuery) >= 0;
+                  }.bind(this),
+                }),
+                new Filter({
+                  path: "PlasiyerDisplay",
+                  test: function (sValue) {
+                    return this._normalizeSearchText(sValue).indexOf(sQuery) >= 0;
+                  }.bind(this),
+                }),
+                new Filter({
+                  path: "PlasiyerName",
+                  test: function (sValue) {
+                    return this._normalizeSearchText(sValue).indexOf(sQuery) >= 0;
+                  }.bind(this),
+                }),
+              ],
+              and: false,
+            }),
+          ]);
+        },
+
+        onMDPlasiyerDialogConfirm: function (oEvent) {
+          var oSelectedItem = oEvent.getParameter("selectedItem");
+          var oModel = this.getView().getModel("returnCountModel");
+          var oCurrentGroup = oModel.getProperty("/mdEntryGroup");
+          var oPlasiyer = oSelectedItem
+            ? oSelectedItem.getBindingContext("returnCountModel").getObject()
+            : null;
+
+          if (
+            oCurrentGroup &&
+            oPlasiyer &&
+            oCurrentGroup.Plasiyer !== oPlasiyer.PlasiyerNo &&
+            ((oCurrentGroup.ProductItems || []).length ||
+              (oCurrentGroup.DepositItems || []).length)
+          ) {
+            MessageBox.confirm(
+              "Plasiyer değiştirilirse mevcut ürün ve depozito sayımları temizlenecek. Devam etmek istiyor musunuz?",
+              {
+                title: "Plasiyeri Değiştir",
+                actions: [MessageBox.Action.YES, MessageBox.Action.NO],
+                emphasizedAction: MessageBox.Action.NO,
+                onClose: function (sAction) {
+                  if (sAction === MessageBox.Action.YES) {
+                    this._selectMDPlasiyer(oPlasiyer);
+                  } else {
+                    oModel.setProperty(
+                      "/selectedMDPlasiyerNo",
+                      oCurrentGroup.Plasiyer,
+                    );
+                    oModel.setProperty(
+                      "/selectedMDPlasiyerText",
+                      oCurrentGroup.PlasiyerDisplay +
+                        " - " +
+                        oCurrentGroup.PlasiyerName,
+                    );
+                  }
+                }.bind(this),
+              },
+            );
+            return;
+          }
+
+          if (!oPlasiyer) {
+            oModel.setProperty("/selectedMDPlasiyerNo", "");
+            oModel.setProperty("/selectedMDPlasiyerName", "");
+            oModel.setProperty("/selectedMDPlasiyerText", "");
+            oModel.setProperty("/mdEntryGroup", null);
+            this._applyStatusFilter();
+            return;
+          }
+
+          this._selectMDPlasiyer(oPlasiyer);
+        },
+
+        _selectMDPlasiyer: function (oPlasiyer) {
+          var oModel = this.getView().getModel("returnCountModel");
+          oModel.setProperty("/selectedMDPlasiyerNo", oPlasiyer.PlasiyerNo);
+          oModel.setProperty("/selectedMDPlasiyerName", oPlasiyer.PlasiyerName);
+          oModel.setProperty(
+            "/selectedMDPlasiyerText",
+            oPlasiyer.PlasiyerDisplay + " - " + oPlasiyer.PlasiyerName,
+          );
+          oModel.setProperty(
+            "/mdEntryGroup",
+            this._createMDEntryGroup(oPlasiyer),
+          );
+          this._applyStatusFilter();
+        },
+
+        _createMDEntryGroup: function (oPlasiyer) {
+          var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
+          var sWarehouseNum = oSessionModel
+            ? oSessionModel.getProperty("/Login/WarehouseNum")
+            : "";
+          var oHeader = {
+            LogUid: "",
+            VbelnVa: "",
+            IrsNo: "",
+            IrsTar: this._getSelectedReturnDate(),
+            Lgort: sWarehouseNum,
+            Plasiyer: oPlasiyer.PlasiyerNo || "",
+            PlasiyerName: oPlasiyer.PlasiyerName || "",
+            Kunnr: oPlasiyer.PlasiyerNo || "",
+            KunnrName: oPlasiyer.PlasiyerName || "",
+            ShipmentType: "MD",
+            ReturnType: "P",
+            Status: "N",
+            selected: true,
+            ToItems: { results: [] },
+          };
+
+          return {
+            Plasiyer: oHeader.Plasiyer,
+            PlasiyerDisplay: this._formatNumericCode(oHeader.Plasiyer),
+            PlasiyerName: oHeader.PlasiyerName,
+            expanded: true,
+            selectionScope: "ALL",
+            canApprove: false,
+            isCompleted: false,
+            isMD: true,
+            Waybills: [oHeader],
+            ProductItems: [],
+            ProductItemsSource: [],
+            DepositItems: [],
+            DepositItemsSource: [],
+            ExternalDeposits: [],
+            ProductCount: 0,
+            DepositCount: 0,
+            TotalWaybills: 0,
+          };
         },
 
         _applyStatusFilter: function () {
@@ -351,6 +608,21 @@ sap.ui.define(
           var iCompletedCount = 0;
           var mPendingPlasiyer = {};
           var mCompletedPlasiyer = {};
+
+          if (sType === "MD" && sStatus === "pending") {
+            var oMDEntryGroup = oModel.getProperty("/mdEntryGroup");
+            oModel.setProperty("/pendingCount", oMDEntryGroup ? 1 : 0);
+            oModel.setProperty("/completedCount", this._countReturnGroupsByStatus(
+              aGroups,
+              "MD",
+              "S",
+            ));
+            oModel.setProperty(
+              "/visibleGroups",
+              oMDEntryGroup ? [oMDEntryGroup] : [],
+            );
+            return;
+          }
 
           aGroups.forEach(
             function (oGroup) {
@@ -414,6 +686,12 @@ sap.ui.define(
                   aDepositItems,
                 );
 
+                if (sType === "MD") {
+                  aAggregatedProductItems.forEach(function (oItem) {
+                    oItem._isMD = true;
+                  });
+                }
+
                 aVisibleGroups.push({
                   Plasiyer: oGroup.Plasiyer,
                   PlasiyerDisplay: oGroup.PlasiyerDisplay,
@@ -422,6 +700,7 @@ sap.ui.define(
                   selectionScope: "ALL",
                   canApprove: false,
                   isCompleted: sStatus === "completed",
+                  isMD: sType === "MD",
                   Waybills: aWaybills,
                   ProductItems: aAggregatedProductItems,
                   ProductItemsSource: aProductItems,
@@ -439,6 +718,23 @@ sap.ui.define(
           oModel.setProperty("/pendingCount", iPendingCount);
           oModel.setProperty("/completedCount", iCompletedCount);
           oModel.setProperty("/visibleGroups", aVisibleGroups);
+        },
+
+        _countReturnGroupsByStatus: function (aGroups, sType, sStatus) {
+          var mPlasiyer = {};
+
+          (aGroups || []).forEach(function (oGroup) {
+            (oGroup.Waybills || []).forEach(function (oWaybill) {
+              if (
+                oWaybill.ShipmentType === sType &&
+                oWaybill.Status === sStatus
+              ) {
+                mPlasiyer["$" + String(oWaybill.Plasiyer || "")] = true;
+              }
+            });
+          });
+
+          return Object.keys(mPlasiyer).length;
         },
 
         _formatMaterialCode: function (sMatnr) {
@@ -580,10 +876,17 @@ sap.ui.define(
               return oItem._countConfirmed === true;
             },
           );
+          var bHasItems =
+            (oGroup.ProductItems || []).length +
+              (oGroup.DepositItems || []).length >
+            0;
 
           oModel.setProperty(
             sGroupPath + "/canApprove",
-            bAllWaybillsSelected && bAllItemsConfirmed && bAllDepositsConfirmed,
+            (!oGroup.isMD || bHasItems) &&
+              bAllWaybillsSelected &&
+              bAllItemsConfirmed &&
+              bAllDepositsConfirmed,
           );
         },
 
@@ -1110,6 +1413,10 @@ sap.ui.define(
         },
 
         _hasProductCountMismatch: function (oGroup) {
+          if (oGroup.isMD) {
+            return false;
+          }
+
           return (oGroup.ProductItems || []).some(
             function (oItem) {
               return (
@@ -1168,6 +1475,255 @@ sap.ui.define(
               );
             }.bind(this),
           );
+        },
+
+        onReturnMDProductAddPress: function (oEvent) {
+          var oContext = oEvent
+            .getSource()
+            .getBindingContext("returnCountModel");
+
+          if (!oContext || !oContext.getObject().Plasiyer) {
+            MessageBox.warning("Ürün eklemeden önce plasiyer seçin.");
+            return;
+          }
+
+          this._oReturnMDProductGroupContext = oContext;
+          this._loadReturnMDProductCatalog();
+        },
+
+        _loadReturnMDProductCatalog: function () {
+          if (this._returnMDProductListCache) {
+            this._showReturnMDProductDialog(
+              this._prepareReturnMDProductCatalog(
+                this._returnMDProductListCache,
+              ),
+            );
+            return;
+          }
+
+          sap.ui.core.BusyIndicator.show(0);
+          this.getOwnerComponent()
+            .getModel()
+            .read("/ReturnMDUrunSet", {
+              success: function (oData) {
+                sap.ui.core.BusyIndicator.hide();
+                this._returnMDProductListCache = JSON.parse(
+                  JSON.stringify(oData.results || []),
+                );
+                this._showReturnMDProductDialog(
+                  this._prepareReturnMDProductCatalog(
+                    this._returnMDProductListCache,
+                  ),
+                );
+              }.bind(this),
+              error: function (oError) {
+                sap.ui.core.BusyIndicator.hide();
+                MessageBox.error(
+                  this._getErrorMessage(oError, "Ürün listesi yüklenemedi."),
+                );
+              }.bind(this),
+            });
+        },
+
+        _prepareReturnMDProductCatalog: function (aCatalogItems) {
+          var oGroup = this._oReturnMDProductGroupContext.getObject();
+          var mSelected = {};
+
+          (oGroup.ProductItems || []).forEach(
+            function (oItem) {
+              mSelected[this._normalizeMaterialNumber(oItem.Matnr)] = true;
+            }.bind(this),
+          );
+
+          return (aCatalogItems || []).map(
+            function (oItem) {
+              var sUrunNo = oItem.UrunNo || "";
+              var bIsLansman = this._isAbapTrue(oItem.Lansman);
+              return {
+                UrunNo: sUrunNo,
+                UrunDisplay: this._formatMaterialCode(sUrunNo),
+                UrunAdi: oItem.UrunAdi || "",
+                Meins: oItem.Meins || "ADT",
+                Lansman: oItem.Lansman || "",
+                _isLansman: bIsLansman,
+                Selected:
+                  mSelected[this._normalizeMaterialNumber(sUrunNo)] === true,
+              };
+            }.bind(this),
+          );
+        },
+
+        _showReturnMDProductDialog: function (aItems) {
+          this.getView().setModel(
+            new JSONModel({
+              items: aItems,
+              searchQuery: "",
+              lansmanOnly: false,
+            }),
+            "returnMDProductAddModel",
+          );
+
+          if (!this._oReturnMDProductDialog) {
+            this._oReturnMDProductDialog = sap.ui.xmlfragment(
+              "returnMDProductAdd",
+              "com.sut.bolgeyonetim.view.ReturnMDProductAddDialog",
+              this,
+            );
+            this.getView().addDependent(this._oReturnMDProductDialog);
+          }
+
+          var oSearchField = sap.ui.core.Fragment.byId(
+            "returnMDProductAdd",
+            "idReturnMDProductSearchField",
+          );
+          var oTable = sap.ui.core.Fragment.byId(
+            "returnMDProductAdd",
+            "idReturnMDProductAddTable",
+          );
+          if (oSearchField) {
+            oSearchField.setValue("");
+          }
+          if (oTable && oTable.getBinding("items")) {
+            oTable.getBinding("items").filter([]);
+          }
+          this._oReturnMDProductDialog.open();
+        },
+
+        onReturnMDProductSearch: function (oEvent) {
+          var sQuery = this._normalizeSearchText(
+            oEvent.getParameter("newValue") || oEvent.getParameter("query") || "",
+          ).trim();
+          var oDialogModel = this.getView().getModel("returnMDProductAddModel");
+
+          oDialogModel.setProperty("/searchQuery", sQuery);
+          this._applyReturnMDProductFilters();
+        },
+
+        onReturnMDLansmanFilterSelect: function (oEvent) {
+          var oDialogModel = this.getView().getModel("returnMDProductAddModel");
+
+          oDialogModel.setProperty(
+            "/lansmanOnly",
+            oEvent.getParameter("selected") === true,
+          );
+          this._applyReturnMDProductFilters();
+        },
+
+        _applyReturnMDProductFilters: function () {
+          var oDialogModel = this.getView().getModel("returnMDProductAddModel");
+          var sQuery = oDialogModel.getProperty("/searchQuery") || "";
+          var bLansmanOnly = oDialogModel.getProperty("/lansmanOnly") === true;
+          var oTable = sap.ui.core.Fragment.byId(
+            "returnMDProductAdd",
+            "idReturnMDProductAddTable",
+          );
+          var oBinding = oTable && oTable.getBinding("items");
+          var aFilters = [];
+
+          if (!oBinding) {
+            return;
+          }
+
+          if (sQuery) {
+            aFilters.push(
+              new Filter({
+                filters: [
+                  new Filter({
+                    path: "UrunAdi",
+                    test: function (sValue) {
+                      return (
+                        this._normalizeSearchText(sValue).indexOf(sQuery) >= 0
+                      );
+                    }.bind(this),
+                  }),
+                  new Filter({
+                    path: "UrunDisplay",
+                    test: function (sValue) {
+                      return (
+                        this._normalizeSearchText(sValue).indexOf(sQuery) >= 0
+                      );
+                    }.bind(this),
+                  }),
+                  new Filter({
+                    path: "UrunNo",
+                    test: function (sValue) {
+                      return (
+                        this._normalizeSearchText(sValue).indexOf(sQuery) >= 0
+                      );
+                    }.bind(this),
+                  }),
+                ],
+                and: false,
+              }),
+            );
+          }
+
+          if (bLansmanOnly) {
+            aFilters.push(
+              new Filter("_isLansman", FilterOperator.EQ, true),
+            );
+          }
+
+          oBinding.filter(aFilters);
+        },
+
+        onReturnMDProductAddSave: function () {
+          var oDialogModel = this.getView().getModel("returnMDProductAddModel");
+          var aCatalogItems = oDialogModel.getProperty("/items") || [];
+          var oGroupContext = this._oReturnMDProductGroupContext;
+          var oGroup = oGroupContext.getObject();
+          var mExisting = {};
+
+          (oGroup.ProductItemsSource || []).forEach(
+            function (oItem) {
+              mExisting[this._normalizeMaterialNumber(oItem.Matnr)] = oItem;
+            }.bind(this),
+          );
+
+          var aProducts = aCatalogItems
+            .filter(function (oItem) {
+              return oItem.Selected === true;
+            })
+            .map(
+              function (oItem, iIndex) {
+                var sKey = this._normalizeMaterialNumber(oItem.UrunNo);
+                var bIsLansman = oItem._isLansman === true;
+                var oProduct =
+                  mExisting[sKey] ||
+                  {
+                    LogUid: "",
+                    Posnr: String(iIndex + 1).padStart(6, "0"),
+                    Matnr: oItem.UrunNo || "",
+                    Maktx: oItem.UrunAdi || "",
+                    Meins: oItem.Meins || "ADT",
+                    MengeSiparis: 0,
+                    MengeSayim: 0,
+                    MengeFire: 0,
+                    MengeKalite: 0,
+                    MengeLansman: 0,
+                    MengeSatilab: 0,
+                    IsDepozito: false,
+                    MaterialDisplayCode: this._formatMaterialCode(oItem.UrunNo),
+                    _completed: false,
+                    _countConfirmed: false,
+                  };
+
+                oProduct.NoLansman = bIsLansman ? "" : "X";
+                oProduct._isLansman = bIsLansman;
+                oProduct._isMD = true;
+
+                return oProduct;
+              }.bind(this),
+            );
+
+          oGroup.Waybills[0].ToItems = { results: aProducts };
+          this._refreshGroupItems(oGroupContext);
+          this._oReturnMDProductDialog.close();
+          MessageToast.show("Ürün listesi güncellendi.");
+        },
+
+        onReturnMDProductAddCancel: function () {
+          this._oReturnMDProductDialog.close();
         },
 
         onReturnDepositAddPress: function (oEvent) {
@@ -1252,9 +1808,11 @@ sap.ui.define(
         },
 
         _showReturnDepositDialog: function (aItems) {
+          var oGroup = this._oReturnDepositGroupContext.getObject();
           this.getView().setModel(
             new JSONModel({
               items: aItems,
+              isMD: oGroup.isMD === true,
             }),
             "returnDepositAddModel",
           );
@@ -1452,7 +2010,11 @@ sap.ui.define(
             .then(
               function () {
                 this._oReturnDepositDialog.close();
-                MessageToast.show("Depozito taslağı güncellendi.");
+                MessageToast.show(
+                  oGroup.isMD
+                    ? "Depozito listesi güncellendi."
+                    : "Depozito taslağı güncellendi.",
+                );
               }.bind(this),
             )
             .catch(
@@ -1550,6 +2112,13 @@ sap.ui.define(
           bDeleted,
         ) {
           var oGroup = oGroupContext.getObject();
+
+          // MD sayımı Fiori'de sıfırdan oluşturulur; OP'ye ait LogUid tabanlı
+          // depozito taslak servisi bu akışta kullanılmaz.
+          if (oGroup.isMD) {
+            return Promise.resolve();
+          }
+
           var oDraftHeader = this._getReturnDepositDraftHeader(oGroup);
           var sLogUid = oDraftHeader && oDraftHeader.LogUid;
 
@@ -1621,14 +2190,20 @@ sap.ui.define(
           });
 
           if (!aSelectedWaybills.length) {
-            MessageBox.warning("Onaylamak için en az bir irsaliye seçin.");
+            MessageBox.warning(
+              oGroup.isMD
+                ? "Onaylamak için önce plasiyer seçin."
+                : "Onaylamak için en az bir irsaliye seçin.",
+            );
             return;
           }
 
           if (!oGroup.canApprove) {
             MessageBox.warning(
-              "Tüm irsaliyelerdeki tüm kalemlerin sayımını tamamlayıp " +
-                '"Tamam" alanını işaretleyin.',
+              oGroup.isMD
+                ? 'Eklenen tüm kalemlerin sayımını tamamlayıp "Tamam" alanını işaretleyin.'
+                : "Tüm irsaliyelerdeki tüm kalemlerin sayımını tamamlayıp " +
+                    '"Tamam" alanını işaretleyin.',
             );
             return;
           }
@@ -1673,12 +2248,23 @@ sap.ui.define(
         },
 
         _confirmApproveCount: function (oGroupContext, aPayloads) {
+          var oGroup = oGroupContext.getObject();
           MessageBox.confirm(
-            aPayloads.length + " irsaliyenin sayımı onaylanacak.",
+            oGroup.isMD
+              ? oGroup.PlasiyerDisplay +
+                  " - " +
+                  oGroup.PlasiyerName +
+                  " için sayım onaylanacak."
+              : aPayloads.length + " irsaliyenin sayımı onaylanacak.",
             {
               title: "Sayımı Onayla",
               onClose: function (sAction) {
                 if (sAction === MessageBox.Action.OK) {
+                  if (oGroup.isMD) {
+                    this._submitPayloads(aPayloads);
+                    return;
+                  }
+
                   sap.ui.core.BusyIndicator.show(0);
                   this._syncReturnDepositDraft(oGroupContext)
                     .then(
@@ -1902,6 +2488,18 @@ sap.ui.define(
                 oODataModel.setUseBatch(true);
                 sap.ui.core.BusyIndicator.hide();
                 MessageToast.show("İade sayımları başarıyla onaylandı.");
+                if (
+                  aPayloads[0] &&
+                  String(aPayloads[0].ShipmentType || "").toUpperCase() === "MD"
+                ) {
+                  var oReturnCountModel = this.getView().getModel(
+                    "returnCountModel",
+                  );
+                  oReturnCountModel.setProperty("/selectedMDPlasiyerNo", "");
+                  oReturnCountModel.setProperty("/selectedMDPlasiyerName", "");
+                  oReturnCountModel.setProperty("/selectedMDPlasiyerText", "");
+                  oReturnCountModel.setProperty("/mdEntryGroup", null);
+                }
                 this.refreshDashboardData();
                 this._loadReturnCountData();
               }.bind(this),

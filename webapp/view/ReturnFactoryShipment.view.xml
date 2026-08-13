@@ -36,7 +36,7 @@
                         color="#0854A0"/>
                     <Label text="Plaka"/>
                     <Select
-                        width="18rem"
+                        width="10rem"
                         forceSelection="false"
                         selectedKey="{returnFactoryShipmentModel>/selectedVehicleKey}"
                         change="onVehicleChange"
@@ -48,9 +48,9 @@
                             key="{returnFactoryShipmentModel>VehicleKey}"
                             text="{returnFactoryShipmentModel>VehicleText}"/>
                     </Select>
-                    <Label text="&#220;retim Yeri"/>
+                    <Label text="&#220;Y"/>
                     <Select
-                        width="14rem"
+                        width="10rem"
                         selectedKey="{returnFactoryShipmentModel>/selectedPlantKey}"
                         change="onPlantChange"
                         items="{

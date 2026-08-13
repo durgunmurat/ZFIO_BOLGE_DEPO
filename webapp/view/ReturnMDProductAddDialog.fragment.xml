@@ -1,0 +1,80 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+    <Dialog
+        id="idReturnMDProductAddDialog"
+        title="Ürün Ekle"
+        contentWidth="42rem"
+        contentHeight="36rem"
+        stretch="{device>/isPhone}"
+        verticalScrolling="true"
+        horizontalScrolling="false"
+        class="returnDepositAddDialog">
+        <content>
+            <VBox class="sapUiSmallMargin returnDepositAddContent">
+                <MessageStrip
+                    text="Sayıma dahil etmek istediğiniz ürünleri seçin. Seçimi kaldırılan ürünler sayımdan çıkarılır."
+                    type="Information"
+                    showIcon="true"
+                    class="sapUiSmallMarginBottom" />
+                <SearchField
+                    id="idReturnMDProductSearchField"
+                    width="100%"
+                    placeholder="Ürün adı veya ürün kodu ara"
+                    liveChange="onReturnMDProductSearch"
+                    search="onReturnMDProductSearch"
+                    class="sapUiTinyMarginBottom" />
+                <CheckBox
+                    text="Sadece Lansman ürünlerini göster"
+                    selected="{returnMDProductAddModel>/lansmanOnly}"
+                    select="onReturnMDLansmanFilterSelect"
+                    class="sapUiSmallMarginBottom" />
+                <Table
+                    id="idReturnMDProductAddTable"
+                    items="{
+                        path: 'returnMDProductAddModel>/items',
+                        templateShareable: false
+                    }"
+                    growing="false"
+                    sticky="ColumnHeaders"
+                    noDataText="Ürün bulunamadı"
+                    fixedLayout="true"
+                    class="returnDepositAddTable">
+                    <columns>
+                        <Column width="5rem" hAlign="Center">
+                            <Text text="SEÇ" />
+                        </Column>
+                        <Column>
+                            <Text text="ÜRÜN" />
+                        </Column>
+                        <Column>
+                            <Text text="LANSMAN" />
+                        </Column>
+                    </columns>
+                    <items>
+                        <ColumnListItem>
+                            <cells>
+                                <CheckBox
+                                    selected="{returnMDProductAddModel>Selected}" />
+                                <ObjectIdentifier
+                                    title="{returnMDProductAddModel>UrunAdi}"
+                                    text="{returnMDProductAddModel>UrunDisplay} · {returnMDProductAddModel>Meins}" />
+                                <Text text="{returnMDProductAddModel>Lansman}" />
+                            </cells>
+                        </ColumnListItem>
+                    </items>
+                </Table>
+            </VBox>
+        </content>
+        <buttons>
+            <Button
+                text="Uygula"
+                type="Emphasized"
+                press="onReturnMDProductAddSave" />
+            <Button
+                text="İptal"
+                type="Transparent"
+                press="onReturnMDProductAddCancel" />
+        </buttons>
+    </Dialog>
+</core:FragmentDefinition>

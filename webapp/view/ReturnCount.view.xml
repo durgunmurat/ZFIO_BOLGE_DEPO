@@ -37,7 +37,7 @@
         <content>
             <IconTabBar
                 id="idReturnTypeFilterBar"
-                selectedKey="MD"
+                selectedKey="OP"
                 select="onTypeFilterSelect"
                 class="sapUiResponsiveContentPadding returnCountTypeBar"
                 upperCase="false"
@@ -46,19 +46,46 @@
             >
                 <items>
                     <IconTabFilter
-                        key="MD"
-                        text="Monodistribütör"
-                        count="{returnCountModel>/mdCount}"
-                        icon="sap-icon://supplier"
-                    />
-                    <IconTabFilter
                         key="OP"
                         text="Organize Dağıtım"
                         count="{returnCountModel>/opCount}"
                         icon="sap-icon://tree"
                     />
+                    <IconTabFilter
+                        key="MD"
+                        text="Monodistribütör"
+                        count="{returnCountModel>/mdCount}"
+                        icon="sap-icon://supplier"
+                    />
                 </items>
             </IconTabBar>
+
+            <VBox
+                visible="{= ${returnCountModel>/selectedType} === 'MD' &amp;&amp; ${returnCountModel>/selectedStatus} === 'pending' }"
+                class="sapUiResponsiveContentPadding returnMDPlasiyerBar"
+            >
+                <MessageStrip
+                    text="Sayıma başlamak için önce plasiyer seçin. Plasiyer seçildikten sonra ürün ve depozito ekleyebilirsiniz."
+                    type="Information"
+                    showIcon="true"
+                    class="sapUiTinyMarginBottom"
+                />
+                <Label
+                    text="Plasiyer"
+                    labelFor="idReturnMDPlasiyerSelect"
+                    required="true"
+                />
+                <Input
+                    id="idReturnMDPlasiyerSelect"
+                    value="{returnCountModel>/selectedMDPlasiyerText}"
+                    placeholder="Plasiyer seçin"
+                    width="100%"
+                    editable="true"
+                    showValueHelp="true"
+                    valueHelpOnly="true"
+                    valueHelpRequest="onMDPlasiyerValueHelpRequest"
+                />
+            </VBox>
 
             <IconTabBar
                 id="idReturnStatusFilterBar"
@@ -91,7 +118,7 @@
                     path: 'returnCountModel>/visibleGroups',
                     templateShareable: false
                 }"
-                noDataText="Seçilen tarih ve depo için iade kaydı bulunamadı"
+                noDataText="{= ${returnCountModel>/selectedType} === 'MD' &amp;&amp; ${returnCountModel>/selectedStatus} === 'pending' ? 'Sayıma başlamak için plasiyer seçin' : 'Seçilen tarih ve depo için iade kaydı bulunamadı' }"
             >
                 <items>
                     <CustomListItem>
@@ -232,7 +259,7 @@
                                             </CustomListItem>
                                         </items>
                                     </List>
-                                    <Toolbar>
+                                    <Toolbar visible="{= !${returnCountModel>isMD} }">
                                         <Title
                                             text="Toplam İrsaliye: {returnCountModel>TotalWaybills}"
                                             level="H3"
@@ -256,6 +283,15 @@
                                                 />
                                                 <ObjectNumber
                                                     number="{returnCountModel>ProductCount}"
+                                                />
+                                                <ToolbarSpacer />
+                                                <Button
+                                                    text="Ürün Ekle"
+                                                    icon="sap-icon://add"
+                                                    type="Transparent"
+                                                    press="onReturnMDProductAddPress"
+                                                    visible="{= ${returnCountModel>isMD} &amp;&amp; !${returnCountModel>isCompleted} }"
+                                                    enabled="{= !!${returnCountModel>Plasiyer} }"
                                                 />
                                             </OverflowToolbar>
                                         </headerToolbar>
@@ -316,7 +352,7 @@
                                                 </columns>
                                                 <items>
                                                     <ColumnListItem
-                                                        highlight="{= ${returnCountModel>MengeSayim} !== ${returnCountModel>MengeSiparis} ? 'Error' : 'None' }"
+                                                        highlight="{= !${returnCountModel>_isMD} &amp;&amp; ${returnCountModel>MengeSayim} !== ${returnCountModel>MengeSiparis} ? 'Error' : 'None' }"
                                                     >
                                                         <cells>
                                                             <ObjectIdentifier
@@ -327,7 +363,7 @@
                                                             <ObjectNumber
                                                                 number="{returnCountModel>MengeSayim}"
                                                                 unit="{returnCountModel>Meins}"
-                                                                state="{= ${returnCountModel>MengeSayim} !== ${returnCountModel>MengeSiparis} ? 'Error' : 'None' }"
+                                                                state="{= !${returnCountModel>_isMD} &amp;&amp; ${returnCountModel>MengeSayim} !== ${returnCountModel>MengeSiparis} ? 'Error' : 'None' }"
                                                             />
                                                             <Input
                                                                 value="{returnCountModel>MengeFire}"
@@ -335,7 +371,7 @@
                                                                 width="100%"
                                                                 textAlign="End"
                                                                 class="returnCountQuantityInput"
-                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} }"
+                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} &amp;&amp; (!${returnCountModel>_isMD} || !${returnCountModel>_isLansman}) }"
                                                                 change="onCountChange"
                                                             />
                                                             <Input
@@ -344,7 +380,7 @@
                                                                 width="100%"
                                                                 textAlign="End"
                                                                 class="returnCountQuantityInput"
-                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} }"
+                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} &amp;&amp; (!${returnCountModel>_isMD} || !${returnCountModel>_isLansman}) }"
                                                                 change="onCountChange"
                                                             />
                                                             <Input
@@ -353,7 +389,7 @@
                                                                 width="100%"
                                                                 textAlign="End"
                                                                 class="returnCountQuantityInput"
-                                                                editable="{= ${returnCountModel>NoLansman} === 'X' ? false : (!${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed}) }"
+                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} &amp;&amp; (${returnCountModel>_isMD} ? ${returnCountModel>_isLansman} : ${returnCountModel>NoLansman} !== 'X') }"
                                                                 change="onCountChange"
                                                             />
                                                             <Input
@@ -362,7 +398,7 @@
                                                                 width="100%"
                                                                 textAlign="End"
                                                                 class="returnCountQuantityInput"
-                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} }"
+                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} &amp;&amp; (!${returnCountModel>_isMD} || !${returnCountModel>_isLansman}) }"
                                                                 change="onCountChange"
                                                             />
                                                             <CheckBox
@@ -403,6 +439,7 @@
                                                     type="Transparent"
                                                     press="onReturnDepositAddPress"
                                                     visible="{= !${returnCountModel>isCompleted} }"
+                                                    enabled="{= !${returnCountModel>isMD} || !!${returnCountModel>Plasiyer} }"
                                                 />
                                             </OverflowToolbar>
                                         </headerToolbar>
@@ -417,7 +454,7 @@
                                                 growing="true"
                                                 growingThreshold="50"
                                                 width="100%"
-                                                noDataText="Son ZDAI siparişinde depozito bulunamadı"
+                                                noDataText="Sayım için depozito bulunamadı"
                                                 class="returnCountTable returnDepositTable"
                                             >
                                                 <columns>
