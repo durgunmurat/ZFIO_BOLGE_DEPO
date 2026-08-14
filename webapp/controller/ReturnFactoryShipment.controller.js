@@ -35,6 +35,11 @@ sap.ui.define(
             totalItemCount: 0,
             confirmedItemCount: 0,
             canSubmit: false,
+            extraReturnDialog: {
+              itemPath: "",
+              materialText: "",
+              value: 0,
+            },
           });
           oModel.setSizeLimit(9999);
           this.getView().setModel(oModel, "returnFactoryShipmentModel");
@@ -65,6 +70,11 @@ sap.ui.define(
 
         onExit: function () {
           this.getView().$().off(".returnFactoryZeroSelect");
+          if (this._oExtraReturnReasonDialog) {
+            this._oExtraReturnReasonDialog.$().off(".returnFactoryZeroSelect");
+            this._oExtraReturnReasonDialog.destroy();
+            this._oExtraReturnReasonDialog = null;
+          }
         },
 
         _onRouteMatched: function () {
@@ -126,6 +136,11 @@ sap.ui.define(
               totalItemCount: 0,
               confirmedItemCount: 0,
               canSubmit: false,
+              extraReturnDialog: {
+                itemPath: "",
+                materialText: "",
+                value: 0,
+              },
             }),
           );
 
@@ -193,12 +208,13 @@ sap.ui.define(
                     MaterialDisplayCode: this._formatMaterialCode(oItem.Matnr),
                     SapStock: this._toNumber(oItem.SapStock || oItem.Labst),
                     MengeSayim: 0,
-                    MengeUretimHatali: 0,
-                    MengeFabrikaLojistik: 0,
-                    MengeSatisFireKati: 0,
-                    MengeSatisFireSivi: 0,
-                    MengeSatisFireUht: 0,
-                    MengeSatisFireCam: 0,
+                    MengeUretimHatali: this._toNumber(oItem.MengeUretimHatali || 0),
+                    MengeFabrikaLojistik: this._toNumber(oItem.MengeFabrikaLojistik || 0),
+                    MengeSatisFireKati: this._toNumber(oItem.MengeSatisFireKati || 0),
+                    MengeSatisFireSivi: this._toNumber(oItem.MengeSatisFireSivi || 0),
+                    MengeSatisFireUht: this._toNumber(oItem.MengeSatisFireUht || 0),
+                    MengeSatisFireCam: this._toNumber(oItem.MengeSatisFireCam || 0),
+                    MengeLansman: this._toNumber(oItem.MengeLansman || 0),
                     DifferenceQuantity: this._toNumber(
                       oItem.SapStock || oItem.Labst,
                     ),
@@ -302,7 +318,8 @@ sap.ui.define(
             this._toNumber(oItem.MengeSatisFireKati) +
             this._toNumber(oItem.MengeSatisFireSivi) +
             this._toNumber(oItem.MengeSatisFireUht) +
-            this._toNumber(oItem.MengeSatisFireCam);
+            this._toNumber(oItem.MengeSatisFireCam) +
+            this._toNumber(oItem.MengeLansman);
           oModel.setProperty(sPath + "/MengeSayim", fTotal);
           oModel.setProperty(sPath + "/_countConfirmed", false);
           this._updateItemState(oModel, sPath, Object.assign({}, oItem, {
@@ -310,6 +327,115 @@ sap.ui.define(
             _countConfirmed: false,
           }));
           this._recalculateSubmitState();
+        },
+
+        onExtraReturnReasonPress: function (oEvent) {
+          var oContext = oEvent
+            .getSource()
+            .getBindingContext("returnFactoryShipmentModel");
+          var oItem = oContext && oContext.getObject();
+          var oModel = this.getView().getModel("returnFactoryShipmentModel");
+
+          if (!oContext || !oItem || oItem._countConfirmed) {
+            return;
+          }
+
+          oModel.setProperty("/extraReturnDialog", {
+            itemPath: oContext.getPath(),
+            materialText:
+              (oItem.Maktx || "") +
+              (oItem.MaterialDisplayCode
+                ? " (" + oItem.MaterialDisplayCode + ")"
+                : ""),
+            value: this._toNumber(oItem.MengeLansman),
+          });
+
+          if (!this._oExtraReturnReasonDialog) {
+            this._oExtraReturnReasonDialog = sap.ui.xmlfragment(
+              "returnFactoryExtraReason",
+              "com.sut.bolgeyonetim.view.ExtraReturnReasonDialog",
+              this,
+            );
+            this.getView().addDependent(this._oExtraReturnReasonDialog);
+          }
+
+          this._oExtraReturnReasonDialog.open();
+        },
+
+        onExtraReturnReasonAfterOpen: function () {
+          var $Dialog = this._oExtraReturnReasonDialog.$();
+
+          $Dialog.off(".returnFactoryZeroSelect");
+          $Dialog.on(
+            "focusin.returnFactoryZeroSelect",
+            ".returnFactoryQuantityInput input",
+            function (oEvent) {
+              var oInput = oEvent.currentTarget;
+
+              setTimeout(function () {
+                oInput.select();
+              }, 0);
+            },
+          );
+        },
+
+        onExtraReturnReasonSave: function () {
+          var oModel = this.getView().getModel("returnFactoryShipmentModel");
+          var sItemPath = oModel.getProperty("/extraReturnDialog/itemPath");
+          var vValue = oModel.getProperty("/extraReturnDialog/value");
+          var fValue = this._toNumber(vValue);
+          var oItem = sItemPath ? oModel.getProperty(sItemPath) : null;
+
+          if (!oItem) {
+            this._oExtraReturnReasonDialog.close();
+            return;
+          }
+
+          if (fValue < 0) {
+            MessageBox.warning("Negatif miktar girilemez.");
+            return;
+          }
+
+          if (oItem._countConfirmed) {
+            MessageBox.warning("Tamamlanan kalem de\u011fi\u015ftirilemez.");
+            this._oExtraReturnReasonDialog.close();
+            return;
+          }
+
+          oModel.setProperty(sItemPath + "/MengeLansman", fValue);
+          oItem.MengeLansman = fValue;
+
+          var fTotal = this._calculateItemTotal(oItem);
+          oModel.setProperty(sItemPath + "/MengeSayim", fTotal);
+          oModel.setProperty(sItemPath + "/_countConfirmed", false);
+          this._updateItemState(
+            oModel,
+            sItemPath,
+            Object.assign({}, oItem, {
+              MengeSayim: fTotal,
+              _countConfirmed: false,
+            }),
+          );
+          this._recalculateSubmitState();
+          this._oExtraReturnReasonDialog.close();
+        },
+
+        onExtraReturnReasonCancel: function () {
+          if (this._oExtraReturnReasonDialog) {
+            this._oExtraReturnReasonDialog.close();
+          }
+        },
+
+        _calculateItemTotal: function (oItem) {
+          return (
+            this._toNumber(oItem.MengeUretimHatali) +
+            this._toNumber(oItem.MengeFabrikaLojistik) +
+            this._toNumber(oItem.MengeSatisFireKati) +
+            this._toNumber(oItem.MengeSatisFireSivi) +
+            this._toNumber(oItem.MengeSatisFireUht) +
+            this._toNumber(oItem.MengeSatisFireCam) +
+            this._toNumber(oItem.MengeLansman)
+          );
         },
 
         onCountConfirmed: function (oEvent) {
@@ -482,6 +608,7 @@ sap.ui.define(
                   MengeSatisFireCam: this._toODataDecimal(
                     oItem.MengeSatisFireCam,
                   ),
+                  MengeLansman: this._toODataDecimal(oItem.MengeLansman),
                 };
               }.bind(this),
             ),

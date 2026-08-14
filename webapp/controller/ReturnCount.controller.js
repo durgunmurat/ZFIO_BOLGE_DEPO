@@ -1501,10 +1501,16 @@ sap.ui.define(
             return;
           }
 
+          var oModel = this.getView().getModel("returnCountModel");
+          var plasiyer = oModel.getProperty(
+            this._oReturnMDProductGroupContext.getPath() + "/Plasiyer",
+          );
+
           sap.ui.core.BusyIndicator.show(0);
           this.getOwnerComponent()
             .getModel()
             .read("/ReturnMDUrunSet", {
+              filters: [new Filter("Plasiyer", FilterOperator.EQ, plasiyer)],
               success: function (oData) {
                 sap.ui.core.BusyIndicator.hide();
                 this._returnMDProductListCache = JSON.parse(

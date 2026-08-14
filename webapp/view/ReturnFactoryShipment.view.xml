@@ -152,10 +152,13 @@
                                             </HBox>
                                         </HBox>
 
-                                        <ObjectStatus
-                                            text="{returnFactoryShipmentModel>RowStateText}"
-                                            state="{returnFactoryShipmentModel>RowState}"
-                                            class="sapUiTinyMarginTop sapUiTinyMarginBottom"/>
+                                        <Button
+                                            text="Ekstra &#304;ade Nedeni Giri&#351;i"
+                                            icon="sap-icon://add"
+                                            type="Transparent"
+                                            enabled="{= !${returnFactoryShipmentModel>_countConfirmed} }"
+                                            press="onExtraReturnReasonPress"
+                                            class="sapUiTinyMarginTop sapUiTinyMarginBottom returnFactoryExtraReasonButton"/>
 
                                         <FlexBox wrap="Wrap" class="returnFactoryCategoryGrid">
                                             <VBox class="returnFactoryQuantityField">
