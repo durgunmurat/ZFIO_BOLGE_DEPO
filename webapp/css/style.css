@@ -552,16 +552,76 @@
     align-self: flex-start;
 }
 
-.returnFactoryExtraReasonGroup {
+.returnFactoryExtraReasonDialog .sapMDialogSection {
+    background: #f5f7f9;
+}
+
+.returnFactoryExtraReasonContent {
+    gap: 0.75rem;
+    padding: 1rem;
+}
+
+.returnFactoryExtraReasonMaterial {
     padding: 0.75rem;
-    border: 1px solid #c9d7e6;
+    border: 1px solid #d9e2ec;
     border-radius: 0.4rem;
-    background: #f7fafd;
+    background: #ffffff;
+}
+
+.returnFactoryExtraReasonMaterial .sapUiIcon {
+    color: #107e3e;
+}
+
+.returnFactoryExtraReasonMaterial .sapMObjectIdentifierTitle .sapMText {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.returnFactoryExtraReasonGroup {
+    padding: 1rem;
+    border: 1px solid #b8cce0;
+    border-left: 4px solid #0a6ed1;
+    border-radius: 0.45rem;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(34, 53, 72, 0.12);
+}
+
+.returnFactoryExtraReasonHeading {
+    margin-bottom: 0.25rem;
+}
+
+.returnFactoryExtraReasonHeading .sapUiIcon,
+.returnFactoryExtraReasonHeading .sapMTitle {
+    color: #0854a0;
+}
+
+.returnFactoryExtraReasonHint {
+    margin-bottom: 0.75rem;
+    color: #52606d;
+    font-size: 0.8125rem;
+}
+
+.returnFactoryExtraReasonLabel {
+    margin-bottom: 0.25rem;
+    color: #32363a;
+    font-weight: 600;
 }
 
 .returnFactoryExtraReasonGroup .sapMInputBaseInner {
-    min-height: 2.75rem;
-    font-size: 1rem;
+    min-height: 3rem;
+    padding-right: 0.75rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.returnFactoryExtraReasonGroup .sapMInputBaseContentWrapper {
+    border-color: #8996a3;
+    background: #ffffff;
+}
+
+.returnFactoryExtraReasonGroup .sapMInputBaseContentWrapper:focus-within {
+    border-color: #0a6ed1;
+    box-shadow: 0 0 0 1px #0a6ed1;
 }
 
 .returnFactoryQuantityField {

@@ -25,6 +25,8 @@ sap.ui.define(
         _oReturnDepositGroupContext: null,
         _returnDepositDraftQueue: null,
         _returnMDProductListCache: null,
+        _returnMDProductListCachePlasiyer: "",
+        _mdSelectionRequestId: 0,
         _oReturnMDProductDialog: null,
         _oReturnMDProductGroupContext: null,
         _oReturnMDPlasiyerDialog: null,
@@ -64,6 +66,8 @@ sap.ui.define(
         },
 
         onExit: function () {
+          this._mdSelectionRequestId++;
+          sap.ui.core.BusyIndicator.hide();
           this.getView().$().off(".returnCountSelectAll");
           if (this._oReturnDepositDialog) {
             this._oReturnDepositDialog.$().off(".returnDepositSelectAll");
@@ -109,6 +113,7 @@ sap.ui.define(
           oModel.setProperty("/selectedMDPlasiyerName", "");
           oModel.setProperty("/selectedMDPlasiyerText", "");
           oModel.setProperty("/mdEntryGroup", null);
+          this._mdSelectionRequestId++;
           this._loadReturnCountData();
         },
 
@@ -528,6 +533,8 @@ sap.ui.define(
           }
 
           if (!oPlasiyer) {
+            this._mdSelectionRequestId++;
+            sap.ui.core.BusyIndicator.hide();
             oModel.setProperty("/selectedMDPlasiyerNo", "");
             oModel.setProperty("/selectedMDPlasiyerName", "");
             oModel.setProperty("/selectedMDPlasiyerText", "");
@@ -541,17 +548,199 @@ sap.ui.define(
 
         _selectMDPlasiyer: function (oPlasiyer) {
           var oModel = this.getView().getModel("returnCountModel");
+          var iRequestId = ++this._mdSelectionRequestId;
+
           oModel.setProperty("/selectedMDPlasiyerNo", oPlasiyer.PlasiyerNo);
           oModel.setProperty("/selectedMDPlasiyerName", oPlasiyer.PlasiyerName);
           oModel.setProperty(
             "/selectedMDPlasiyerText",
             oPlasiyer.PlasiyerDisplay + " - " + oPlasiyer.PlasiyerName,
           );
-          oModel.setProperty(
-            "/mdEntryGroup",
-            this._createMDEntryGroup(oPlasiyer),
-          );
+          oModel.setProperty("/mdEntryGroup", null);
           this._applyStatusFilter();
+
+          sap.ui.core.BusyIndicator.show(0);
+          this._loadExistingMDEntry(oPlasiyer).then(
+            function (oExistingGroup) {
+              if (iRequestId !== this._mdSelectionRequestId) {
+                return;
+              }
+
+              sap.ui.core.BusyIndicator.hide();
+              oModel.setProperty(
+                "/mdEntryGroup",
+                oExistingGroup || this._createMDEntryGroup(oPlasiyer),
+              );
+              this._applyStatusFilter();
+            }.bind(this),
+            function (oError) {
+              if (iRequestId !== this._mdSelectionRequestId) {
+                return;
+              }
+
+              sap.ui.core.BusyIndicator.hide();
+              oModel.setProperty("/mdEntryGroup", null);
+              this._applyStatusFilter();
+              MessageBox.error(
+                this._getErrorMessage(
+                  oError,
+                  "Plasiyere ait mevcut MD sayımı yüklenemedi.",
+                ),
+              );
+            }.bind(this),
+          );
+        },
+
+        _loadExistingMDEntry: function (oPlasiyer) {
+          var oODataModel = this.getOwnerComponent().getModel();
+          var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
+          var sWarehouseNum = oSessionModel
+            ? oSessionModel.getProperty("/Login/WarehouseNum")
+            : "";
+          var oReturnDate = this._getSelectedReturnDate();
+          var aFilters = [
+            new Filter("ShipmentType", FilterOperator.EQ, "MD"),
+            new Filter(
+              "Plasiyer",
+              FilterOperator.EQ,
+              oPlasiyer.PlasiyerNo,
+            ),
+            new Filter("Lgort", FilterOperator.EQ, sWarehouseNum),
+            new Filter("IrsTar", FilterOperator.EQ, oReturnDate),
+          ];
+
+          if (!sWarehouseNum || !oReturnDate) {
+            return Promise.reject(
+              new Error("Depo numarası ve sayım tarihi zorunludur."),
+            );
+          }
+
+          return new Promise(
+            function (resolve, reject) {
+              oODataModel.read("/ReturnHeaderSet", {
+                filters: aFilters,
+                urlParameters: {
+                  $expand: "ToItems",
+                },
+                success: function (oExpandedData) {
+                  oODataModel.read("/ReturnHeaderSet", {
+                    filters: aFilters,
+                    urlParameters: {
+                      $select: "LogUid,Status",
+                    },
+                    success: function (oStatusData) {
+                      var aHeaders = this._mergeReturnHeaderStatuses(
+                        oExpandedData.results || [],
+                        oStatusData.results || [],
+                      ).filter(function (oHeader) {
+                        return (
+                          String(oHeader.ShipmentType || "").toUpperCase() ===
+                            "MD" &&
+                          String(oHeader.Status || "").toUpperCase() === "N"
+                        );
+                      });
+
+                      if (aHeaders.length > 1) {
+                        reject(
+                          new Error(
+                            "Aynı plasiyer, depo ve tarih için birden fazla açık MD kaydı bulundu.",
+                          ),
+                        );
+                        return;
+                      }
+
+                      resolve(
+                        aHeaders.length
+                          ? this._createMDEntryGroupFromHeader(
+                              aHeaders[0],
+                              oPlasiyer,
+                            )
+                          : null,
+                      );
+                    }.bind(this),
+                    error: reject,
+                  });
+                }.bind(this),
+                error: reject,
+              });
+            }.bind(this),
+          );
+        },
+
+        _createMDEntryGroupFromHeader: function (oRawHeader, oPlasiyer) {
+          var oHeader = this._normalizeReturnHeader(oRawHeader);
+          var aItems =
+            oHeader.ToItems && oHeader.ToItems.results
+              ? oHeader.ToItems.results
+              : oHeader.ToItems || [];
+          var aProductItems = [];
+          var aDepositItems = [];
+          var mDepositItems = {};
+
+          oHeader.ShipmentType = "MD";
+          oHeader.Status = "N";
+          oHeader.selected = true;
+          oHeader.ReturnTypeText =
+            oHeader.ReturnType === "M"
+              ? "Müşteri iade irsaliyesi"
+              : "Plasiyer iade irsaliyesi";
+
+          aItems.forEach(
+            function (oItem) {
+              oItem.MengeSiparis = this._toNumber(oItem.MengeSiparis);
+              oItem.MengeFire = this._toNumber(oItem.MengeFire);
+              oItem.MengeKalite = this._toNumber(oItem.MengeKalite);
+              oItem.MengeLansman = this._toNumber(oItem.MengeLansman);
+              oItem.MengeSatilab = this._toNumber(oItem.MengeSatilab);
+              oItem.NoLansman = this._normalizeUpperText(oItem.NoLansman);
+              oItem.MaterialDisplayCode = this._formatMaterialCode(oItem.Matnr);
+              oItem.MengeSayim = this._getProductCountTotal(oItem);
+              oItem._completed = false;
+              oItem._countConfirmed = false;
+              oItem._isMD = true;
+              oItem._isLansman = oItem.NoLansman !== "X";
+
+              if (oItem.IsDepozito === true) {
+                this._addUniqueDepositItem(
+                  aDepositItems,
+                  mDepositItems,
+                  oItem,
+                );
+              } else {
+                aProductItems.push(oItem);
+              }
+            }.bind(this),
+          );
+          oHeader.ToItems = { results: aItems };
+
+          var aAggregatedProductItems = this._aggregateReturnProductItems(
+            aProductItems,
+          );
+          var aAggregatedDepositItems = this._aggregateReturnDepositItems(
+            aDepositItems,
+          );
+
+          return {
+            Plasiyer: oHeader.Plasiyer || oPlasiyer.PlasiyerNo,
+            PlasiyerDisplay: this._formatNumericCode(
+              oHeader.Plasiyer || oPlasiyer.PlasiyerNo,
+            ),
+            PlasiyerName: oHeader.PlasiyerName || oPlasiyer.PlasiyerName,
+            expanded: true,
+            selectionScope: "ALL",
+            canApprove: false,
+            isCompleted: false,
+            isMD: true,
+            Waybills: [oHeader],
+            ProductItems: aAggregatedProductItems,
+            ProductItemsSource: aProductItems,
+            DepositItems: aAggregatedDepositItems,
+            DepositItemsSource: aDepositItems,
+            ExternalDeposits: [],
+            ProductCount: aAggregatedProductItems.length,
+            DepositCount: aAggregatedDepositItems.length,
+            TotalWaybills: 1,
+          };
         },
 
         _createMDEntryGroup: function (oPlasiyer) {
@@ -1492,7 +1681,15 @@ sap.ui.define(
         },
 
         _loadReturnMDProductCatalog: function () {
-          if (this._returnMDProductListCache) {
+          var oModel = this.getView().getModel("returnCountModel");
+          var sPlasiyer = oModel.getProperty(
+            this._oReturnMDProductGroupContext.getPath() + "/Plasiyer",
+          );
+
+          if (
+            this._returnMDProductListCache &&
+            this._returnMDProductListCachePlasiyer === sPlasiyer
+          ) {
             this._showReturnMDProductDialog(
               this._prepareReturnMDProductCatalog(
                 this._returnMDProductListCache,
@@ -1501,21 +1698,17 @@ sap.ui.define(
             return;
           }
 
-          var oModel = this.getView().getModel("returnCountModel");
-          var plasiyer = oModel.getProperty(
-            this._oReturnMDProductGroupContext.getPath() + "/Plasiyer",
-          );
-
           sap.ui.core.BusyIndicator.show(0);
           this.getOwnerComponent()
             .getModel()
             .read("/ReturnMDUrunSet", {
-              filters: [new Filter("Plasiyer", FilterOperator.EQ, plasiyer)],
+              filters: [new Filter("Plasiyer", FilterOperator.EQ, sPlasiyer)],
               success: function (oData) {
                 sap.ui.core.BusyIndicator.hide();
                 this._returnMDProductListCache = JSON.parse(
                   JSON.stringify(oData.results || []),
                 );
+                this._returnMDProductListCachePlasiyer = sPlasiyer;
                 this._showReturnMDProductDialog(
                   this._prepareReturnMDProductCatalog(
                     this._returnMDProductListCache,
@@ -1534,17 +1727,21 @@ sap.ui.define(
         _prepareReturnMDProductCatalog: function (aCatalogItems) {
           var oGroup = this._oReturnMDProductGroupContext.getObject();
           var mSelected = {};
+          var mCatalog = {};
 
           (oGroup.ProductItems || []).forEach(
             function (oItem) {
-              mSelected[this._normalizeMaterialNumber(oItem.Matnr)] = true;
+              mSelected[this._normalizeMaterialNumber(oItem.Matnr)] = oItem;
             }.bind(this),
           );
 
-          return (aCatalogItems || []).map(
+          var aPreparedItems = (aCatalogItems || []).map(
             function (oItem) {
               var sUrunNo = oItem.UrunNo || "";
+              var sMaterialKey = this._normalizeMaterialNumber(sUrunNo);
               var bIsLansman = this._isAbapTrue(oItem.Lansman);
+
+              mCatalog[sMaterialKey] = true;
               return {
                 UrunNo: sUrunNo,
                 UrunDisplay: this._formatMaterialCode(sUrunNo),
@@ -1552,11 +1749,32 @@ sap.ui.define(
                 Meins: oItem.Meins || "ADT",
                 Lansman: oItem.Lansman || "",
                 _isLansman: bIsLansman,
-                Selected:
-                  mSelected[this._normalizeMaterialNumber(sUrunNo)] === true,
+                Selected: !!mSelected[sMaterialKey],
               };
             }.bind(this),
           );
+
+          Object.keys(mSelected).forEach(
+            function (sMaterialKey) {
+              var oExistingItem = mSelected[sMaterialKey];
+
+              if (mCatalog[sMaterialKey]) {
+                return;
+              }
+
+              aPreparedItems.push({
+                UrunNo: oExistingItem.Matnr || "",
+                UrunDisplay: this._formatMaterialCode(oExistingItem.Matnr),
+                UrunAdi: oExistingItem.Maktx || "",
+                Meins: oExistingItem.Meins || "ADT",
+                Lansman: oExistingItem._isLansman === true ? "X" : "",
+                _isLansman: oExistingItem._isLansman === true,
+                Selected: true,
+              });
+            }.bind(this),
+          );
+
+          return aPreparedItems;
         },
 
         _showReturnMDProductDialog: function (aItems) {

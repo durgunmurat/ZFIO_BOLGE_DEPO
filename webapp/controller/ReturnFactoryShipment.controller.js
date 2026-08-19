@@ -207,7 +207,7 @@ sap.ui.define(
                   return Object.assign({}, oItem, {
                     MaterialDisplayCode: this._formatMaterialCode(oItem.Matnr),
                     SapStock: this._toNumber(oItem.SapStock || oItem.Labst),
-                    MengeSayim: 0,
+                    MengeSayim: this._calculateItemTotal(oItem),
                     MengeUretimHatali: this._toNumber(oItem.MengeUretimHatali || 0),
                     MengeFabrikaLojistik: this._toNumber(oItem.MengeFabrikaLojistik || 0),
                     MengeSatisFireKati: this._toNumber(oItem.MengeSatisFireKati || 0),

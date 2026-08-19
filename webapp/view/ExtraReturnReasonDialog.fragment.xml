@@ -6,15 +6,41 @@
         title="Ekstra &#304;ade Nedeni Giri&#351;i"
         contentWidth="28rem"
         stretch="{device>/isPhone}"
-        afterOpen="onExtraReturnReasonAfterOpen">
+        afterOpen="onExtraReturnReasonAfterOpen"
+        class="returnFactoryExtraReasonDialog">
         <content>
-            <VBox class="sapUiSmallMargin">
-                <ObjectIdentifier
-                    title="{returnFactoryShipmentModel>/extraReturnDialog/materialText}"
-                    class="sapUiSmallMarginBottom"/>
+            <VBox class="returnFactoryExtraReasonContent">
+                <HBox
+                    alignItems="Center"
+                    class="returnFactoryExtraReasonMaterial">
+                    <core:Icon
+                        src="sap-icon://product"
+                        size="1.25rem"
+                        class="sapUiSmallMarginEnd"/>
+                    <ObjectIdentifier
+                        title="{returnFactoryShipmentModel>/extraReturnDialog/materialText}"/>
+                </HBox>
                 <VBox class="returnFactoryExtraReasonGroup">
-                    <Label text="Toplat&#305;lan &#220;r&#252;n &#304;ade"/>
+                    <HBox
+                        alignItems="Center"
+                        class="returnFactoryExtraReasonHeading">
+                        <core:Icon
+                            src="sap-icon://undo"
+                            size="1rem"
+                            class="sapUiTinyMarginEnd"/>
+                        <Title
+                            text="Toplat&#305;lan &#220;r&#252;n &#304;ade"
+                            level="H5"/>
+                    </HBox>
+                    <Text
+                        text="Toplat&#305;lan &#252;r&#252;n miktar&#305;n&#305; girin."
+                        class="returnFactoryExtraReasonHint"/>
+                    <Label
+                        text="Miktar"
+                        labelFor="idExtraReturnReasonQuantity"
+                        class="returnFactoryExtraReasonLabel"/>
                     <Input
+                        id="idExtraReturnReasonQuantity"
                         value="{returnFactoryShipmentModel>/extraReturnDialog/value}"
                         type="Number"
                         textAlign="End"
