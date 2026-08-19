@@ -534,13 +534,43 @@
     border-bottom: 1px solid #e5e9f0;
 }
 
+.returnFactoryMaterialBlock {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.returnFactoryMaterial {
+    width: 100%;
+    min-width: 0;
+}
+
+.returnFactoryMaterial .sapMObjectIdentifierTitle,
+.returnFactoryMaterial .sapMObjectIdentifierTitle .sapMText {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.returnFactoryHeaderMetrics {
+    flex: 0 0 auto;
+}
+
 .returnFactoryStockMetric {
     min-width: 8rem;
 }
 
 .returnFactoryStockMetric .sapMLabel {
     color: #52606d;
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.returnFactoryStockMetric .sapMObjectNumberText {
+    font-size: 1.125rem;
+}
+
+.returnFactoryStockMetric .sapMObjectNumberUnit {
+    font-size: 0.875rem;
 }
 
 .returnFactoryCategoryGrid {

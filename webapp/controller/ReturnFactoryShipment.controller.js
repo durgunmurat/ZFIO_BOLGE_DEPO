@@ -34,7 +34,10 @@ sap.ui.define(
             processId: "",
             totalItemCount: 0,
             confirmedItemCount: 0,
+            expandedItemCount: 0,
             canSubmit: false,
+            hasStockExceeded: false,
+            stockExceededMessage: "",
             extraReturnDialog: {
               itemPath: "",
               materialText: "",
@@ -135,7 +138,10 @@ sap.ui.define(
               processId: this._createProcessId(),
               totalItemCount: 0,
               confirmedItemCount: 0,
+              expandedItemCount: 0,
               canSubmit: false,
+              hasStockExceeded: false,
+              stockExceededMessage: "",
               extraReturnDialog: {
                 itemPath: "",
                 materialText: "",
@@ -218,6 +224,7 @@ sap.ui.define(
                     DifferenceQuantity: this._toNumber(
                       oItem.SapStock || oItem.Labst,
                     ),
+                    _expanded: false,
                     _countConfirmed: false,
                     RowHighlight: "None",
                     RowStateText: "",
@@ -456,12 +463,56 @@ sap.ui.define(
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
           var aItems = oModel.getProperty("/items") || [];
 
+          if (
+            bConfirmed &&
+            aItems.some(function (oItem) {
+              return oItem._expanded !== true;
+            })
+          ) {
+            MessageBox.information(
+              "Tüm kalemleri tamamlamadan önce 'Tümünü Genişlet' ile ürün detaylarını kontrol edin.",
+            );
+            return;
+          }
+
           aItems.forEach(function (oItem, iIndex) {
             oItem._countConfirmed = bConfirmed;
             oModel.setProperty(
               "/items/" + iIndex + "/_countConfirmed",
               bConfirmed,
             );
+          });
+          this._recalculateSubmitState();
+          oModel.refresh(true);
+        },
+
+        onFactoryItemTogglePress: function (oEvent) {
+          var oContext = oEvent
+            .getSource()
+            .getBindingContext("returnFactoryShipmentModel");
+
+          if (!oContext) {
+            return;
+          }
+
+          var oModel = oContext.getModel();
+          var sExpandedPath = oContext.getPath() + "/_expanded";
+          oModel.setProperty(
+            sExpandedPath,
+            oModel.getProperty(sExpandedPath) !== true,
+          );
+          this._recalculateSubmitState();
+        },
+
+        onExpandAllItemsPress: function (oEvent) {
+          var vExpanded = oEvent.getSource().data("expanded");
+          var bExpanded = vExpanded === true || vExpanded === "true";
+          var oModel = this.getView().getModel("returnFactoryShipmentModel");
+          var aItems = oModel.getProperty("/items") || [];
+
+          aItems.forEach(function (oItem, iIndex) {
+            oItem._expanded = bExpanded;
+            oModel.setProperty("/items/" + iIndex + "/_expanded", bExpanded);
           });
           this._recalculateSubmitState();
           oModel.refresh(true);
@@ -498,7 +549,8 @@ sap.ui.define(
           var oSelectedVehicle = oModel.getProperty("/selectedVehicle");
           var sSelectedPlantKey = oModel.getProperty("/selectedPlantKey");
           var iConfirmed = 0;
-          var bHasStockExceeded = false;
+          var iExpanded = 0;
+          var iStockExceededItemCount = 0;
 
           if (!sSelectedVehicleKey && oSelectedVehicle) {
             sSelectedVehicleKey = oSelectedVehicle.VehicleKey || "";
@@ -512,20 +564,36 @@ sap.ui.define(
               if (oItem._countConfirmed) {
                 iConfirmed++;
               }
+              if (oItem._expanded) {
+                iExpanded++;
+              }
               if (this._toNumber(oItem.MengeSayim) > this._toNumber(oItem.SapStock)) {
-                bHasStockExceeded = true;
+                iStockExceededItemCount++;
               }
             }.bind(this),
           );
 
           oModel.setProperty("/confirmedItemCount", iConfirmed);
+          oModel.setProperty("/expandedItemCount", iExpanded);
+          oModel.setProperty(
+            "/hasStockExceeded",
+            iStockExceededItemCount > 0,
+          );
+          oModel.setProperty(
+            "/stockExceededMessage",
+            iStockExceededItemCount > 0
+              ? "UYARI: " +
+                  iStockExceededItemCount +
+                  " kalemde sayım miktarı, depo stoğunu aşıyor. "
+              : "",
+          );
           oModel.setProperty(
             "/canSubmit",
             Boolean(sSelectedVehicleKey) &&
               Boolean(sSelectedPlantKey) &&
               aItems.length > 0 &&
               iConfirmed === aItems.length &&
-              !bHasStockExceeded,
+              iStockExceededItemCount === 0,
           );
         },
 

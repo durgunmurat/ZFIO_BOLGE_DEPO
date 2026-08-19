@@ -67,18 +67,35 @@
     border-bottom: 1px solid #e5e9f0;
 }
 
+.returnFactoryMaterialBlock {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.returnFactoryMaterial {
+    width: 100%;
+    min-width: 0;
+}
+
+.returnFactoryMaterial .sapMObjectIdentifierTitle,
 .returnFactoryMaterial .sapMObjectIdentifierTitle .sapMText {
+    max-width: 100%;
     color: #32363a;
     font-size: 1rem;
     font-weight: 600;
     line-height: normal;
     white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .returnFactoryMaterial .sapMObjectIdentifierText {
     margin-top: 0;
     color: #6a6d70;
     font-size: 0.875rem;
+}
+
+.returnFactoryHeaderMetrics {
+    flex: 0 0 auto;
 }
 
 .returnFactoryConfirmCheck {
@@ -94,7 +111,16 @@
 
 .returnFactoryStockMetric .sapMLabel {
     color: #52606d;
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.returnFactoryStockMetric .sapMObjectNumberText {
+    font-size: 1.125rem;
+}
+
+.returnFactoryStockMetric .sapMObjectNumberUnit {
+    font-size: 0.875rem;
 }
 
 .returnFactoryCategoryGrid {

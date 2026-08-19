@@ -63,10 +63,30 @@
                     </Select>
                     <ToolbarSpacer/>
                     <Button
+                        text="Tümünü Genişlet"
+                        icon="sap-icon://expand-all"
+                        type="Transparent"
+                        enabled="{= ${returnFactoryShipmentModel>/totalItemCount} > 0 &amp;&amp; ${returnFactoryShipmentModel>/expandedItemCount} !== ${returnFactoryShipmentModel>/totalItemCount} }"
+                        press="onExpandAllItemsPress">
+                        <customData>
+                            <core:CustomData key="expanded" value="true"/>
+                        </customData>
+                    </Button>
+                    <Button
+                        text="Tümünü Sıkıştır"
+                        icon="sap-icon://collapse-all"
+                        type="Transparent"
+                        enabled="{= ${returnFactoryShipmentModel>/expandedItemCount} > 0 }"
+                        press="onExpandAllItemsPress">
+                        <customData>
+                            <core:CustomData key="expanded" value="false"/>
+                        </customData>
+                    </Button>
+                    <Button
                         text="Tümünü Tamamla"
                         icon="sap-icon://multiselect-all"
                         type="Transparent"
-                        enabled="{= ${returnFactoryShipmentModel>/totalItemCount} > 0 }"
+                        enabled="{= ${returnFactoryShipmentModel>/totalItemCount} > 0 &amp;&amp; ${returnFactoryShipmentModel>/expandedItemCount} === ${returnFactoryShipmentModel>/totalItemCount} }"
                         press="onConfirmAllCountsPress">
                         <customData>
                             <core:CustomData key="confirmed" value="true"/>
@@ -93,6 +113,14 @@
                         press="onSubmitPress"/>
                 </OverflowToolbar>
 
+                <MessageStrip
+                    text="{returnFactoryShipmentModel>/stockExceededMessage}"
+                    type="Error"
+                    showIcon="true"
+                    showCloseButton="false"
+                    visible="{returnFactoryShipmentModel>/hasStockExceeded}"
+                    class="sapUiSmallMarginTop"/>
+
                 <Panel
                     expandable="false"
                     class="sapUiSmallMarginTop returnFactoryProductPanel">
@@ -117,50 +145,60 @@
                             noDataText="Seçilen tarih ve depo için iade depo stoğu bulunamadı"
                             class="returnFactoryCardList">
                             <items>
-                                <CustomListItem highlight="{returnFactoryShipmentModel>RowHighlight}">
+                                <CustomListItem
+                                    highlight="{returnFactoryShipmentModel>RowHighlight}"
+                                    type="Active"
+                                    press="onFactoryItemTogglePress"
+                                    tooltip="Ürün detaylarını açmak veya kapatmak için tıklayın">
                                     <VBox class="returnFactoryItemCard sapUiSmallMargin">
                                         <HBox
                                             alignItems="Center"
                                             justifyContent="SpaceBetween"
-                                            wrap="Wrap"
+                                            wrap="NoWrap"
                                             class="returnFactoryItemHeader">
-                                            <VBox class="sapUiTinyMarginEnd">
+                                            <HBox alignItems="Center" class="returnFactoryMaterialBlock sapUiTinyMarginEnd">
+                                                <core:Icon
+                                                    src="{= ${returnFactoryShipmentModel>_expanded} ? 'sap-icon://slim-arrow-up' : 'sap-icon://slim-arrow-down' }"
+                                                    size="1rem"
+                                                    class="sapUiTinyMarginEnd"/>
                                                 <ObjectIdentifier
                                                     title="{returnFactoryShipmentModel>Maktx}"
                                                     text="{returnFactoryShipmentModel>MaterialDisplayCode}"
                                                     class="returnFactoryMaterial"/>
-                                            </VBox>
-                                            <HBox alignItems="Center" wrap="Wrap">
+                                            </HBox>
+                                            <HBox alignItems="Center" wrap="NoWrap" class="returnFactoryHeaderMetrics">
                                                 <VBox class="returnFactoryStockMetric sapUiTinyMarginEnd">
-                                                    <Label text="İade depo önerisi"/>
+                                                    <Label text="Stok"/>
                                                     <ObjectNumber
                                                         number="{returnFactoryShipmentModel>SapStock}"
                                                         unit="{returnFactoryShipmentModel>Meins}"/>
                                                 </VBox>
                                                 <VBox class="returnFactoryStockMetric sapUiTinyMarginEnd">
-                                                    <Label text="Girilen toplam"/>
+                                                    <Label text="Sayım"/>
                                                     <ObjectNumber
                                                         number="{returnFactoryShipmentModel>MengeSayim}"
                                                         unit="{returnFactoryShipmentModel>Meins}"
                                                         state="{returnFactoryShipmentModel>RowState}"/>
                                                 </VBox>
                                                 <CheckBox
-                                                    text="Tamam"
+                                                    text=""
                                                     selected="{returnFactoryShipmentModel>_countConfirmed}"
+                                                    enabled="true"
                                                     tooltip="Bu kalemin fiziksel sayımı tamamlandı"
                                                     select="onCountConfirmed"/>
                                             </HBox>
                                         </HBox>
 
-                                        <Button
-                                            text="Ekstra &#304;ade Nedeni Giri&#351;i"
-                                            icon="sap-icon://add"
-                                            type="Transparent"
-                                            enabled="{= !${returnFactoryShipmentModel>_countConfirmed} }"
-                                            press="onExtraReturnReasonPress"
-                                            class="sapUiTinyMarginTop sapUiTinyMarginBottom returnFactoryExtraReasonButton"/>
+                                        <VBox visible="{returnFactoryShipmentModel>_expanded}">
+                                            <Button
+                                                text="Ekstra &#304;ade Nedeni Giri&#351;i"
+                                                icon="sap-icon://add"
+                                                type="Transparent"
+                                                enabled="{= !${returnFactoryShipmentModel>_countConfirmed} }"
+                                                press="onExtraReturnReasonPress"
+                                                class="sapUiTinyMarginTop sapUiTinyMarginBottom returnFactoryExtraReasonButton"/>
 
-                                        <FlexBox wrap="Wrap" class="returnFactoryCategoryGrid">
+                                            <FlexBox wrap="Wrap" class="returnFactoryCategoryGrid">
                                             <VBox class="returnFactoryQuantityField">
                                                 <Label text="Üretim Hatalı"/>
                                                 <Input
@@ -226,7 +264,8 @@
                                                     </VBox>
                                                 </FlexBox>
                                             </VBox>
-                                        </FlexBox>
+                                            </FlexBox>
+                                        </VBox>
                                     </VBox>
                                 </CustomListItem>
                             </items>
