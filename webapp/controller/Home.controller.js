@@ -79,6 +79,10 @@ sap.ui.define([
             this.getRouter().navTo("returnFactoryShipment");
         },
 
+        onFactoryShipmentApprovalPress: function() {
+            this.getRouter().navTo("factoryShipmentApproval");
+        },
+
         onInventoryCountPress: function() {
             // Get session data (sicil, depo)
             var oSessionModel = this.getOwnerComponent().getModel("sessionModel");

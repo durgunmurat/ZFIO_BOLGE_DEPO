@@ -28,6 +28,53 @@
     padding: 0.5rem 1rem 1rem !important;
 }
 
+.returnFactoryFilterBar {
+    margin-bottom: 0.75rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #d9e2ec;
+    border-radius: 0.4rem;
+    background: #f7fafd;
+}
+
+.returnFactoryFilterHeading {
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.returnFactoryFilterHeading .sapMLabel {
+    color: #32363a;
+    font-weight: 600;
+}
+
+.returnFactoryFilterHeading .sapUiIcon {
+    color: #0a6ed1;
+}
+
+.returnFactoryFilterOptions {
+    gap: 0.4rem;
+}
+
+.returnFactorySalesFireFilters {
+    margin-top: 0.45rem;
+    padding-left: 1rem;
+    border-left: 0.2rem solid #91c8f6;
+}
+
+.returnFactoryProductSearch {
+    margin-bottom: 0.5rem;
+}
+
+.returnFactoryFilterButton .sapMBtnInner {
+    min-width: auto;
+    border-radius: 1rem;
+}
+
+.returnFactoryFilterButton.sapMToggleBtnPressed .sapMBtnInner {
+    border-color: #0a6ed1;
+    background: #d1e8ff;
+    color: #0854a0;
+}
+
 .returnFactoryCardList,
 .returnFactoryCardList .sapMListUl {
     background: transparent !important;
@@ -191,5 +238,274 @@
 
     .returnFactorySalesFireGroup {
         min-width: 100%;
+    }
+}
+
+.factoryApprovalPage {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.factoryApprovalFilterPanel {
+    padding: 0.75rem;
+    border: 1px solid #d9e2ec;
+    border-radius: 0.4rem;
+    background: #f7fafd;
+}
+
+.factoryApprovalFilterFields {
+    gap: 0.75rem;
+}
+
+.factoryApprovalFilterField {
+    width: 10rem;
+    min-width: 9rem;
+}
+
+.factoryApprovalDateField {
+    width: 10.5rem;
+}
+
+.factoryApprovalStatusField {
+    width: 12rem;
+}
+
+.factoryApprovalFilterField > .sapMLabel {
+    margin-bottom: 0.2rem;
+    color: #52606d;
+    font-weight: 600;
+}
+
+.factoryApprovalFilterField .sapMInputBaseInner,
+.factoryApprovalFilterField .sapMSlt,
+.factoryApprovalFilterActions .sapMBtnInner {
+    min-height: 2.75rem;
+}
+
+.factoryApprovalFilterActions {
+    margin-left: auto;
+}
+
+.factoryApprovalDocumentList,
+.factoryApprovalDetailPanel {
+    overflow: hidden;
+    border: 1px solid #d9e2ec;
+    border-radius: 0.4rem;
+    background: #ffffff;
+}
+
+.factoryApprovalDocumentList > .sapMListHdrTBar,
+.factoryApprovalDetailPanel > .sapMPanelWrappingDivTb,
+.factoryApprovalDetailPanel > .sapMPanelWrappingDivTb .sapMIBar {
+    background-color: #107e3e !important;
+}
+
+.factoryApprovalDocumentList > .sapMListHdrTBar .sapMTitle,
+.factoryApprovalDocumentList > .sapMListHdrTBar .sapUiIcon,
+.factoryApprovalDocumentList > .sapMListHdrTBar .sapMObjStatusText,
+.factoryApprovalDetailPanel > .sapMPanelWrappingDivTb .sapMTitle,
+.factoryApprovalDetailPanel > .sapMPanelWrappingDivTb .sapUiIcon,
+.factoryApprovalDetailPanel > .sapMPanelWrappingDivTb .sapMObjStatusText {
+    color: #ffffff !important;
+}
+
+.factoryApprovalDocumentList .sapMListUl,
+.factoryApprovalItemList,
+.factoryApprovalItemList .sapMListUl,
+.factoryApprovalDifferenceList .sapMListUl {
+    padding: 0.5rem;
+    background: #f5f7f9;
+}
+
+.factoryApprovalDocumentList .sapMLIB,
+.factoryApprovalItemList .sapMLIB,
+.factoryApprovalDifferenceList .sapMLIB {
+    margin-bottom: 0.65rem;
+    overflow: hidden;
+    border: 1px solid #d9e2ec;
+    border-radius: 0.45rem;
+    background: #ffffff;
+}
+
+.factoryApprovalDocumentList .sapMLIB:last-child,
+.factoryApprovalItemList .sapMLIB:last-child,
+.factoryApprovalDifferenceList .sapMLIB:last-child {
+    margin-bottom: 0;
+}
+
+.factoryApprovalDocumentList .sapMLIBContent,
+.factoryApprovalItemList .sapMLIBContent,
+.factoryApprovalDifferenceList .sapMLIBContent {
+    padding: 0 !important;
+}
+
+.factoryApprovalDocumentList .sapMLIBSelected {
+    border-color: #0a6ed1;
+    background: #e5f2ff;
+    box-shadow: inset 0 0 0 1px #0a6ed1;
+}
+
+.factoryApprovalDocumentCard,
+.factoryApprovalItemCard {
+    width: auto;
+    box-sizing: border-box;
+}
+
+.factoryApprovalCardHeader {
+    gap: 1rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px solid #e5e9f0;
+}
+
+.factoryApprovalCardHeader .sapMObjectIdentifier {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.factoryApprovalItemIdentity {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.factoryApprovalCardHeader .sapMObjectIdentifierTitle .sapMText {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.factoryApprovalDocumentMetrics,
+.factoryApprovalPrimaryMetrics,
+.factoryApprovalCategoryMetrics {
+    gap: 0.65rem;
+    padding-top: 0.65rem;
+}
+
+.factoryApprovalMetric {
+    flex: 1 1 9rem;
+    min-width: 8rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: 0.3rem;
+    background: #f7fafd;
+}
+
+.factoryApprovalWideMetric {
+    flex-basis: 12rem;
+}
+
+.factoryApprovalMetric > .sapMLabel,
+.factoryApprovalQuantityMetric > .sapMLabel,
+.factoryApprovalCategoryMetric > .sapMLabel,
+.factoryApprovalItemMessage > .sapMLabel {
+    color: #52606d;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.factoryApprovalDocumentMessage,
+.factoryApprovalItemMessage,
+.factoryApprovalBusinessDocuments {
+    margin-top: 0.65rem;
+    padding: 0.55rem 0.65rem;
+    border-radius: 0.3rem;
+    background: #f7fafd;
+}
+
+.factoryApprovalDetailPanel .sapMPanelContent {
+    padding: 0.65rem !important;
+}
+
+.factoryApprovalQuantityMetric {
+    flex: 1 1 calc(33.333% - 0.5rem);
+    min-width: 10rem;
+    padding: 0.65rem;
+    border: 1px solid #c9d7e6;
+    border-radius: 0.35rem;
+    background: #eef5fc;
+}
+
+.factoryApprovalQuantityMetric .sapMObjectNumberText {
+    font-size: 1.25rem;
+}
+
+.factoryApprovalCategoryMetric {
+    flex: 1 1 calc(25% - 0.55rem);
+    min-width: 8rem;
+    padding: 0.55rem 0.65rem;
+    border-radius: 0.3rem;
+    background: #f7fafd;
+}
+
+.factoryApprovalTechnicalDetails {
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    background: #f7fafd;
+}
+
+.factoryApprovalCategoryFilterPanel {
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #d9e2ec;
+    border-radius: 0.4rem;
+    background: #f7fafd;
+}
+
+.factoryApprovalCategoryFilterHeading {
+    gap: 0.45rem;
+    margin-bottom: 0.55rem;
+}
+
+.factoryApprovalCategoryFilterHeading .sapMLabel {
+    color: #32363a;
+    font-weight: 600;
+}
+
+.factoryApprovalCategoryFilterHeading .sapUiIcon {
+    color: #0a6ed1;
+}
+
+@media (max-width: 1024px) {
+    .factoryApprovalPage {
+        padding: 0.75rem !important;
+    }
+
+    .factoryApprovalFilterField,
+    .factoryApprovalDateField,
+    .factoryApprovalStatusField {
+        flex: 1 1 calc(50% - 0.5rem);
+        width: calc(50% - 0.5rem);
+        min-width: 12rem;
+    }
+
+    .factoryApprovalFilterActions {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-end;
+    }
+
+    .factoryApprovalFilterActions .sapMBtn {
+        min-width: 8rem;
+    }
+
+    .factoryApprovalMetric {
+        flex-basis: calc(50% - 0.4rem);
+    }
+
+    .factoryApprovalCategoryMetric {
+        flex-basis: calc(50% - 0.4rem);
+    }
+}
+
+@media (max-width: 600px) {
+    .factoryApprovalFilterField,
+    .factoryApprovalDateField,
+    .factoryApprovalStatusField,
+    .factoryApprovalMetric,
+    .factoryApprovalQuantityMetric,
+    .factoryApprovalCategoryMetric {
+        flex-basis: 100%;
+        width: 100%;
+        min-width: 100%;
+    }
+
+    .factoryApprovalFilterActions .sapMBtn {
+        flex: 1 1 50%;
     }
 }

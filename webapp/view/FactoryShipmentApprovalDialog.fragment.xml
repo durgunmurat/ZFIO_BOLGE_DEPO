@@ -1,0 +1,91 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.ui.layout.form">
+    <Dialog
+        title="{i18n>factoryApprovalSummaryTitle}"
+        contentWidth="48rem"
+        contentHeight="32rem"
+        stretchOnPhone="true"
+        busy="{factoryApprovalModel>/approvalBusy}"
+        busyIndicatorDelay="0">
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <MessageStrip
+                    text="{factoryApprovalModel>/confirmation/question}"
+                    type="Warning"
+                    showIcon="true"
+                    showCloseButton="false"
+                    class="sapUiTinyMarginBottom"/>
+                <f:SimpleForm
+                    editable="false"
+                    layout="ResponsiveGridLayout"
+                    labelSpanXL="3"
+                    labelSpanL="3"
+                    labelSpanM="4"
+                    emptySpanXL="0"
+                    emptySpanL="0"
+                    emptySpanM="0"
+                    columnsXL="2"
+                    columnsL="2"
+                    columnsM="1">
+                    <Label text="{i18n>factoryApprovalPlate}"/>
+                    <Text text="{factoryApprovalModel>/confirmation/plate}"/>
+                    <Label text="{i18n>factoryApprovalDate}"/>
+                    <Text text="{factoryApprovalModel>/confirmation/date}"/>
+                    <Label text="{i18n>factoryApprovalSourceLgort}"/>
+                    <Text text="{factoryApprovalModel>/confirmation/sourceLgort}"/>
+                    <Label text="{i18n>factoryApprovalMaterialCount}"/>
+                    <ObjectNumber number="{factoryApprovalModel>/confirmation/materialCount}"/>
+                    <Label text="{i18n>factoryApprovalTotalCount}"/>
+                    <FlexBox wrap="Wrap" items="{path: 'factoryApprovalModel>/confirmation/totalQuantities', templateShareable: false}">
+                        <items>
+                            <ObjectNumber number="{factoryApprovalModel>NumberText}" unit="{factoryApprovalModel>Meins}" class="sapUiTinyMarginEnd"/>
+                        </items>
+                    </FlexBox>
+                    <Label text="{i18n>factoryApprovalDifferenceCount}"/>
+                    <ObjectNumber number="{factoryApprovalModel>/confirmation/differenceCount}"/>
+                </f:SimpleForm>
+                <List
+                    visible="{= ${factoryApprovalModel>/confirmation/differenceCount} > 0 }"
+                    showSeparators="None"
+                    items="{
+                        path: 'factoryApprovalModel>/confirmation/differences',
+                        templateShareable: false
+                    }"
+                    class="sapUiTinyMarginTop factoryApprovalDifferenceList">
+                    <headerToolbar>
+                        <Toolbar>
+                            <Title text="{i18n>factoryApprovalDifferenceItems}" level="H5"/>
+                        </Toolbar>
+                    </headerToolbar>
+                    <items>
+                        <CustomListItem highlight="{factoryApprovalModel>DifferenceHighlight}">
+                            <VBox class="factoryApprovalDifferenceCard sapUiSmallMargin">
+                                <ObjectIdentifier title="{factoryApprovalModel>Maktx}" text="{factoryApprovalModel>MatnrText}"/>
+                                <FlexBox wrap="Wrap" class="factoryApprovalPrimaryMetrics">
+                                    <VBox class="factoryApprovalQuantityMetric"><Label text="{i18n>factoryApprovalCurrentStock}"/><ObjectNumber number="{factoryApprovalModel>MevcutStokText}" unit="{factoryApprovalModel>Meins}"/></VBox>
+                                    <VBox class="factoryApprovalQuantityMetric"><Label text="{i18n>factoryApprovalTotalCount}"/><ObjectNumber number="{factoryApprovalModel>ToplamSayimText}" unit="{factoryApprovalModel>Meins}"/></VBox>
+                                    <VBox class="factoryApprovalQuantityMetric"><Label text="{i18n>factoryApprovalDifference}"/><ObjectNumber number="{factoryApprovalModel>FarkText}" unit="{factoryApprovalModel>Meins}" state="{factoryApprovalModel>DifferenceState}"/></VBox>
+                                </FlexBox>
+                            </VBox>
+                        </CustomListItem>
+                    </items>
+                </List>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button
+                text="{i18n>factoryApprovalApprove}"
+                type="Emphasized"
+                enabled="{= !${factoryApprovalModel>/approvalBusy} }"
+                press="onConfirmApproval"/>
+        </beginButton>
+        <endButton>
+            <Button
+                text="{i18n>factoryApprovalCancel}"
+                enabled="{= !${factoryApprovalModel>/approvalBusy} }"
+                press="onCancelApproval"/>
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

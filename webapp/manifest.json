@@ -137,6 +137,11 @@
                     "pattern": "returnFactoryShipment",
                     "name": "returnFactoryShipment",
                     "target": "returnFactoryShipment"
+                },
+                {
+                    "pattern": "factoryShipmentApproval",
+                    "name": "factoryShipmentApproval",
+                    "target": "factoryShipmentApproval"
                 }
             ],
             "targets": {
@@ -175,6 +180,10 @@
                 "returnFactoryShipment": {
                     "viewName": "ReturnFactoryShipment",
                     "viewLevel": 2
+                },
+                "factoryShipmentApproval": {
+                    "viewName": "FactoryShipmentApproval",
+                    "viewLevel": 3
                 },
                 "passwordResetVerify": {
                     "viewName": "PasswordResetVerify",

@@ -154,6 +154,26 @@
                             animateTextChange="true"/>
                     </TileContent>
                 </GenericTile>
+
+                <!-- Tile 7: Fabrika Gonderim Onayi -->
+                <GenericTile
+                    visible="false"
+                    class="sapUiTinyMarginBottom"
+                    frameType="TwoByOne"
+                    header="{i18n>factoryApprovalHomeTileTitle}"
+                    subheader="{i18n>factoryApprovalHomeTileSubtitle}"
+                    press="onFactoryShipmentApprovalPress">
+                    <TileContent footer="{i18n>factoryApprovalHomeTileFooter}">
+                        <NumericContent
+                            value="{dashboardData>/pendingReturnFactoryShipment}"
+                            valueColor="{dashboardData>/pendingReturnFactoryShipmentColor}"
+                            indicator="{dashboardData>/pendingReturnFactoryShipmentIndicator}"
+                            icon="sap-icon://approvals"
+                            truncateValueTo="4"
+                            withMargin="false"
+                            animateTextChange="true"/>
+                    </TileContent>
+                </GenericTile>
             </l:Grid>
         </content>
     </Page>

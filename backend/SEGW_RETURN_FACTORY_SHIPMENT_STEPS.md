@@ -23,6 +23,13 @@ Bu akış, `fabrika gönderim.xlsx` içindeki yeni kategori modelini uygular. Es
 | `MengeSatisFireUht` | `MENGESATISFIREUHT` | `Edm.Decimal` | 13 / 3 |
 | `MengeSatisFireCam` | `MENGESATISFIRECAM` | `Edm.Decimal` | 13 / 3 |
 
+`ReturnFactoryStock` entity'sinde gönderilmiş sayım snapshot'ını geri açmak
+için aşağıdaki property bulunmalıdır:
+
+| Property | ABAP alanı | EDM tipi | Precision / Scale |
+|---|---|---|---|
+| `MengeSayim` | `MENGESAYIM` | `Edm.Decimal` | 13 / 3 |
+
 Navigation ve anahtar yapısı değişmez:
 
 - `ReturnFactoryShipment(Lgort, IrsTar, PlakaNo)`
@@ -56,16 +63,20 @@ alanlarının bulunduğunu kontrol edin:
 
 ## 3. Stok ve validasyon
 
-Backend toplamı şu formülle tekrar hesaplar:
+Fiziksel sayım ve kategori dağılımı bağımsız değerlerdir:
 
 ```text
-MengeSayim = Üretim Hatalı + Fabrika Lojistik
-           + Satış Firesi Katı + Sıvı + UHT + Cam
+Fark  = SapStock - MengeSayim
+Diğer = max(SapStock - Üretim Hatalı - Fabrika Lojistik
+           - Satış Firesi Katı - Sıvı - UHT - Cam, 0)
 ```
 
-- Toplam 18xx iade depo stokundan büyükse HTTP business error döner.
-- Toplam stoktan küçükse işleme izin verilir; fark önce 311 ile 19xx depoya
-  aktarılır, sonra 702 sayım farkıyla kapatılır.
+- Fiziksel sayım veya kategori dağılımı 18xx iade depo stokundan büyükse HTTP
+  business error döner.
+- `FARK` kategorisi fiziksel sayım snapshot'ını taşır ve UB/351 dağılımına
+  katılmaz.
+- Onaylanan çıkış miktarı güncel MARD stoğu, fiziksel sayım ve kategori
+  dağılımı toplamının en küçüğüyle sınırlandırılır.
 - Eşit ve eşit olmayan durumlar frontend'de ayrı gösterilir; eşit olmayan her
   satır kırmızı, yalnız fazla olan satır bloklayıcıdır.
 
@@ -103,9 +114,10 @@ En az şu senaryoları çalıştırın:
 3. Dört Satış Firesi alt türü: `ZZGRUND=4`, `ZZALTNDN=09`, dört ayrı kalem.
 4. Üretim Hatalı + diğer kategoriler: iki ayrı UB; aynı UB içinde farklı
    `ZZGRUND` bulunmamalı.
-5. Toplam = stok: gönderim başarılı, 311/702 oluşmamalı.
-6. Toplam < stok: gönderim başarılı, fark için 311 ve 702 oluşmalı.
-7. Toplam > stok: hiçbir UB veya malzeme belgesi oluşmamalı.
+5. Stok 5, dağılım 3, sayım 3: Diğer 2, Fark 2, çıkış en fazla 3.
+6. Stok 5, dağılım 3, sayım 2: Diğer 2, Fark 3, çıkış en fazla 2.
+7. Fiziksel sayım veya kategori dağılımı stoktan büyük: hiçbir UB veya malzeme
+   belgesi oluşmamalı.
 8. Aynı `LogUid` ile tekrar POST: `P` ve `S` durumlarında reddedilmeli; kısmi
    belge oluşmuş `E` kaydı otomatik tekrar edilmemelidir.
 

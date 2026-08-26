@@ -1,0 +1,64 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.ui.layout.form">
+    <Dialog
+        title="{i18n>factoryRejectionDialogTitle}"
+        contentWidth="36rem"
+        stretchOnPhone="true"
+        busy="{factoryApprovalModel>/rejectionBusy}"
+        busyIndicatorDelay="0">
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <f:SimpleForm
+                    editable="false"
+                    layout="ResponsiveGridLayout"
+                    labelSpanXL="3"
+                    labelSpanL="3"
+                    labelSpanM="4"
+                    emptySpanXL="0"
+                    emptySpanL="0"
+                    emptySpanM="0"
+                    columnsXL="1"
+                    columnsL="1"
+                    columnsM="1">
+                    <Label text="{i18n>factoryApprovalPlate}"/>
+                    <Text text="{factoryApprovalModel>/rejection/plate}"/>
+                    <Label text="{i18n>factoryApprovalDate}"/>
+                    <Text text="{factoryApprovalModel>/rejection/date}"/>
+                    <Label text="{i18n>factoryApprovalSourceLgort}"/>
+                    <Text text="{factoryApprovalModel>/rejection/sourceLgort}"/>
+                </f:SimpleForm>
+                <Label
+                    text="{i18n>factoryRejectionReasonLabel}"
+                    required="true"
+                    labelFor="factoryRejectionReason"
+                    class="sapUiTinyMarginTop"/>
+                <TextArea
+                    id="factoryRejectionReason"
+                    value="{factoryApprovalModel>/rejection/reason}"
+                    valueLiveUpdate="true"
+                    liveChange="onRejectionReasonLiveChange"
+                    maxLength="{factoryApprovalModel>/rejection/maxLength}"
+                    rows="5"
+                    width="100%"
+                    enabled="{= !${factoryApprovalModel>/rejectionBusy} }"
+                    placeholder="{i18n>factoryRejectionReasonPlaceholder}"/>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button
+                text="{i18n>factoryApprovalReject}"
+                icon="sap-icon://decline"
+                type="Reject"
+                enabled="{= ${factoryApprovalModel>/rejection/reasonValid} &amp;&amp; !${factoryApprovalModel>/rejectionBusy} }"
+                press="onConfirmRejection"/>
+        </beginButton>
+        <endButton>
+            <Button
+                text="{i18n>factoryApprovalCancel}"
+                enabled="{= !${factoryApprovalModel>/rejectionBusy} }"
+                press="onCancelRejection"/>
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

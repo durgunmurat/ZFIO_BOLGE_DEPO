@@ -1,0 +1,166 @@
+<mvc:View
+    controllerName="com.sut.bolgeyonetim.controller.FactoryShipmentApproval"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+    <Page title="{i18n>factoryApprovalTitle}" showNavButton="true" navButtonPress="onNavBack">
+        <content>
+            <VBox class="sapUiResponsiveContentPadding factoryApprovalPage">
+                <List
+                    id="factoryApprovalDocumentTable"
+                    mode="SingleSelectMaster"
+                    includeItemInSelection="true"
+                    growing="true"
+                    growingThreshold="20"
+                    showSeparators="None"
+                    busy="{factoryApprovalModel>/listBusy}"
+                    busyIndicatorDelay="0"
+                    noDataText="{i18n>factoryApprovalNoData}"
+                    selectionChange="onDocumentSelectionChange"
+                    items="{path: 'factoryApprovalModel>/documents', templateShareable: false}"
+                    class="factoryApprovalDocumentList">
+                    <headerToolbar>
+                        <OverflowToolbar>
+                            <core:Icon src="sap-icon://documents" size="1.1rem"/>
+                            <Title text="{i18n>factoryApprovalDocuments}" level="H4"/>
+                            <ToolbarSpacer/>
+                            <ObjectStatus visible="{= !!${factoryApprovalModel>/pollingLogUid} }" text="{i18n>factoryApprovalPollingActive}" state="Information"/>
+                            <Button text="{i18n>factoryApprovalRefresh}" icon="sap-icon://refresh" type="Transparent" enabled="{= !${factoryApprovalModel>/listBusy} }" press="onRefreshPress"/>
+                            <Button text="{i18n>factoryApprovalApprove}" icon="sap-icon://accept" type="Emphasized" busy="{factoryApprovalModel>/approvalBusy}" busyIndicatorDelay="0" enabled="{factoryApprovalModel>/canApprove}" press="onApprovePress"/>
+                            <Button text="{i18n>factoryApprovalReject}" icon="sap-icon://decline" type="Reject" busy="{factoryApprovalModel>/rejectionBusy}" busyIndicatorDelay="0" enabled="{factoryApprovalModel>/canReject}" press="onRejectPress"/>
+                        </OverflowToolbar>
+                    </headerToolbar>
+                    <items>
+                        <CustomListItem type="Active" selected="{= ${factoryApprovalModel>LogUid} === ${factoryApprovalModel>/selectedLogUid} }">
+                            <VBox class="factoryApprovalDocumentCard sapUiSmallMargin">
+                                <HBox alignItems="Start" justifyContent="SpaceBetween" class="factoryApprovalCardHeader">
+                                    <ObjectIdentifier title="{factoryApprovalModel>PlakaNo}" text="{factoryApprovalModel>IrsTarText}"/>
+                                    <ObjectStatus text="{factoryApprovalModel>StatusText}" state="{factoryApprovalModel>StatusState}"/>
+                                </HBox>
+                                <FlexBox wrap="Wrap" class="factoryApprovalDocumentMetrics">
+                                    <VBox class="factoryApprovalMetric">
+                                        <Label text="{i18n>factoryApprovalTargetPlant}"/>
+                                        <Text text="{factoryApprovalModel>Werks}"/>
+                                    </VBox>
+                                    <VBox class="factoryApprovalMetric factoryApprovalWideMetric">
+                                        <Label text="{i18n>factoryApprovalTotalWarehouseStock}"/>
+                                        <FlexBox wrap="Wrap" items="{path: 'factoryApprovalModel>TotalStocks', templateShareable: false}">
+                                            <items>
+                                                <ObjectNumber number="{factoryApprovalModel>NumberText}" unit="{factoryApprovalModel>Meins}" class="sapUiTinyMarginEnd"/>
+                                            </items>
+                                        </FlexBox>
+                                    </VBox>
+                                    <VBox class="factoryApprovalMetric factoryApprovalWideMetric">
+                                        <Label text="{i18n>factoryApprovalTotalCount}"/>
+                                        <FlexBox wrap="Wrap" items="{path: 'factoryApprovalModel>TotalQuantities', templateShareable: false}">
+                                            <items>
+                                                <ObjectNumber number="{factoryApprovalModel>NumberText}" unit="{factoryApprovalModel>Meins}" class="sapUiTinyMarginEnd"/>
+                                            </items>
+                                        </FlexBox>
+                                    </VBox>
+                                    <VBox class="factoryApprovalMetric factoryApprovalWideMetric">
+                                        <Label text="{i18n>factoryApprovalTotalDifference}"/>
+                                        <FlexBox wrap="Wrap" items="{path: 'factoryApprovalModel>TotalDifferences', templateShareable: false}">
+                                            <items>
+                                                <ObjectNumber number="{factoryApprovalModel>NumberText}" unit="{factoryApprovalModel>Meins}" class="sapUiTinyMarginEnd"/>
+                                            </items>
+                                        </FlexBox>
+                                    </VBox>
+                                </FlexBox>
+                                <Text visible="{= !!${factoryApprovalModel>LastMessage} }" text="{factoryApprovalModel>LastMessage}" tooltip="{factoryApprovalModel>LastMessage}" wrapping="true" maxLines="2" class="factoryApprovalDocumentMessage"/>
+                            </VBox>
+                        </CustomListItem>
+                    </items>
+                </List>
+
+                <Panel visible="{= !!${factoryApprovalModel>/selectedLogUid} }" class="sapUiSmallMarginTop factoryApprovalDetailPanel">
+                    <headerToolbar>
+                        <OverflowToolbar>
+                            <core:Icon src="sap-icon://product" size="1.1rem"/>
+                            <Title text="{i18n>factoryApprovalItems}" level="H4"/>
+                            <ToolbarSpacer/>
+                            <Button
+                                text="{i18n>factoryApprovalExpandAll}"
+                                icon="sap-icon://expand-all"
+                                type="Transparent"
+                                enabled="{= ${factoryApprovalModel>/approvalDetailItemCount} > 0 &amp;&amp; ${factoryApprovalModel>/expandedApprovalItemCount} !== ${factoryApprovalModel>/approvalDetailItemCount} }"
+                                press="onExpandAllApprovalItemsPress">
+                                <customData><core:CustomData key="expanded" value="true"/></customData>
+                            </Button>
+                            <Button
+                                text="{i18n>factoryApprovalCollapseAll}"
+                                icon="sap-icon://collapse-all"
+                                type="Transparent"
+                                enabled="{= ${factoryApprovalModel>/expandedApprovalItemCount} > 0 }"
+                                press="onExpandAllApprovalItemsPress">
+                                <customData><core:CustomData key="expanded" value="false"/></customData>
+                            </Button>
+                            <ObjectStatus text="{factoryApprovalModel>/selectedDocument/StatusText}" state="{factoryApprovalModel>/selectedDocument/StatusState}"/>
+                        </OverflowToolbar>
+                    </headerToolbar>
+                    <content>
+                        <VBox>
+                            <MessageStrip visible="{= !!${factoryApprovalModel>/selectedDocument/LastMessage} }" text="{factoryApprovalModel>/selectedDocument/LastMessage}" type="Information" showIcon="true" showCloseButton="false" class="sapUiTinyMarginBottom"/>
+                            <HBox visible="{= ${factoryApprovalModel>/selectedLogUid} === ${factoryApprovalModel>/jobLogUid} &amp;&amp; (!!${factoryApprovalModel>/jobName} || !!${factoryApprovalModel>/jobCount}) }" wrap="Wrap" class="factoryApprovalTechnicalDetails sapUiTinyMarginBottom">
+                                <ObjectStatus title="{i18n>factoryApprovalJobName}" text="{factoryApprovalModel>/jobName}" class="sapUiSmallMarginEnd"/>
+                                <ObjectStatus title="{i18n>factoryApprovalJobCount}" text="{factoryApprovalModel>/jobCount}"/>
+                            </HBox>
+                            <VBox class="factoryApprovalCategoryFilterPanel sapUiTinyMarginBottom">
+                                <HBox alignItems="Center" class="factoryApprovalCategoryFilterHeading">
+                                    <core:Icon src="sap-icon://filter" size="1rem"/>
+                                    <Label text="{i18n>factoryApprovalCategoryFilterTitle}"/>
+                                </HBox>
+                                <FlexBox wrap="Wrap" items="{path: 'factoryApprovalModel>/approvalCategoryFilters', templateShareable: false}" class="returnFactoryFilterOptions">
+                                    <items>
+                                        <ToggleButton
+                                            text="{factoryApprovalModel>text}"
+                                            pressed="{= ${factoryApprovalModel>/selectedApprovalCategory} === ${factoryApprovalModel>key} }"
+                                            enabled="{= ${factoryApprovalModel>key} === 'ALL' || ${factoryApprovalModel>count} > 0 }"
+                                            press="onApprovalCategoryFilterPress"
+                                            class="returnFactoryFilterButton"/>
+                                    </items>
+                                </FlexBox>
+                            </VBox>
+                            <List growing="true" growingThreshold="30" showSeparators="None" noDataText="{i18n>factoryApprovalNoCategoryItems}" items="{path: 'factoryApprovalModel>/detailItems', templateShareable: false}" class="factoryApprovalItemList">
+                                <items>
+                                    <CustomListItem type="Active" press="onApprovalItemTogglePress" highlight="{factoryApprovalModel>DifferenceHighlight}">
+                                        <VBox class="factoryApprovalItemCard sapUiSmallMargin">
+                                            <HBox alignItems="Start" justifyContent="SpaceBetween" class="factoryApprovalCardHeader">
+                                                <HBox alignItems="Center" class="factoryApprovalItemIdentity">
+                                                    <core:Icon src="{= ${factoryApprovalModel>_expanded} ? 'sap-icon://slim-arrow-up' : 'sap-icon://slim-arrow-down' }" size="1rem" class="sapUiTinyMarginEnd"/>
+                                                    <ObjectIdentifier title="{factoryApprovalModel>Maktx}" text="{factoryApprovalModel>MatnrText}"/>
+                                                </HBox>
+                                                <ObjectStatus text="{factoryApprovalModel>StatusText}" state="{factoryApprovalModel>StatusState}"/>
+                                            </HBox>
+                                            <FlexBox wrap="Wrap" class="factoryApprovalPrimaryMetrics">
+                                                <VBox class="factoryApprovalQuantityMetric"><Label text="{i18n>factoryApprovalCurrentStock}"/><ObjectNumber number="{factoryApprovalModel>MevcutStokText}" unit="{factoryApprovalModel>Meins}"/></VBox>
+                                                <VBox class="factoryApprovalQuantityMetric"><Label text="{i18n>factoryApprovalTotalCount}"/><ObjectNumber number="{factoryApprovalModel>ToplamSayimText}" unit="{factoryApprovalModel>Meins}"/></VBox>
+                                                <VBox class="factoryApprovalQuantityMetric"><Label text="{i18n>factoryApprovalDifference}"/><ObjectNumber number="{factoryApprovalModel>FarkText}" unit="{factoryApprovalModel>Meins}" state="{factoryApprovalModel>DifferenceState}"/></VBox>
+                                            </FlexBox>
+                                            <VBox visible="{factoryApprovalModel>_expanded}">
+                                                <FlexBox wrap="Wrap" class="factoryApprovalCategoryMetrics">
+                                                    <VBox class="factoryApprovalCategoryMetric"><Label text="{i18n>factoryApprovalSalesWaste}"/><ObjectNumber number="{factoryApprovalModel>SatisFiresiText}" unit="{factoryApprovalModel>Meins}"/></VBox>
+                                                    <VBox class="factoryApprovalCategoryMetric"><Label text="{i18n>factoryApprovalProductionFault}"/><ObjectNumber number="{factoryApprovalModel>UretimHataliText}" unit="{factoryApprovalModel>Meins}"/></VBox>
+                                                    <VBox class="factoryApprovalCategoryMetric"><Label text="{i18n>factoryApprovalFactoryLogistics}"/><ObjectNumber number="{factoryApprovalModel>FabrikaLojistikText}" unit="{factoryApprovalModel>Meins}"/></VBox>
+                                                    <VBox class="factoryApprovalCategoryMetric"><Label text="{i18n>factoryApprovalOther}"/><ObjectNumber number="{factoryApprovalModel>DigerText}" unit="{factoryApprovalModel>Meins}"/></VBox>
+                                                </FlexBox>
+                                                <VBox visible="{= !!${factoryApprovalModel>LastMessage} }" class="factoryApprovalItemMessage">
+                                                    <Label text="{i18n>factoryApprovalProcessMessage}"/>
+                                                    <Text text="{factoryApprovalModel>LastMessage}" tooltip="{factoryApprovalModel>LastMessage}" wrapping="true"/>
+                                                </VBox>
+                                                <FlexBox visible="{= !!${factoryApprovalModel>Ebeln} || !!${factoryApprovalModel>Mblnr351} }" wrap="Wrap" class="factoryApprovalBusinessDocuments">
+                                                    <ObjectStatus visible="{= !!${factoryApprovalModel>Ebeln} }" title="{i18n>factoryApprovalPurchaseOrder}" text="{factoryApprovalModel>Ebeln}" class="sapUiMediumMarginEnd"/>
+                                                    <ObjectStatus visible="{= !!${factoryApprovalModel>Mblnr351} }" title="{i18n>factoryApprovalMaterialDocument351}" text="{factoryApprovalModel>Mblnr351} {factoryApprovalModel>Mjahr351}"/>
+                                                </FlexBox>
+                                            </VBox>
+                                        </VBox>
+                                    </CustomListItem>
+                                </items>
+                            </List>
+                        </VBox>
+                    </content>
+                </Panel>
+            </VBox>
+        </content>
+    </Page>
+</mvc:View>
