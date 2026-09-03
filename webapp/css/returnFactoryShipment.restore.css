@@ -51,7 +51,18 @@
 }
 
 .returnFactoryFilterOptions {
+    width: 100%;
     gap: 0.4rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap !important;
+    padding-bottom: 0.2rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+.returnFactoryFilterOptions > .sapMFlexItem {
+    flex: 0 0 auto !important;
 }
 
 .returnFactorySalesFireFilters {
@@ -66,7 +77,14 @@
 
 .returnFactoryFilterButton .sapMBtnInner {
     min-width: auto;
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
     border-radius: 1rem;
+    white-space: nowrap;
+}
+
+.returnFactoryCompletionFilters {
+    margin-top: 0.5rem;
 }
 
 .returnFactoryFilterButton.sapMToggleBtnPressed .sapMBtnInner {
@@ -145,11 +163,31 @@
     flex: 0 0 auto;
 }
 
+.returnFactoryCountRow {
+    min-height: 3rem;
+}
+
 .returnFactoryConfirmCheck {
-    min-height: 0;
+    width: 3rem;
+    min-width: 3rem;
+    height: 3rem;
+    flex: 0 0 3rem;
     padding: 0;
+    overflow: visible;
     border-radius: 0;
     background: transparent;
+}
+
+.returnFactoryStockMetric.returnFactoryCountMetric {
+    width: 11rem;
+    min-width: 11rem;
+    flex: 0 0 11rem;
+}
+
+.returnFactoryUncountedToggle .sapMBtnInner {
+    min-width: auto;
+    padding-right: 0.625rem;
+    padding-left: 0.625rem;
 }
 
 .returnFactoryStockMetric {
@@ -379,6 +417,16 @@
     padding-top: 0.65rem;
 }
 
+.factoryApprovalPrimaryMetrics {
+    gap: 0.35rem;
+    padding-top: 0.45rem;
+}
+
+.factoryApprovalCategoryMetrics {
+    gap: 0.35rem;
+    padding-top: 0.45rem;
+}
+
 .factoryApprovalMetric {
     flex: 1 1 9rem;
     min-width: 8rem;
@@ -393,15 +441,12 @@
 
 .factoryApprovalMetric > .sapMLabel,
 .factoryApprovalQuantityMetric > .sapMLabel,
-.factoryApprovalCategoryMetric > .sapMLabel,
-.factoryApprovalItemMessage > .sapMLabel {
+.factoryApprovalCategoryMetric > .sapMLabel {
     color: #52606d;
     font-size: 0.8125rem;
     font-weight: 600;
 }
 
-.factoryApprovalDocumentMessage,
-.factoryApprovalItemMessage,
 .factoryApprovalBusinessDocuments {
     margin-top: 0.65rem;
     padding: 0.55rem 0.65rem;
@@ -414,24 +459,42 @@
 }
 
 .factoryApprovalQuantityMetric {
-    flex: 1 1 calc(33.333% - 0.5rem);
-    min-width: 10rem;
-    padding: 0.65rem;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.4rem 0.45rem;
     border: 1px solid #c9d7e6;
     border-radius: 0.35rem;
     background: #eef5fc;
+    overflow: hidden;
 }
 
 .factoryApprovalQuantityMetric .sapMObjectNumberText {
-    font-size: 1.25rem;
+    font-size: 1.05rem;
+}
+
+.factoryApprovalQuantityMetric .sapMObjectNumberUnit {
+    font-size: 0.75rem;
 }
 
 .factoryApprovalCategoryMetric {
-    flex: 1 1 calc(25% - 0.55rem);
-    min-width: 8rem;
-    padding: 0.55rem 0.65rem;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.4rem 0.45rem;
     border-radius: 0.3rem;
     background: #f7fafd;
+    overflow: hidden;
+}
+
+.factoryApprovalCategoryMetric > .sapMLabel {
+    font-size: 0.75rem;
+}
+
+.factoryApprovalCategoryMetric .sapMObjectNumberText {
+    font-size: 1.05rem;
+}
+
+.factoryApprovalCategoryMetric .sapMObjectNumberUnit {
+    font-size: 0.75rem;
 }
 
 .factoryApprovalTechnicalDetails {
@@ -488,18 +551,13 @@
         flex-basis: calc(50% - 0.4rem);
     }
 
-    .factoryApprovalCategoryMetric {
-        flex-basis: calc(50% - 0.4rem);
-    }
 }
 
 @media (max-width: 600px) {
     .factoryApprovalFilterField,
     .factoryApprovalDateField,
     .factoryApprovalStatusField,
-    .factoryApprovalMetric,
-    .factoryApprovalQuantityMetric,
-    .factoryApprovalCategoryMetric {
+    .factoryApprovalMetric {
         flex-basis: 100%;
         width: 100%;
         min-width: 100%;

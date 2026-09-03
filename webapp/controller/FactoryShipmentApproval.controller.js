@@ -38,7 +38,12 @@ sap.ui.define(
 
           var oViewModel = new JSONModel({
             documents: [],
+            filter: {
+              date: this._getTodayFilterValue(),
+              status: "WAIT_APPROVAL",
+            },
             selectedLogUid: "",
+            collapsedLogUid: "",
             selectedDocument: null,
             detailItems: [],
             approvalCategoryFilters: [],
@@ -114,6 +119,10 @@ sap.ui.define(
 
         _onRouteMatched: function () {
           this._bApprovalRouteActive = true;
+          this.getModel("factoryApprovalModel").setProperty(
+            "/filter/date",
+            this._getTodayFilterValue(),
+          );
           this._loadApprovals().then(
             function () {
               var sPollingLogUid = this._getStoredPollingLogUid();
@@ -135,6 +144,81 @@ sap.ui.define(
           this._loadApprovals();
         },
 
+        onApprovalFilterPress: function () {
+          this._loadApprovals();
+        },
+
+        onApprovalDateFilterChange: function (oEvent) {
+          var oDatePicker = oEvent.getSource();
+          var oDate = oDatePicker.getDateValue();
+          var sDate = "";
+
+          if (oDate && oEvent.getParameter("valid") !== false) {
+            sDate =
+              String(oDate.getFullYear()).padStart(4, "0") +
+              "-" +
+              String(oDate.getMonth() + 1).padStart(2, "0") +
+              "-" +
+              String(oDate.getDate()).padStart(2, "0");
+          }
+
+          this.getModel("factoryApprovalModel").setProperty(
+            "/filter/date",
+            sDate,
+          );
+          this._loadApprovals();
+        },
+
+        onApprovalStatusFilterChange: function (oEvent) {
+          this.getModel("factoryApprovalModel").setProperty(
+            "/filter/status",
+            oEvent.getSource().getSelectedKey(),
+          );
+          this._loadApprovals();
+        },
+
+        onApprovalFilterResetPress: function () {
+          var oViewModel = this.getModel("factoryApprovalModel");
+          oViewModel.setProperty("/filter/date", this._getTodayFilterValue());
+          oViewModel.setProperty("/filter/status", "WAIT_APPROVAL");
+          this._loadApprovals();
+        },
+
+        _getTodayFilterValue: function () {
+          var oToday = new Date();
+
+          return (
+            String(oToday.getFullYear()).padStart(4, "0") +
+            "-" +
+            String(oToday.getMonth() + 1).padStart(2, "0") +
+            "-" +
+            String(oToday.getDate()).padStart(2, "0")
+          );
+        },
+
+        _buildApprovalFilters: function () {
+          var oFilter =
+            this.getModel("factoryApprovalModel").getProperty("/filter") || {};
+          var aFilters = [];
+          var sStatus = String(oFilter.status || "WAIT_APPROVAL");
+
+          if (sStatus === "ALL") {
+            // An explicit, unrestricted status filter prevents the service's
+            // default WAIT_APPROVAL restriction from being applied.
+            aFilters.push(new Filter("Status", FilterOperator.NE, ""));
+          } else if (sStatus === "COMPLETE") {
+            aFilters.push(new Filter("Status", FilterOperator.EQ, "S"));
+          } else if (sStatus === "ERROR") {
+            aFilters.push(new Filter("Status", FilterOperator.EQ, "E"));
+          } else if (sStatus === "REJECTED") {
+            aFilters.push(new Filter("Status", FilterOperator.EQ, "R"));
+          } else {
+            aFilters.push(new Filter("LastStep", FilterOperator.EQ, sStatus));
+          }
+
+          return aFilters;
+        },
+
         _loadApprovals: function (aFilters) {
           var oViewModel = this.getModel("factoryApprovalModel");
           var sSelectedLogUid = oViewModel.getProperty("/selectedLogUid");
@@ -142,13 +226,19 @@ sap.ui.define(
           this._iListRequestId = iRequestId;
           oViewModel.setProperty("/listBusy", true);
 
-          return this._readApprovalRows(aFilters || [], false, true)
+          return this._readApprovalRows(
+            aFilters || this._buildApprovalFilters(),
+            false,
+            true,
+          )
             .then(
               function (aRows) {
                 if (iRequestId !== this._iListRequestId) {
                   return [];
                 }
-                var aDocuments = this._groupRows(aRows);
+                var aDocuments = this._filterApprovalDocumentsByDate(
+                  this._groupRows(aRows),
+                );
                 oViewModel.setProperty("/documents", aDocuments);
                 this._selectDocumentByLogUid(sSelectedLogUid, false);
                 return aDocuments;
@@ -176,6 +266,24 @@ sap.ui.define(
                 return vResult;
               }.bind(this),
             );
+        },
+
+        _filterApprovalDocumentsByDate: function (aDocuments) {
+          var sSelectedDate = String(
+            this.getModel("factoryApprovalModel").getProperty("/filter/date") ||
+              "",
+          );
+          var aDateParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(sSelectedDate);
+
+          if (!aDateParts) {
+            return aDocuments || [];
+          }
+
+          var sExpectedDate =
+            aDateParts[3] + "." + aDateParts[2] + "." + aDateParts[1];
+          return (aDocuments || []).filter(function (oDocument) {
+            return oDocument.IrsTarText === sExpectedDate;
+          });
         },
 
         _readApprovalRows: function (aFilters, bPollingRequest, bListRequest) {
@@ -383,6 +491,19 @@ sap.ui.define(
             return;
           }
 
+          if (
+            this.getModel("factoryApprovalModel").getProperty(
+              "/selectedLogUid",
+            ) === oDocument.LogUid
+          ) {
+            this.getModel("factoryApprovalModel").setProperty(
+              "/collapsedLogUid",
+              oDocument.LogUid,
+            );
+            this._clearSelection();
+            return;
+          }
+
           if (sCurrentPolling && sCurrentPolling !== oDocument.LogUid) {
             this._stopPolling(true);
           }
@@ -400,6 +521,7 @@ sap.ui.define(
           var oViewModel = this.getModel("factoryApprovalModel");
           var sPreviousLogUid = oViewModel.getProperty("/selectedLogUid");
 
+          oViewModel.setProperty("/collapsedLogUid", "");
           if (sPreviousLogUid !== oDocument.LogUid) {
             oViewModel.setProperty("/selectedApprovalCategory", "ALL");
             oDocument.Items.forEach(function (oItem) {
@@ -686,7 +808,11 @@ sap.ui.define(
                 if (this._oApprovalDialog) {
                   this._oApprovalDialog.close();
                 }
-                if (oResult.Message) {
+                if (
+                  oResult.Message &&
+                  this._getStatusKey(oResult.Status, oResult.LastStep) !==
+                    "ERROR"
+                ) {
                   MessageToast.show(oResult.Message);
                 }
                 this._storePollingLogUid(oDocument.LogUid);
@@ -968,9 +1094,10 @@ sap.ui.define(
                     ]),
                   );
                 } else if (oDocument.StatusKey === "ERROR") {
-                  MessageBox.error(
-                    oDocument.LastMessage ||
-                      this._text("factoryApprovalProcessingError"),
+                  // BAPI ayrintisi secili kayitta kalir; tablet akisini teknik
+                  // ve bloklayan bir popup ile kesmeyiz.
+                  MessageToast.show(
+                    this._text("factoryApprovalBackgroundErrorToast"),
                   );
                 }
               }.bind(this),
@@ -1010,7 +1137,8 @@ sap.ui.define(
           oViewModel.setProperty("/documents", aDocuments.slice());
           if (
             oViewModel.getProperty("/selectedLogUid") === oDocument.LogUid ||
-            !oViewModel.getProperty("/selectedLogUid")
+            (!oViewModel.getProperty("/selectedLogUid") &&
+              oViewModel.getProperty("/collapsedLogUid") !== oDocument.LogUid)
           ) {
             this._setSelectedDocument(oDocument);
           }
@@ -1127,7 +1255,9 @@ sap.ui.define(
           if (sStatusKey === "WAIT_APPROVAL") {
             return "Warning";
           }
-          return "Information";
+          // Eski UI5 sürümlerinde ObjectStatus, Information ValueState'ini
+          // desteklemiyor. QUEUED ve RUNNING durumlarını nötr göster.
+          return "None";
         },
 
         _getDifferenceState: function (fDifference) {

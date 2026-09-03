@@ -1,0 +1,89 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+>
+    <Dialog
+        title="{i18n>factoryShipmentCommissionDialogTitle}"
+        contentWidth="56rem"
+        contentHeight="34rem"
+        stretchOnPhone="true"
+        busy="{returnFactoryShipmentModel>/commissionDialog/busy}"
+        busyIndicatorDelay="0"
+    >
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <ObjectStatus
+                    title="{i18n>factoryShipmentCommissionRegion}"
+                    text="{returnFactoryShipmentModel>/commissionDialog/region}"
+                    class="sapUiTinyMarginBottom"
+                />
+                <SearchField
+                    value="{returnFactoryShipmentModel>/commissionDialog/searchQuery}"
+                    placeholder="{i18n>factoryShipmentCommissionSearchPlaceholder}"
+                    liveChange="onCommissionSearch"
+                    search="onCommissionSearch"
+                    width="100%"
+                />
+                <Toolbar>
+                    <Title
+                        text="{i18n>factoryShipmentCommissionMembers}"
+                        level="H5"
+                    />
+                    <ToolbarSpacer />
+                    <ObjectStatus
+                        text="{= ${returnFactoryShipmentModel>/commissionDialog/selectedCount} + ' / 4' }"
+                        state="{= ${returnFactoryShipmentModel>/commissionDialog/selectedCount} > 0 ? 'Success' : 'None' }"
+                    />
+                </Toolbar>
+                <Table
+                    id="commissionMemberTable"
+                    mode="MultiSelect"
+                    selectionChange="onCommissionSelectionChange"
+                    noDataText="{i18n>factoryShipmentCommissionNoData}"
+                    growing="true"
+                    growingThreshold="100"
+                    items="{
+                        path: 'returnFactoryShipmentModel>/commissionDialog/members',
+                        templateShareable: false
+                    }"
+                >
+                    <columns>
+                        <Column width="9rem">
+                            <Text text="{i18n>factoryShipmentCommissionRegistryNo}" />
+                        </Column>
+                        <Column>
+                            <Text text="{i18n>factoryShipmentCommissionFullName}" />
+                        </Column>
+                        <Column>
+                            <Text text="{i18n>factoryShipmentCommissionTitle}" />
+                        </Column>
+                    </columns>
+                    <items>
+                        <ColumnListItem selected="{returnFactoryShipmentModel>Selected}">
+                            <cells>
+                                <Text text="{returnFactoryShipmentModel>SicilNo}" />
+                                <Text text="{returnFactoryShipmentModel>AdSoyad}" />
+                                <Text text="{returnFactoryShipmentModel>Unvan}" />
+                            </cells>
+                        </ColumnListItem>
+                    </items>
+                </Table>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button
+                text="{i18n>factoryShipmentCommissionContinue}"
+                type="Emphasized"
+                enabled="{= !${returnFactoryShipmentModel>/commissionDialog/busy} }"
+                press="onCommissionConfirm"
+            />
+        </beginButton>
+        <endButton>
+            <Button
+                text="{i18n>factoryApprovalCancel}"
+                enabled="{= !${returnFactoryShipmentModel>/commissionDialog/busy} }"
+                press="onCommissionCancel"
+            />
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

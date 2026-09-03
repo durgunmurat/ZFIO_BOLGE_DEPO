@@ -112,6 +112,10 @@ public section.
            sourcelgort TYPE string,
            werks       TYPE string,
            loguid      TYPE string,
+           komisyon1   TYPE string,
+           komisyon2   TYPE string,
+           komisyon3   TYPE string,
+           komisyon4   TYPE string,
            toitems     TYPE STANDARD TABLE OF zcl_zmm_bolge_depo_yon_mpc_ext=>ts_returnfactoryshipmentitem WITH DEFAULT KEY,
          END OF ts_deep_returnfactoryshipment .
   types:
@@ -5297,7 +5301,14 @@ ENDMETHOD.
         log_uid = iv_log_uid
         _scope  = '1'.
 
-    schedule_return_factory_job( iv_log_uid = iv_log_uid ).
+    " Onay bu noktada kalici olarak QUEUED durumundadir. Job planlama hatasi
+    " loga ERROR olarak yazilir; basarili onay HTTP hata cevabina cevrilmez.
+    TRY.
+        schedule_return_factory_job( iv_log_uid = iv_log_uid ).
+      CATCH /iwbep/cx_mgw_busi_exception.
+        " schedule_return_factory_job hata durumunu ve mesaji loga kaydeder.
+        CLEAR lv_message.
+    ENDTRY.
 
     SELECT SINGLE status, last_step, last_message, jobname, jobcount
       FROM zmm_t_bdy_fsh_h
@@ -9902,12 +9913,19 @@ ENDMETHOD.
         posnr     TYPE posnr,
         matnr     TYPE matnr,
         count_qty TYPE menge_d,
-      END OF ty_count_snapshot.
+      END OF ty_count_snapshot,
+      BEGIN OF ty_approval_stock_snapshot,
+        log_uid        TYPE sysuuid_c32,
+        posnr          TYPE posnr,
+        matnr          TYPE matnr,
+        approval_stock TYPE labst,
+      END OF ty_approval_stock_snapshot.
 
     DATA: lr_log_uid       TYPE RANGE OF sysuuid_c32,
           lr_status        TYPE RANGE OF char1,
           lr_last_step     TYPE RANGE OF zmm_de_bdy_step,
           lr_lgort         TYPE RANGE OF lgort_d,
+          lr_irs_tar       TYPE RANGE OF zmm_t_bdy_fsh_h-irs_tar,
           lr_source_lgort  TYPE RANGE OF lgort_d,
           lr_matnr         TYPE RANGE OF matnr,
           lt_headers       TYPE TABLE OF zmm_t_bdy_fsh_h,
@@ -9920,6 +9938,11 @@ ENDMETHOD.
                              WITH UNIQUE KEY log_uid,
           lt_count_snapshot TYPE HASHED TABLE OF ty_count_snapshot
                               WITH UNIQUE KEY log_uid posnr matnr,
+          lt_approval_stock_snapshot TYPE HASHED TABLE OF ty_approval_stock_snapshot
+                                      WITH UNIQUE KEY log_uid posnr matnr,
+          lv_filter_date   TYPE d,
+          lv_filter_high_date TYPE d,
+          lv_filter_timestamp TYPE timestamp,
           lv_snapshot_text TYPE string,
           lv_snapshot_hash TYPE string.
 
@@ -9942,8 +9965,35 @@ ENDMETHOD.
           LOOP AT <filter>-select_options ASSIGNING <option>.
             APPEND CORRESPONDING #( <option> ) TO lr_lgort.
           ENDLOOP.
+        WHEN 'IRSTAR'.
+          LOOP AT <filter>-select_options ASSIGNING <option>.
+            CLEAR: lv_filter_date, lv_filter_high_date,
+                   lv_filter_timestamp.
+            IF <option>-low IS NOT INITIAL.
+              lv_filter_timestamp = <option>-low.
+              CONVERT TIME STAMP lv_filter_timestamp TIME ZONE 'UTC'
+                INTO DATE lv_filter_date.
+            ENDIF.
+            IF <option>-high IS NOT INITIAL.
+              lv_filter_timestamp = <option>-high.
+              CONVERT TIME STAMP lv_filter_timestamp TIME ZONE 'UTC'
+                INTO DATE lv_filter_high_date.
+            ENDIF.
+            IF lv_filter_date IS NOT INITIAL.
+              APPEND VALUE #(
+                sign   = <option>-sign
+                option = <option>-option
+                low    = lv_filter_date
+                high   = lv_filter_high_date ) TO lr_irs_tar.
+            ENDIF.
+          ENDLOOP.
       ENDCASE.
     ENDLOOP.
+
+    IF lr_irs_tar[] IS INITIAL.
+      APPEND VALUE #( sign = 'I' option = 'BT'
+                      low = '00010101' high = '99991231' ) TO lr_irs_tar.
+    ENDIF.
 
     "LogUid verilmeden açılan liste varsayılan olarak onay bekleyenleri gösterir.
     IF lr_log_uid[] IS INITIAL
@@ -9966,21 +10016,24 @@ ENDMETHOD.
         FROM zmm_t_bdy_fsh_h
         INTO TABLE @lt_headers
         WHERE status    IN @lr_status
-          AND last_step IN @lr_last_step.
+          AND last_step IN @lr_last_step
+          AND irs_tar   IN @lr_irs_tar.
     ELSEIF lr_log_uid[] IS NOT INITIAL AND lr_lgort[] IS INITIAL.
       SELECT *
         FROM zmm_t_bdy_fsh_h
         INTO TABLE @lt_headers
         WHERE log_uid  IN @lr_log_uid
           AND status    IN @lr_status
-          AND last_step IN @lr_last_step.
+          AND last_step IN @lr_last_step
+          AND irs_tar   IN @lr_irs_tar.
     ELSEIF lr_log_uid[] IS INITIAL AND lr_lgort[] IS NOT INITIAL.
       SELECT *
         FROM zmm_t_bdy_fsh_h
         INTO TABLE @lt_headers
         WHERE lgort     IN @lr_lgort
           AND status    IN @lr_status
-          AND last_step IN @lr_last_step.
+          AND last_step IN @lr_last_step
+          AND irs_tar   IN @lr_irs_tar.
     ELSE.
       SELECT *
         FROM zmm_t_bdy_fsh_h
@@ -9988,7 +10041,8 @@ ENDMETHOD.
         WHERE log_uid  IN @lr_log_uid
           AND lgort     IN @lr_lgort
           AND status    IN @lr_status
-          AND last_step IN @lr_last_step.
+          AND last_step IN @lr_last_step
+          AND irs_tar   IN @lr_irs_tar.
     ENDIF.
     IF lt_headers[] IS INITIAL.
       RETURN.
@@ -10003,6 +10057,25 @@ ENDMETHOD.
     IF lt_items[] IS INITIAL.
       RETURN.
     ENDIF.
+
+    " Onay aksiyonunda her kategori satırına yazılan stok değerini belge
+    " snapshot'ı olarak sakla. Mal çıkışı sonrası MARD değişse de onay
+    " ekranındaki Mevcut Stok bu değer üzerinden sabit kalır.
+    LOOP AT lt_items ASSIGNING FIELD-SYMBOL(<approval_stock_item>)
+      WHERE category <> 'FARK'.
+      READ TABLE lt_approval_stock_snapshot TRANSPORTING NO FIELDS
+        WITH TABLE KEY log_uid = <approval_stock_item>-log_uid
+                       posnr   = <approval_stock_item>-posnr
+                       matnr   = <approval_stock_item>-matnr.
+      IF sy-subrc <> 0.
+        INSERT VALUE #(
+          log_uid        = <approval_stock_item>-log_uid
+          posnr          = <approval_stock_item>-posnr
+          matnr          = <approval_stock_item>-matnr
+          approval_stock = <approval_stock_item>-approval_stock )
+          INTO TABLE lt_approval_stock_snapshot.
+      ENDIF.
+    ENDLOOP.
 
     LOOP AT lt_headers ASSIGNING FIELD-SYMBOL(<header>).
       APPEND VALUE #( sign = 'I' option = 'EQ' low = <header>-source_lgort )
@@ -10087,6 +10160,22 @@ ENDMETHOD.
                          matnr = <item>-matnr.
         IF sy-subrc = 0.
           <approval>-mevcutstok = <stock>-labst.
+        ENDIF.
+
+        " Onaydan sonra canlı MARD stoğu mal çıkışı nedeniyle değişir.
+        " Bu aşamada onay anında kaydedilen stok snapshot'ını göster.
+        IF <header>-last_step = 'QUEUED'
+           OR <header>-last_step = 'RUNNING'
+           OR <header>-last_step = 'COMPLETE'.
+          READ TABLE lt_approval_stock_snapshot
+            ASSIGNING FIELD-SYMBOL(<approval_stock_snapshot>)
+            WITH TABLE KEY log_uid = <item>-log_uid
+                           posnr   = <item>-posnr
+                           matnr   = <item>-matnr.
+          IF sy-subrc = 0.
+            <approval>-mevcutstok =
+              <approval_stock_snapshot>-approval_stock.
+          ENDIF.
         ENDIF.
       ENDIF.
 

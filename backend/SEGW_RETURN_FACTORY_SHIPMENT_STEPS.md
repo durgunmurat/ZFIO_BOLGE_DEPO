@@ -34,6 +34,10 @@ Navigation ve anahtar yapısı değişmez:
 
 - `ReturnFactoryShipment(Lgort, IrsTar, PlakaNo)`
 - `ToItems -> ReturnFactoryShipmentItem`
+Komisyon seçim listesi `KomisyonListSet` üzerinden `Bolge` filtresiyle okunur.
+Seçilen 0-4 üyenin sicil numaraları `ReturnFactoryShipmentSet` deep-create
+başlığındaki `Komisyon1`, `Komisyon2`, `Komisyon3`, `Komisyon4` alanlarıyla
+gönderilir. Navigation property kullanılmaz; seçilmeyen alanlar boş gönderilir.
 
 Alanları ekledikten sonra runtime artifact'ları yeniden üretin. Özel kodu
 generated `MPC` / `DPC` sınıflarına değil, yalnız `MPC_EXT` / `DPC_EXT`

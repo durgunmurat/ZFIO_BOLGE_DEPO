@@ -28,9 +28,11 @@ sap.ui.define(
             categoryFilters: this._getCategoryFilterOptions([]),
             salesFireFilters: this._getSalesFireFilterOptions([]),
             selectedCategoryFilter: "SATIS_FIRESI",
-            selectedSalesFireFilter: "SATIS_FIRESI_ALL",
+            selectedSalesFireFilter: "SATIS_FIRESI_KATI",
+            selectedCompletionFilter: "ALL",
             productSearchQuery: "",
             visibleItemCount: 0,
+            uncountedItemCount: 0,
             filterNoDataText: "Se\u00e7ilen tarih ve depo i\u00e7in iade depo sto\u011fu bulunamad\u0131",
             selectedVehicleKey: "",
             vehicleInput: "",
@@ -42,6 +44,7 @@ sap.ui.define(
             processId: "",
             totalItemCount: 0,
             confirmedItemCount: 0,
+            confirmationTargetCount: 0,
             expandedItemCount: 0,
             canSubmit: false,
             hasStockExceeded: false,
@@ -55,6 +58,14 @@ sap.ui.define(
             blockingStatus: "",
             blockingLastStep: "",
             availabilityBusy: false,
+            commissionDialog: {
+              allMembers: [],
+              members: [],
+              searchQuery: "",
+              selectedCount: 0,
+              region: "",
+              busy: false,
+            },
             extraReturnDialog: {
               itemPath: "",
               materialText: "",
@@ -89,11 +100,19 @@ sap.ui.define(
         },
 
         onExit: function () {
+          if (this._iProductSearchTimer) {
+            clearTimeout(this._iProductSearchTimer);
+            this._iProductSearchTimer = null;
+          }
           this.getView().$().off(".returnFactoryZeroSelect");
           if (this._oExtraReturnReasonDialog) {
             this._oExtraReturnReasonDialog.$().off(".returnFactoryZeroSelect");
             this._oExtraReturnReasonDialog.destroy();
             this._oExtraReturnReasonDialog = null;
+          }
+          if (this._oCommissionDialog) {
+            this._oCommissionDialog.destroy();
+            this._oCommissionDialog = null;
           }
         },
 
@@ -149,9 +168,11 @@ sap.ui.define(
               categoryFilters: this._getCategoryFilterOptions([]),
               salesFireFilters: this._getSalesFireFilterOptions([]),
               selectedCategoryFilter: "SATIS_FIRESI",
-              selectedSalesFireFilter: "SATIS_FIRESI_ALL",
+              selectedSalesFireFilter: "SATIS_FIRESI_KATI",
+              selectedCompletionFilter: "ALL",
               productSearchQuery: "",
               visibleItemCount: 0,
+              uncountedItemCount: 0,
               filterNoDataText:
                 "Se\u00e7ilen tarih ve depo i\u00e7in iade depo sto\u011fu bulunamad\u0131",
               selectedVehicleKey: "",
@@ -164,6 +185,7 @@ sap.ui.define(
               processId: this._createProcessId(),
               totalItemCount: 0,
               confirmedItemCount: 0,
+              confirmationTargetCount: 0,
               expandedItemCount: 0,
               canSubmit: false,
               hasStockExceeded: false,
@@ -177,6 +199,14 @@ sap.ui.define(
               blockingStatus: "",
               blockingLastStep: "",
               availabilityBusy: false,
+              commissionDialog: {
+                allMembers: [],
+                members: [],
+                searchQuery: "",
+                selectedCount: 0,
+                region: "",
+                busy: false,
+              },
               extraReturnDialog: {
                 itemPath: "",
                 materialText: "",
@@ -204,7 +234,6 @@ sap.ui.define(
                 this._applyCreationAvailability(aItems);
                 this._updateCategoryFilters();
                 this._applyCategoryFilter();
-                this._recalculateSubmitState();
               }.bind(this),
             )
             .catch(
@@ -264,11 +293,7 @@ sap.ui.define(
                     _searchText: this._getProductSearchText(oItem),
                     SapStock: this._toNumber(oItem.SapStock || oItem.Labst),
                     SelectedCategoryCount: this._calculateItemTotal(oItem),
-                    MengeSayim:
-                      oItem.MengeSayim !== undefined &&
-                      oItem.MengeSayim !== null
-                        ? this._toNumber(oItem.MengeSayim)
-                        : this._calculateItemTotal(oItem),
+                    MengeSayim: this._calculateItemTotal(oItem),
                     MengeUretimHatali: this._toNumber(oItem.MengeUretimHatali || 0),
                     MengeFabrikaLojistik: this._toNumber(oItem.MengeFabrikaLojistik || 0),
                     MengeSatisFireKati: this._toNumber(oItem.MengeSatisFireKati || 0),
@@ -280,6 +305,7 @@ sap.ui.define(
                       oItem.SapStock || oItem.Labst,
                     ),
                     _expanded: false,
+                    _categoryConfirmations: {},
                     _countConfirmed: false,
                     RowHighlight: "None",
                     RowStateText: "",
@@ -491,7 +517,7 @@ sap.ui.define(
             .getModel("returnFactoryShipmentModel")
             .setProperty("/selectedCategoryFilter", sFilterKey || "ALL");
           if (sFilterKey !== "ALL") {
-            this._setAllItemExpansion(false);
+            this._setAllItemExpansion(false, true);
           }
           this._applyCategoryFilter();
         },
@@ -502,14 +528,25 @@ sap.ui.define(
             .getBindingContext("returnFactoryShipmentModel");
           var sFilterKey = oContext
             ? oContext.getProperty("key")
-            : "SATIS_FIRESI_ALL";
+            : "SATIS_FIRESI_KATI";
 
           this.getView()
             .getModel("returnFactoryShipmentModel")
             .setProperty(
               "/selectedSalesFireFilter",
-              sFilterKey || "SATIS_FIRESI_ALL",
+              sFilterKey || "SATIS_FIRESI_KATI",
             );
+          this._applyCategoryFilter();
+        },
+
+        onCompletionFilterPress: function (oEvent) {
+          var sFilterKey = oEvent.getParameter("pressed")
+            ? "UNCOUNTED"
+            : "ALL";
+
+          this.getView()
+            .getModel("returnFactoryShipmentModel")
+            .setProperty("/selectedCompletionFilter", sFilterKey);
           this._applyCategoryFilter();
         },
 
@@ -522,7 +559,18 @@ sap.ui.define(
           this.getView()
             .getModel("returnFactoryShipmentModel")
             .setProperty("/productSearchQuery", sQuery || "");
-          this._applyCategoryFilter();
+          clearTimeout(this._iProductSearchTimer);
+          if (oEvent.getParameter("query") !== undefined) {
+            this._applyCategoryFilter();
+            return;
+          }
+          this._iProductSearchTimer = setTimeout(
+            function () {
+              this._iProductSearchTimer = null;
+              this._applyCategoryFilter();
+            }.bind(this),
+            150,
+          );
         },
 
         _getCategoryFilterDefinitions: function () {
@@ -547,22 +595,13 @@ sap.ui.define(
               label: "Fabrika Lojistik",
               field: "MengeFabrikaLojistik",
             },
+            { key: "DIGER", label: "Di\u011fer", isOther: true },
             { key: "ALL", label: "Hepsi", field: "" },
           ];
         },
 
         _getSalesFireFilterDefinitions: function () {
           return [
-            {
-              key: "SATIS_FIRESI_ALL",
-              label: "Hepsi",
-              fields: [
-                "MengeSatisFireKati",
-                "MengeSatisFireSivi",
-                "MengeSatisFireUht",
-                "MengeSatisFireCam",
-              ],
-            },
             {
               key: "SATIS_FIRESI_KATI",
               label: "Kat\u0131",
@@ -583,10 +622,27 @@ sap.ui.define(
               label: "Cam",
               field: "MengeSatisFireCam",
             },
+            {
+              key: "SATIS_FIRESI_ALL",
+              label: "Hepsi",
+              fields: [
+                "MengeSatisFireKati",
+                "MengeSatisFireSivi",
+                "MengeSatisFireUht",
+                "MengeSatisFireCam",
+              ],
+            },
           ];
         },
 
         _getCategoryCount: function (oItem, oDefinition) {
+          if (oDefinition.isOther) {
+            return Math.max(
+              this._toNumber(oItem.SapStock) - this._calculateItemTotal(oItem),
+              0,
+            );
+          }
+
           if (oDefinition.field) {
             return this._toNumber(oItem[oDefinition.field]);
           }
@@ -600,7 +656,139 @@ sap.ui.define(
             );
           }
 
-          return this._toNumber(oItem.MengeSayim);
+          return this._calculateItemTotal(oItem);
+        },
+
+        _getActiveConfirmationFields: function () {
+          var oModel = this.getView().getModel("returnFactoryShipmentModel");
+          var sCategoryKey =
+            oModel.getProperty("/selectedCategoryFilter") || "ALL";
+          var oDefinition;
+
+          if (sCategoryKey === "ALL") {
+            return null;
+          }
+
+          oDefinition = this._getCategoryFilterDefinitions().find(
+            function (oItem) {
+              return oItem.key === sCategoryKey;
+            },
+          );
+
+          if (sCategoryKey === "SATIS_FIRESI") {
+            var sSalesFireKey =
+              oModel.getProperty("/selectedSalesFireFilter") ||
+              "SATIS_FIRESI_KATI";
+            oDefinition = this._getSalesFireFilterDefinitions().find(
+              function (oItem) {
+                return oItem.key === sSalesFireKey;
+              },
+            );
+          }
+
+          if (!oDefinition) {
+            return null;
+          }
+
+          if (oDefinition.isOther) {
+            return ["_other"];
+          }
+
+          return oDefinition.fields || [oDefinition.field];
+        },
+
+        _getRequiredConfirmationFields: function (oItem) {
+          var aFields = [
+            "MengeUretimHatali",
+            "MengeFabrikaLojistik",
+            "MengeSatisFireKati",
+            "MengeSatisFireSivi",
+            "MengeSatisFireUht",
+            "MengeSatisFireCam",
+            "MengeLansman",
+          ].filter(
+            function (sField) {
+              return this._toNumber(oItem[sField]) > 0;
+            }.bind(this),
+          );
+
+          return aFields.length ? aFields : ["_item"];
+        },
+
+        _getApplicableConfirmationFields: function (oItem, aScopeFields) {
+          if (!aScopeFields) {
+            return this._getRequiredConfirmationFields(oItem);
+          }
+
+          if (aScopeFields.indexOf("_other") !== -1) {
+            return this._toNumber(oItem.SapStock) - this._calculateItemTotal(oItem) > 0
+              ? ["_item"]
+              : [];
+          }
+
+          return aScopeFields.filter(
+            function (sField) {
+              return this._toNumber(oItem[sField]) > 0;
+            }.bind(this),
+          );
+        },
+
+        _isItemConfirmedForScope: function (oItem, aScopeFields) {
+          var aFields = this._getApplicableConfirmationFields(
+            oItem,
+            aScopeFields,
+          );
+          var oConfirmations = oItem._categoryConfirmations || {};
+
+          return (
+            aFields.length > 0 &&
+            aFields.every(function (sField) {
+              return oConfirmations[sField] === true;
+            })
+          );
+        },
+
+        _setItemConfirmationForScope: function (
+          oModel,
+          sItemPath,
+          oItem,
+          aScopeFields,
+          bConfirmed,
+          bSilent,
+        ) {
+          var aFields = this._getApplicableConfirmationFields(
+            oItem,
+            aScopeFields,
+          );
+          var oConfirmations = Object.assign(
+            {},
+            oItem._categoryConfirmations || {},
+          );
+
+          aFields.forEach(function (sField) {
+            oConfirmations[sField] = bConfirmed;
+          });
+          oItem._categoryConfirmations = oConfirmations;
+          if (!bSilent) {
+            oModel.setProperty(
+              sItemPath + "/_categoryConfirmations",
+              oConfirmations,
+            );
+          }
+        },
+
+        _clearItemConfirmation: function (oModel, sItemPath, oItem, sField) {
+          var oConfirmations = Object.assign(
+            {},
+            oItem._categoryConfirmations || {},
+          );
+
+          oConfirmations[sField] = false;
+          oItem._categoryConfirmations = oConfirmations;
+          oModel.setProperty(
+            sItemPath + "/_categoryConfirmations",
+            oConfirmations,
+          );
         },
 
         _getCategoryFilterOptions: function (aItems) {
@@ -608,7 +796,7 @@ sap.ui.define(
 
           return this._getCategoryFilterDefinitions().map(
             function (oDefinition) {
-              var iCount = oDefinition.field || oDefinition.fields
+              var iCount = oDefinition.field || oDefinition.fields || oDefinition.isOther
                 ? aProductItems.filter(
                     function (oItem) {
                       return this._getCategoryCount(oItem, oDefinition) > 0;
@@ -666,15 +854,18 @@ sap.ui.define(
           });
           var sSalesFireFilterKey =
             oModel.getProperty("/selectedSalesFireFilter") ||
-            "SATIS_FIRESI_ALL";
+            "SATIS_FIRESI_KATI";
           var oList = this.byId("returnFactoryProductList");
           var oBinding = oList && oList.getBinding("items");
           var aItems = oModel.getProperty("/items") || [];
           var sSearchQuery = this._normalizeSearchText(
             oModel.getProperty("/productSearchQuery"),
           );
+          var sCompletionFilter =
+            oModel.getProperty("/selectedCompletionFilter") || "ALL";
           var aBindingFilters = [];
           var aVisibleItems = aItems;
+          var aConfirmationFields = this._getActiveConfirmationFields();
 
           if (!oDefinition) {
             oDefinition = aDefinitions[0];
@@ -689,24 +880,36 @@ sap.ui.define(
           }
 
           aItems.forEach(
-            function (oItem, iIndex) {
+            function (oItem) {
               var fSelectedCount = this._getCategoryCount(oItem, oDefinition);
               oItem.SelectedCategoryCount = fSelectedCount;
-              oModel.setProperty(
-                "/items/" + iIndex + "/SelectedCategoryCount",
-                fSelectedCount,
+              oItem._countConfirmed = this._isItemConfirmedForScope(
+                oItem,
+                aConfirmationFields,
               );
+              oItem._matchesSelectedCategory =
+                !(oDefinition.field || oDefinition.fields || oDefinition.isOther) ||
+                fSelectedCount > 0;
             }.bind(this),
           );
 
-          if (oDefinition.field || oDefinition.fields) {
+          if (oDefinition.field || oDefinition.fields || oDefinition.isOther) {
             aVisibleItems = aVisibleItems.filter(
               function (oItem) {
-                return this._toNumber(oItem.SelectedCategoryCount) > 0;
-              }.bind(this),
+                return oItem._matchesSelectedCategory;
+              },
             );
             aBindingFilters.push(
-              new Filter("SelectedCategoryCount", FilterOperator.GT, 0),
+              new Filter("_matchesSelectedCategory", FilterOperator.EQ, true),
+            );
+          }
+
+          if (sCompletionFilter !== "ALL") {
+            aVisibleItems = aVisibleItems.filter(function (oItem) {
+              return oItem._countConfirmed === false;
+            });
+            aBindingFilters.push(
+              new Filter("_countConfirmed", FilterOperator.EQ, false),
             );
           }
 
@@ -724,14 +927,16 @@ sap.ui.define(
           }
 
           oModel.setProperty("/visibleItemCount", aVisibleItems.length);
+          this._recalculateSubmitState(true);
           oModel.setProperty(
             "/filterNoDataText",
             sSearchQuery
               ? "Arama ve kategori kriterlerine uygun \u00fcr\u00fcn bulunamad\u0131."
-              : oDefinition.field || oDefinition.fields
+              : oDefinition.field || oDefinition.fields || oDefinition.isOther
                 ? oDefinition.label + " kategorisinde \u00fcr\u00fcn bulunamad\u0131."
                 : "Se\u00e7ilen tarih ve depo i\u00e7in iade depo sto\u011fu bulunamad\u0131",
           );
+          oModel.checkUpdate(false);
         },
 
         _normalizeSearchText: function (vValue) {
@@ -748,6 +953,76 @@ sap.ui.define(
               oItem.Maktx || "",
             ].join(" "),
           );
+        },
+
+        onFilteredCountChange: function (oEvent) {
+          var oInput = oEvent.getSource();
+          var oContext = oInput.getBindingContext(
+            "returnFactoryShipmentModel",
+          );
+          var oModel = oContext.getModel();
+          var sPath = oContext.getPath();
+          var oItem = oContext.getObject();
+          var aCategoryFields = this._getActiveConfirmationFields();
+          var aPopulatedFields;
+          var sCategoryField;
+          var fPreviousValue;
+          var fNewValue = this._toNumber(oEvent.getParameter("value"));
+
+          if (!aCategoryFields || oItem._countConfirmed) {
+            this._applyCategoryFilter();
+            return;
+          }
+
+          fPreviousValue = aCategoryFields.reduce(
+            function (fTotal, sField) {
+              return fTotal + this._toNumber(oItem[sField]);
+            }.bind(this),
+            0,
+          );
+          aPopulatedFields = aCategoryFields.filter(
+            function (sField) {
+              return this._toNumber(oItem[sField]) > 0;
+            }.bind(this),
+          );
+
+          if (aCategoryFields.length === 1) {
+            sCategoryField = aCategoryFields[0];
+          } else if (aPopulatedFields.length === 1) {
+            sCategoryField = aPopulatedFields[0];
+          } else {
+            oModel.setProperty(sPath + "/SelectedCategoryCount", fPreviousValue);
+            oInput.setValue(fPreviousValue);
+            MessageBox.warning(
+              "Bu üründe birden fazla Satış Firesi türü var. Miktarı değiştirmek için Katı, Sıvı, UHT veya Cam alt kategorisini seçin.",
+            );
+            return;
+          }
+
+          if (fNewValue < 0) {
+            fNewValue = 0;
+            oInput.setValue("0");
+            oInput.setValueState("Error");
+            oInput.setValueStateText("Negatif miktar girilemez.");
+          } else {
+            oInput.setValueState("None");
+          }
+
+          oItem[sCategoryField] = fNewValue;
+          oModel.setProperty(sPath + "/" + sCategoryField, fNewValue);
+          this._clearItemConfirmation(
+            oModel,
+            sPath,
+            oItem,
+            sCategoryField,
+          );
+
+          var fTotal = this._calculateItemTotal(oItem);
+          oItem.MengeSayim = fTotal;
+          oModel.setProperty(sPath + "/MengeSayim", fTotal);
+          this._updateItemState(oModel, sPath, oItem);
+          this._updateCategoryFilters();
+          this._applyCategoryFilter();
         },
 
         onCountChange: function (oEvent) {
@@ -790,14 +1065,18 @@ sap.ui.define(
             this._toNumber(oItem.MengeSatisFireCam) +
             this._toNumber(oItem.MengeLansman);
           oModel.setProperty(sPath + "/MengeSayim", fTotal);
-          oModel.setProperty(sPath + "/_countConfirmed", false);
-          this._updateItemState(oModel, sPath, Object.assign({}, oItem, {
-            MengeSayim: fTotal,
-            _countConfirmed: false,
-          }));
+          if (sQuantityPath) {
+            this._clearItemConfirmation(
+              oModel,
+              sPath,
+              oItem,
+              sQuantityPath,
+            );
+          }
+          oItem.MengeSayim = fTotal;
+          this._updateItemState(oModel, sPath, oItem);
           this._updateCategoryFilters();
           this._applyCategoryFilter();
-          this._recalculateSubmitState();
         },
 
         onExtraReturnReasonPress: function (oEvent) {
@@ -878,18 +1157,16 @@ sap.ui.define(
 
           var fTotal = this._calculateItemTotal(oItem);
           oModel.setProperty(sItemPath + "/MengeSayim", fTotal);
-          oModel.setProperty(sItemPath + "/_countConfirmed", false);
-          this._updateItemState(
+          this._clearItemConfirmation(
             oModel,
             sItemPath,
-            Object.assign({}, oItem, {
-              MengeSayim: fTotal,
-              _countConfirmed: false,
-            }),
+            oItem,
+            "MengeLansman",
           );
+          oItem.MengeSayim = fTotal;
+          this._updateItemState(oModel, sItemPath, oItem);
           this._updateCategoryFilters();
           this._applyCategoryFilter();
-          this._recalculateSubmitState();
           this._oExtraReturnReasonDialog.close();
         },
 
@@ -916,11 +1193,17 @@ sap.ui.define(
             .getSource()
             .getBindingContext("returnFactoryShipmentModel");
           var bSelected = oEvent.getParameter("selected");
+          var oItem = oContext.getObject();
+          var aConfirmationFields = this._getActiveConfirmationFields();
 
-          oContext
-            .getModel()
-            .setProperty(oContext.getPath() + "/_countConfirmed", bSelected);
-          this._recalculateSubmitState();
+          this._setItemConfirmationForScope(
+            oContext.getModel(),
+            oContext.getPath(),
+            oItem,
+            aConfirmationFields,
+            bSelected,
+          );
+          this._applyCategoryFilter();
         },
 
         onConfirmAllCountsPress: function (oEvent) {
@@ -928,20 +1211,25 @@ sap.ui.define(
           var bConfirmed = vConfirmed === true || vConfirmed === "true";
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
           var aItems = oModel.getProperty("/items") || [];
+          var aConfirmationFields = this._getActiveConfirmationFields();
 
           if (!oModel.getProperty("/createAllowed")) {
             return;
           }
 
-          aItems.forEach(function (oItem, iIndex) {
-            oItem._countConfirmed = bConfirmed;
-            oModel.setProperty(
-              "/items/" + iIndex + "/_countConfirmed",
-              bConfirmed,
-            );
-          });
-          this._recalculateSubmitState();
-          oModel.refresh(true);
+          aItems.forEach(
+            function (oItem, iIndex) {
+              this._setItemConfirmationForScope(
+                oModel,
+                "/items/" + iIndex,
+                oItem,
+                aConfirmationFields,
+                bConfirmed,
+                true,
+              );
+            }.bind(this),
+          );
+          this._applyCategoryFilter();
         },
 
         onFactoryItemTogglePress: function (oEvent) {
@@ -979,16 +1267,18 @@ sap.ui.define(
           this._setAllItemExpansion(bExpanded);
         },
 
-        _setAllItemExpansion: function (bExpanded) {
+        _setAllItemExpansion: function (bExpanded, bSkipUpdate) {
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
           var aItems = oModel.getProperty("/items") || [];
 
-          aItems.forEach(function (oItem, iIndex) {
+          aItems.forEach(function (oItem) {
             oItem._expanded = bExpanded;
-            oModel.setProperty("/items/" + iIndex + "/_expanded", bExpanded);
           });
-          this._recalculateSubmitState();
-          oModel.refresh(true);
+          if (bSkipUpdate) {
+            return;
+          }
+          this._recalculateSubmitState(true);
+          oModel.checkUpdate(false);
         },
 
         _updateItemState: function (oModel, sPath, oItem) {
@@ -998,32 +1288,39 @@ sap.ui.define(
           var bExceeded = fCount > fStock;
           var fDifference = fStock - fCount;
 
-          oModel.setProperty(sPath + "/RowHighlight", bDifferent ? "Error" : "None");
-          oModel.setProperty(sPath + "/StockExceeded", bExceeded);
-          oModel.setProperty(sPath + "/DifferenceQuantity", fDifference);
-          oModel.setProperty(
-            sPath + "/RowState",
-            bDifferent ? "Error" : "Success",
-          );
-          oModel.setProperty(
-            sPath + "/RowStateText",
-            bExceeded
-              ? "Sayım iade depo stoğundan fazla. Gönderim yapılamaz."
+          oItem.RowHighlight = bExceeded
+            ? "Error"
+            : oItem._countConfirmed
+              ? "Success"
+              : "None";
+          oItem.StockExceeded = bExceeded;
+          oItem.DifferenceQuantity = fDifference;
+          oItem.RowState = bExceeded
+            ? "Error"
+            : oItem._countConfirmed
+              ? "Success"
+              : "None";
+          oItem.RowStateText = bExceeded
+            ? "Sayım iade depo stoğundan fazla. Gönderim yapılamaz."
+            : oItem._countConfirmed
+              ? "Sayım tamamlandı."
               : bDifferent
                 ? "Iade depo stoğundan eksik; gönderime izin verilir."
-                : "Iade depo stoğu ile eşit.",
-          );
+                : "Iade depo stoğu ile eşit.";
         },
 
-        _recalculateSubmitState: function () {
+        _recalculateSubmitState: function (bSkipCheckUpdate) {
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
           var aItems = oModel.getProperty("/items") || [];
           var sSelectedVehicleKey = oModel.getProperty("/selectedVehicleKey");
           var oSelectedVehicle = oModel.getProperty("/selectedVehicle");
           var sSelectedPlantKey = oModel.getProperty("/selectedPlantKey");
           var iConfirmed = 0;
+          var iConfirmationTarget = 0;
+          var iFullyConfirmed = 0;
           var iExpanded = 0;
           var iStockExceededItemCount = 0;
+          var aConfirmationFields = this._getActiveConfirmationFields();
 
           if (!sSelectedVehicleKey && oSelectedVehicle) {
             sSelectedVehicleKey = oSelectedVehicle.VehicleKey || "";
@@ -1034,8 +1331,21 @@ sap.ui.define(
             function (oItem, iIndex) {
               var sPath = "/items/" + iIndex;
               this._updateItemState(oModel, sPath, oItem);
-              if (oItem._countConfirmed) {
-                iConfirmed++;
+              if (
+                this._getApplicableConfirmationFields(
+                  oItem,
+                  aConfirmationFields,
+                ).length > 0
+              ) {
+                iConfirmationTarget++;
+                if (
+                  this._isItemConfirmedForScope(oItem, aConfirmationFields)
+                ) {
+                  iConfirmed++;
+                }
+              }
+              if (this._isItemConfirmedForScope(oItem, null)) {
+                iFullyConfirmed++;
               }
               if (oItem._expanded) {
                 iExpanded++;
@@ -1047,7 +1357,15 @@ sap.ui.define(
           );
 
           oModel.setProperty("/confirmedItemCount", iConfirmed);
+          oModel.setProperty(
+            "/confirmationTargetCount",
+            iConfirmationTarget,
+          );
           oModel.setProperty("/expandedItemCount", iExpanded);
+          oModel.setProperty(
+            "/uncountedItemCount",
+            Math.max(iConfirmationTarget - iConfirmed, 0),
+          );
           oModel.setProperty(
             "/hasStockExceeded",
             iStockExceededItemCount > 0,
@@ -1065,11 +1383,14 @@ sap.ui.define(
             Boolean(sSelectedVehicleKey) &&
               Boolean(sSelectedPlantKey) &&
               aItems.length > 0 &&
-              iConfirmed === aItems.length &&
+              iFullyConfirmed === aItems.length &&
               iStockExceededItemCount === 0 &&
               oModel.getProperty("/createAllowed") === true &&
               oModel.getProperty("/createAllowedConsistent") === true,
           );
+          if (!bSkipCheckUpdate) {
+            oModel.checkUpdate(false);
+          }
         },
 
         onSubmitPress: function () {
@@ -1107,15 +1428,189 @@ sap.ui.define(
 
           if (!oModel.getProperty("/canSubmit")) {
             MessageBox.warning(
-              "Tüm kalemleri tamamlayın. Stoktan fazla sayılan kalemler gönderilemez.",
+              "Tüm kategori sayımlarını tamamlayın. Stoktan fazla sayılan kalemler gönderilemez.",
             );
             return;
           }
 
+          this._openCommissionDialog(oVehicle, aItems);
+        },
+
+        _openCommissionDialog: function (oVehicle, aItems) {
+          var oModel = this.getView().getModel("returnFactoryShipmentModel");
+          var sRegion = this._deriveCommissionRegion(
+            oModel.getProperty("/warehouse"),
+          );
+
+          this._oPendingCommissionSubmission = {
+            vehicle: oVehicle,
+            items: aItems,
+          };
+          oModel.setProperty("/commissionDialog", {
+            allMembers: [],
+            members: [],
+            searchQuery: "",
+            selectedCount: 0,
+            region: sRegion,
+            busy: true,
+          });
+
+          if (!this._oCommissionDialog) {
+            this._oCommissionDialog = sap.ui.xmlfragment(
+              this.getView().getId(),
+              "com.sut.bolgeyonetim.view.CommissionMemberDialog",
+              this,
+            );
+            this.getView().addDependent(this._oCommissionDialog);
+          }
+          this._oCommissionDialog.open();
+
+          this._readSet("/KomisyonListSet", [
+            new Filter("Bolge", FilterOperator.EQ, sRegion),
+          ])
+            .then(function (aMembers) {
+              var aPreparedMembers = aMembers.map(
+                function (oMember) {
+                  return Object.assign({}, oMember, {
+                    Selected: false,
+                    _normalizedSearchText: this._normalizeTurkishSearchText(
+                      [oMember.SicilNo, oMember.AdSoyad, oMember.Unvan].join(
+                        " ",
+                      ),
+                    ),
+                  });
+                }.bind(this),
+              );
+              oModel.setProperty(
+                "/commissionDialog/allMembers",
+                aPreparedMembers,
+              );
+              oModel.setProperty(
+                "/commissionDialog/members",
+                aPreparedMembers.slice(),
+              );
+            }.bind(this))
+            .catch(
+              function (oError) {
+                this._closeCommissionDialog();
+                MessageBox.error(
+                  this._getErrorMessage(
+                    oError,
+                    this.getResourceBundle().getText(
+                      "factoryShipmentCommissionLoadError",
+                    ),
+                  ),
+                );
+              }.bind(this),
+            )
+            .finally(function () {
+              oModel.setProperty("/commissionDialog/busy", false);
+            });
+        },
+
+        onCommissionSearch: function (oEvent) {
+          var oModel = this.getView().getModel("returnFactoryShipmentModel");
+          var sQuery = this._normalizeTurkishSearchText(
+            oEvent.getParameter("newValue") !== undefined
+              ? oEvent.getParameter("newValue")
+              : oEvent.getParameter("query"),
+          );
+          var aAllMembers =
+            oModel.getProperty("/commissionDialog/allMembers") || [];
+
+          oModel.setProperty(
+            "/commissionDialog/members",
+            sQuery
+              ? aAllMembers.filter(function (oMember) {
+                  return oMember._normalizedSearchText.indexOf(sQuery) !== -1;
+                })
+              : aAllMembers.slice(),
+          );
+        },
+
+        onCommissionSelectionChange: function (oEvent) {
+          var oModel = this.getView().getModel("returnFactoryShipmentModel");
+          var aAllMembers =
+            oModel.getProperty("/commissionDialog/allMembers") || [];
+          var aChangedItems = oEvent.getParameter("listItems") || [];
+          var oChangedItem = oEvent.getParameter("listItem");
+          var bSelected = oEvent.getParameter("selected");
+          var aChangedMembers = [];
+          var iSelectedCount;
+          var bLimitReached = false;
+
+          if (!aChangedItems.length && oChangedItem) {
+            aChangedItems = [oChangedItem];
+          }
+
+          aChangedItems.forEach(function (oItem) {
+            var oContext = oItem.getBindingContext(
+              "returnFactoryShipmentModel",
+            );
+            var oMember = oContext && oContext.getObject();
+
+            if (oMember) {
+              aChangedMembers.push(oMember);
+            }
+          });
+          iSelectedCount = aAllMembers.filter(function (oMember) {
+            return (
+              oMember.Selected && aChangedMembers.indexOf(oMember) === -1
+            );
+          }).length;
+
+          aChangedItems.forEach(function (oItem, iIndex) {
+            var oMember = aChangedMembers[iIndex];
+
+            if (!oMember) {
+              return;
+            }
+            if (!bSelected) {
+              oMember.Selected = false;
+              return;
+            }
+            if (iSelectedCount >= 4) {
+              oItem.setSelected(false);
+              oMember.Selected = false;
+              bLimitReached = true;
+              return;
+            }
+            oMember.Selected = true;
+            iSelectedCount++;
+          });
+
+          oModel.setProperty(
+            "/commissionDialog/selectedCount",
+            Math.max(0, iSelectedCount),
+          );
+          oModel.refresh(true);
+          if (bLimitReached) {
+            MessageToast.show(
+              this.getResourceBundle().getText(
+                "factoryShipmentCommissionSelectionLimit",
+              ),
+            );
+          }
+        },
+
+        onCommissionConfirm: function () {
+          var oModel = this.getView().getModel("returnFactoryShipmentModel");
+          var aSelectedMembers = (
+            oModel.getProperty("/commissionDialog/allMembers") || []
+          ).filter(function (oMember) {
+            return oMember.Selected;
+          });
+          var oPending = this._oPendingCommissionSubmission;
+
+          if (!oPending) {
+            return;
+          }
+          this._oCommissionDialog.close();
+
           MessageBox.confirm(
             this.getResourceBundle().getText(
               "factoryShipmentSubmitConfirmation",
-              [oVehicle.PlakaNo],
+              [oPending.vehicle.PlakaNo],
             ),
             {
               title: this.getResourceBundle().getText(
@@ -1123,15 +1618,33 @@ sap.ui.define(
               ),
               onClose: function (sAction) {
                 if (sAction === MessageBox.Action.OK) {
-                  this._submitShipment(oVehicle, aItems);
+                  this._submitShipment(
+                    oPending.vehicle,
+                    oPending.items,
+                    aSelectedMembers,
+                  );
                 }
+                this._oPendingCommissionSubmission = null;
               }.bind(this),
             },
           );
         },
 
-        _submitShipment: function (oVehicle, aItems) {
+        onCommissionCancel: function () {
+          this._closeCommissionDialog();
+        },
+
+        _closeCommissionDialog: function () {
+          if (this._oCommissionDialog) {
+            this._oCommissionDialog.close();
+          }
+          this._oPendingCommissionSubmission = null;
+        },
+
+        _submitShipment: function (oVehicle, aItems, aCommissionMembers) {
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
+
+          aCommissionMembers = aCommissionMembers || [];
 
           if (
             oModel.getProperty("/isSubmitting") ||
@@ -1153,6 +1666,14 @@ sap.ui.define(
             IrsTar: sShipmentDate,
             PlakaNo: oVehicle.PlakaNo || "",
             Werks: sSelectedPlantKey,
+            Komisyon1:
+              (aCommissionMembers[0] && aCommissionMembers[0].SicilNo) || "",
+            Komisyon2:
+              (aCommissionMembers[1] && aCommissionMembers[1].SicilNo) || "",
+            Komisyon3:
+              (aCommissionMembers[2] && aCommissionMembers[2].SicilNo) || "",
+            Komisyon4:
+              (aCommissionMembers[3] && aCommissionMembers[3].SicilNo) || "",
             ToItems: aItems.map(
               function (oItem, iIndex) {
                 return {
@@ -1164,7 +1685,9 @@ sap.ui.define(
                   Maktx: oItem.Maktx || "",
                   Meins: oItem.Meins || "",
                   SapStock: this._toODataDecimal(oItem.SapStock),
-                  MengeSayim: this._toODataDecimal(oItem.MengeSayim),
+                  MengeSayim: this._toODataDecimal(
+                    this._calculateItemTotal(oItem),
+                  ),
                   MengeUretimHatali: this._toODataDecimal(
                     oItem.MengeUretimHatali,
                   ),
@@ -1253,6 +1776,33 @@ sap.ui.define(
             return "18" + sWarehouse.substring(2);
           }
           return sWarehouse === "1900" ? "1800" : sWarehouse;
+        },
+
+        _deriveCommissionRegion: function (sWarehouseNum) {
+          var sWarehouse = String(sWarehouseNum || "").trim();
+
+          if (/^19/.test(sWarehouse)) {
+            return sWarehouse;
+          }
+          if (/^18/.test(sWarehouse)) {
+            return "19" + sWarehouse.substring(2);
+          }
+          if (/^\d{2}$/.test(sWarehouse)) {
+            return "19" + sWarehouse;
+          }
+          return "19" + sWarehouse.slice(-2).padStart(2, "0");
+        },
+
+        _normalizeTurkishSearchText: function (vValue) {
+          return String(vValue || "")
+            .toLocaleLowerCase("tr-TR")
+            .replace(/[çÇ]/g, "c")
+            .replace(/[ğĞ]/g, "g")
+            .replace(/[ıİiI]/g, "i")
+            .replace(/[öÖ]/g, "o")
+            .replace(/[şŞ]/g, "s")
+            .replace(/[üÜ]/g, "u")
+            .trim();
         },
 
         _formatMaterialCode: function (sMatnr) {

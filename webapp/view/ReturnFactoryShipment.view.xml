@@ -2,35 +2,50 @@
     controllerName="com.sut.bolgeyonetim.controller.ReturnFactoryShipment"
     xmlns:mvc="sap.ui.core.mvc"
     xmlns="sap.m"
-    xmlns:core="sap.ui.core">
+    xmlns:core="sap.ui.core"
+>
     <Page
         title="İade Gönderimi"
         showNavButton="true"
-        navButtonPress="onNavBack">
+        navButtonPress="onNavBack"
+    >
         <customHeader>
             <Toolbar>
                 <Button
                     icon="sap-icon://nav-back"
                     type="Transparent"
-                    press="onNavBack"/>
-                <Title text="İade Gönderimi"/>
-                <ToolbarSpacer/>
-                <Button
-                    visible="true"
-                    text="{i18n>factoryShipmentOpenApproval}"
-                    icon="sap-icon://approvals"
-                    type="Transparent"
-                    press="onApprovalScreenPress"/>
+                    press="onNavBack"
+                />
+                <Title text="İade Gönderimi" />
+                <ToolbarSpacer />
+                    <Button
+                        text="{i18n>factoryShipmentSendForApproval}"
+                        icon="sap-icon://accept"
+                        type="Emphasized"
+                        busy="{returnFactoryShipmentModel>/isSubmitting}"
+                        busyIndicatorDelay="0"
+                        enabled="{= ${returnFactoryShipmentModel>/canSubmit} &amp;&amp; !${returnFactoryShipmentModel>/isSubmitting} &amp;&amp; !${returnFactoryShipmentModel>/availabilityBusy} }"
+                        press="onSubmitPress"
+                    />
+                    <Button
+                        visible="true"
+                        text="{i18n>factoryShipmentOpenApproval}"
+                        icon="sap-icon://approvals"
+                        type="Transparent"
+                        press="onApprovalScreenPress"
+                    />
                 <DatePicker
                     visible="false"
                     value="{filterModel>/selectedDate}"
                     displayFormat="dd.MM.yyyy"
                     valueFormat="yyyy-MM-dd"
                     change="onDateChange"
-                    width="10rem"/>
+                    width="10rem"
+                />
                 <Label
                     visible="false"
-                    text="{sessionModel>/Login/WarehouseNum}"/>
+                    text="{sessionModel>/Login/WarehouseNum}"
+                />
             </Toolbar>
         </customHeader>
         <content>
@@ -38,12 +53,14 @@
                 <OverflowToolbar
                     busy="{= ${returnFactoryShipmentModel>/isSubmitting} || ${returnFactoryShipmentModel>/availabilityBusy} }"
                     busyIndicatorDelay="0"
-                    class="returnFactoryActionBar">
+                    class="returnFactoryActionBar"
+                >
                     <core:Icon
                         src="sap-icon://shipping-status"
                         size="1.25rem"
-                        color="#0854A0"/>
-                    <Label text="Plaka"/>
+                        color="#0854A0"
+                    />
+                    <Label text="Plaka" />
                     <ComboBox
                         width="10rem"
                         enabled="{returnFactoryShipmentModel>/createAllowed}"
@@ -55,12 +72,14 @@
                         items="{
                             path: 'returnFactoryShipmentModel>/vehicles',
                             templateShareable: false
-                        }">
+                        }"
+                    >
                         <core:Item
                             key="{returnFactoryShipmentModel>VehicleKey}"
-                            text="{returnFactoryShipmentModel>VehicleText}"/>
+                            text="{returnFactoryShipmentModel>VehicleText}"
+                        />
                     </ComboBox>
-                    <Label text="&#220;Y"/>
+                    <Label text="&#220;Y" />
                     <Select
                         width="10rem"
                         enabled="{returnFactoryShipmentModel>/createAllowed}"
@@ -69,20 +88,27 @@
                         items="{
                             path: 'returnFactoryShipmentModel>/plants',
                             templateShareable: false
-                        }">
+                        }"
+                    >
                         <core:Item
                             key="{returnFactoryShipmentModel>PlantKey}"
-                            text="{returnFactoryShipmentModel>PlantText}"/>
+                            text="{returnFactoryShipmentModel>PlantText}"
+                        />
                     </Select>
-                    <ToolbarSpacer/>
+                    <ToolbarSpacer />
+
                     <Button
                         text="Tümünü Genişlet"
                         icon="sap-icon://expand-all"
                         type="Transparent"
                         enabled="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' &amp;&amp; ${returnFactoryShipmentModel>/totalItemCount} > 0 &amp;&amp; ${returnFactoryShipmentModel>/expandedItemCount} !== ${returnFactoryShipmentModel>/totalItemCount} }"
-                        press="onExpandAllItemsPress">
+                        press="onExpandAllItemsPress"
+                    >
                         <customData>
-                            <core:CustomData key="expanded" value="true"/>
+                            <core:CustomData
+                                key="expanded"
+                                value="true"
+                            />
                         </customData>
                     </Button>
                     <Button
@@ -90,19 +116,27 @@
                         icon="sap-icon://collapse-all"
                         type="Transparent"
                         enabled="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' &amp;&amp; ${returnFactoryShipmentModel>/expandedItemCount} > 0 }"
-                        press="onExpandAllItemsPress">
+                        press="onExpandAllItemsPress"
+                    >
                         <customData>
-                            <core:CustomData key="expanded" value="false"/>
+                            <core:CustomData
+                                key="expanded"
+                                value="false"
+                            />
                         </customData>
                     </Button>
                     <Button
                         text="Tümünü Tamamla"
                         icon="sap-icon://multiselect-all"
                         type="Transparent"
-                        enabled="{= ${returnFactoryShipmentModel>/totalItemCount} > 0 &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
-                        press="onConfirmAllCountsPress">
+                        enabled="{= ${returnFactoryShipmentModel>/confirmationTargetCount} > 0 &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
+                        press="onConfirmAllCountsPress"
+                    >
                         <customData>
-                            <core:CustomData key="confirmed" value="true"/>
+                            <core:CustomData
+                                key="confirmed"
+                                value="true"
+                            />
                         </customData>
                     </Button>
                     <Button
@@ -110,22 +144,20 @@
                         icon="sap-icon://clear-all"
                         type="Transparent"
                         enabled="{= ${returnFactoryShipmentModel>/confirmedItemCount} > 0 &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
-                        press="onConfirmAllCountsPress">
+                        press="onConfirmAllCountsPress"
+                    >
                         <customData>
-                            <core:CustomData key="confirmed" value="false"/>
+                            <core:CustomData
+                                key="confirmed"
+                                value="false"
+                            />
                         </customData>
                     </Button>
                     <ObjectStatus
-                        text="{returnFactoryShipmentModel>/confirmedItemCount}/{returnFactoryShipmentModel>/totalItemCount}"
-                        state="None"/>
-                    <Button
-                        text="{i18n>factoryShipmentSendForApproval}"
-                        icon="sap-icon://accept"
-                        type="Emphasized"
-                        busy="{returnFactoryShipmentModel>/isSubmitting}"
-                        busyIndicatorDelay="0"
-                        enabled="{= ${returnFactoryShipmentModel>/canSubmit} &amp;&amp; !${returnFactoryShipmentModel>/isSubmitting} &amp;&amp; !${returnFactoryShipmentModel>/availabilityBusy} }"
-                        press="onSubmitPress"/>
+                        text="{returnFactoryShipmentModel>/confirmedItemCount}/{returnFactoryShipmentModel>/confirmationTargetCount}"
+                        state="None"
+                    />
+
                 </OverflowToolbar>
 
                 <MessageStrip
@@ -134,7 +166,8 @@
                     showIcon="true"
                     showCloseButton="false"
                     visible="{returnFactoryShipmentModel>/creationBlocked}"
-                    class="sapUiSmallMarginTop"/>
+                    class="sapUiSmallMarginTop"
+                />
 
                 <MessageStrip
                     text="{returnFactoryShipmentModel>/stockExceededMessage}"
@@ -142,18 +175,26 @@
                     showIcon="true"
                     showCloseButton="false"
                     visible="{returnFactoryShipmentModel>/hasStockExceeded}"
-                    class="sapUiSmallMarginTop"/>
+                    class="sapUiSmallMarginTop"
+                />
 
                 <Panel
                     expandable="false"
-                    class="sapUiSmallMarginTop returnFactoryProductPanel">
+                    class="sapUiSmallMarginTop returnFactoryProductPanel"
+                >
                     <headerToolbar>
                         <OverflowToolbar>
                             <core:Icon
                                 src="sap-icon://product"
-                                size="1.2rem"/>
-                            <Title text="Ürünler" level="H4"/>
-                            <ObjectNumber number="{returnFactoryShipmentModel>/totalItemCount}"/>
+                                size="1.2rem"
+                            />
+                            <Title
+                                text="Ürünler"
+                                level="H4"
+                            />
+                            <ObjectNumber
+                                number="{returnFactoryShipmentModel>/totalItemCount}"
+                            />
                         </OverflowToolbar>
                     </headerToolbar>
                     <content>
@@ -162,17 +203,22 @@
                                 alignItems="Center"
                                 justifyContent="SpaceBetween"
                                 wrap="Wrap"
-                                class="returnFactoryFilterHeading">
+                                class="returnFactoryFilterHeading"
+                            >
                                 <HBox alignItems="Center">
                                     <core:Icon
                                         src="sap-icon://filter"
                                         size="1rem"
-                                        class="sapUiTinyMarginEnd"/>
-                                    <Label text="&#220;r&#252;nleri kategoriye g&#246;re filtrele"/>
+                                        class="sapUiTinyMarginEnd"
+                                    />
+                                    <Label
+                                        text="&#220;r&#252;nleri kategoriye g&#246;re filtrele"
+                                    />
                                 </HBox>
                                 <ObjectStatus
                                     text="{= ${returnFactoryShipmentModel>/visibleItemCount} + ' / ' + ${returnFactoryShipmentModel>/totalItemCount} + ' &#252;r&#252;n' }"
-                                    state="None"/>
+                                    state="None"
+                                />
                             </HBox>
                             <SearchField
                                 value="{returnFactoryShipmentModel>/productSearchQuery}"
@@ -180,40 +226,53 @@
                                 liveChange="onProductSearch"
                                 search="onProductSearch"
                                 width="100%"
-                                class="returnFactoryProductSearch"/>
+                                class="returnFactoryProductSearch"
+                            />
                             <FlexBox
-                                wrap="Wrap"
+                                wrap="NoWrap"
                                 items="{
                                     path: 'returnFactoryShipmentModel>/categoryFilters',
                                     templateShareable: false
                                 }"
-                                class="returnFactoryFilterOptions">
+                                class="returnFactoryFilterOptions"
+                            >
                                 <items>
                                     <ToggleButton
                                         text="{returnFactoryShipmentModel>text}"
                                         pressed="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === ${returnFactoryShipmentModel>key} }"
                                         enabled="{= ${returnFactoryShipmentModel>key} === 'ALL' || ${returnFactoryShipmentModel>count} > 0 }"
                                         press="onCategoryFilterPress"
-                                        class="returnFactoryFilterButton"/>
+                                        class="returnFactoryFilterButton"
+                                    />
                                 </items>
                             </FlexBox>
                             <FlexBox
                                 visible="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'SATIS_FIRESI' }"
-                                wrap="Wrap"
+                                wrap="NoWrap"
                                 items="{
                                     path: 'returnFactoryShipmentModel>/salesFireFilters',
                                     templateShareable: false
                                 }"
-                                class="returnFactoryFilterOptions returnFactorySalesFireFilters">
+                                class="returnFactoryFilterOptions returnFactorySalesFireFilters"
+                            >
                                 <items>
                                     <ToggleButton
                                         text="{returnFactoryShipmentModel>text}"
                                         pressed="{= ${returnFactoryShipmentModel>/selectedSalesFireFilter} === ${returnFactoryShipmentModel>key} }"
                                         enabled="{= ${returnFactoryShipmentModel>key} === 'SATIS_FIRESI_ALL' || ${returnFactoryShipmentModel>count} > 0 }"
                                         press="onSalesFireFilterPress"
-                                        class="returnFactoryFilterButton"/>
+                                        class="returnFactoryFilterButton"
+                                    />
                                 </items>
                             </FlexBox>
+                            <HBox width="100%" justifyContent="End" class="returnFactoryCompletionFilters">
+                                <ToggleButton
+                                    text="{= 'Sayılmayan (' + ${returnFactoryShipmentModel>/uncountedItemCount} + ')' }"
+                                    tooltip="Sayılmayan ürünleri göster; tekrar basarak genel görünüme dön"
+                                    pressed="{= ${returnFactoryShipmentModel>/selectedCompletionFilter} === 'UNCOUNTED' }"
+                                    press="onCompletionFilterPress"
+                                    class="returnFactoryUncountedToggle"/>
+                            </HBox>
                         </VBox>
                         <List
                             id="returnFactoryProductList"
@@ -225,128 +284,207 @@
                             growingThreshold="30"
                             showSeparators="None"
                             noDataText="{returnFactoryShipmentModel>/filterNoDataText}"
-                            class="returnFactoryCardList">
+                            class="returnFactoryCardList"
+                        >
                             <items>
                                 <CustomListItem
                                     highlight="{returnFactoryShipmentModel>RowHighlight}"
                                     type="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' ? 'Active' : 'Inactive' }"
                                     press="onFactoryItemTogglePress"
-                                    tooltip="Ürün detaylarını açmak veya kapatmak için tıklayın">
-                                    <VBox class="returnFactoryItemCard sapUiSmallMargin">
+                                    tooltip="Ürün detaylarını açmak veya kapatmak için tıklayın"
+                                >
+                                    <VBox
+                                        class="returnFactoryItemCard sapUiSmallMargin"
+                                    >
                                         <HBox
                                             alignItems="Center"
                                             justifyContent="SpaceBetween"
                                             wrap="NoWrap"
-                                            class="returnFactoryItemHeader">
-                                            <HBox alignItems="Center" class="returnFactoryMaterialBlock sapUiTinyMarginEnd">
+                                            class="returnFactoryItemHeader"
+                                        >
+                                            <HBox
+                                                alignItems="Center"
+                                                class="returnFactoryMaterialBlock sapUiTinyMarginEnd"
+                                            >
                                                 <core:Icon
                                                     visible="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' }"
                                                     src="{= ${returnFactoryShipmentModel>_expanded} ? 'sap-icon://slim-arrow-up' : 'sap-icon://slim-arrow-down' }"
                                                     size="1rem"
-                                                    class="sapUiTinyMarginEnd"/>
+                                                    class="sapUiTinyMarginEnd"
+                                                />
                                                 <ObjectIdentifier
                                                     title="{returnFactoryShipmentModel>Maktx}"
                                                     text="{returnFactoryShipmentModel>MaterialDisplayCode}"
-                                                    class="returnFactoryMaterial"/>
+                                                    class="returnFactoryMaterial"
+                                                />
                                             </HBox>
-                                            <HBox alignItems="Center" wrap="NoWrap" class="returnFactoryHeaderMetrics">
-                                                <VBox class="returnFactoryStockMetric sapUiTinyMarginEnd">
-                                                    <Label text="Stok"/>
+                                            <HBox
+                                                alignItems="Center"
+                                                wrap="NoWrap"
+                                                class="returnFactoryHeaderMetrics"
+                                            >
+                                                <VBox
+                                                    visible="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' }"
+                                                    class="returnFactoryStockMetric sapUiTinyMarginEnd"
+                                                >
+                                                    <Label text="Stok" />
                                                     <ObjectNumber
                                                         number="{returnFactoryShipmentModel>SapStock}"
-                                                        unit="{returnFactoryShipmentModel>Meins}"/>
-                                                </VBox>
-                                                <VBox class="returnFactoryStockMetric sapUiTinyMarginEnd">
-                                                    <Label text="Sayım"/>
-                                                    <ObjectNumber
-                                                        number="{returnFactoryShipmentModel>SelectedCategoryCount}"
                                                         unit="{returnFactoryShipmentModel>Meins}"
-                                                        state="{returnFactoryShipmentModel>RowState}"/>
+                                                    />
                                                 </VBox>
-                                                <CheckBox
-                                                    text=""
-                                                    selected="{returnFactoryShipmentModel>_countConfirmed}"
-                                                    enabled="{returnFactoryShipmentModel>/createAllowed}"
-                                                    tooltip="Bu kalemin fiziksel sayımı tamamlandı"
-                                                    select="onCountConfirmed"/>
+                                                <VBox
+                                                    class="returnFactoryStockMetric returnFactoryCountMetric"
+                                                >
+                                                    <Label text="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'DIGER' ? 'Diğer' : 'Sayım' }" />
+                                                    <HBox
+                                                        alignItems="Center"
+                                                        wrap="NoWrap"
+                                                        class="returnFactoryCountRow"
+                                                    >
+                                                        <ObjectNumber
+                                                            visible="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' || ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'DIGER' }"
+                                                            number="{returnFactoryShipmentModel>SelectedCategoryCount}"
+                                                            unit="{returnFactoryShipmentModel>Meins}"
+                                                            state="{returnFactoryShipmentModel>RowState}"
+                                                        />
+                                                        <HBox
+                                                            visible="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} !== 'ALL' &amp;&amp; ${returnFactoryShipmentModel>/selectedCategoryFilter} !== 'DIGER' }"
+                                                            alignItems="Center">
+                                                            <Input
+                                                                value="{returnFactoryShipmentModel>SelectedCategoryCount}"
+                                                                type="Number"
+                                                                width="5rem"
+                                                                textAlign="End"
+                                                                editable="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
+                                                                change="onFilteredCountChange"
+                                                                class="returnFactoryQuantityInput sapUiTinyMarginEnd"/>
+                                                            <Text text="{returnFactoryShipmentModel>Meins}"/>
+                                                        </HBox>
+                                                        <CheckBox
+                                                            text=""
+                                                            selected="{returnFactoryShipmentModel>_countConfirmed}"
+                                                            enabled="{returnFactoryShipmentModel>/createAllowed}"
+                                                            tooltip="Bu kalemin fiziksel sayımı tamamlandı"
+                                                            select="onCountConfirmed"
+                                                            class="returnFactoryConfirmCheck"/>
+                                                    </HBox>
+                                                </VBox>
                                             </HBox>
                                         </HBox>
 
-                                        <VBox visible="{returnFactoryShipmentModel>_expanded}">
+                                        <VBox
+                                            visible="{returnFactoryShipmentModel>_expanded}"
+                                        >
                                             <Button
                                                 text="Ekstra &#304;ade Nedeni Giri&#351;i"
                                                 icon="sap-icon://add"
                                                 type="Transparent"
                                                 enabled="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
                                                 press="onExtraReturnReasonPress"
-                                                class="sapUiTinyMarginTop sapUiTinyMarginBottom returnFactoryExtraReasonButton"/>
+                                                class="sapUiTinyMarginTop sapUiTinyMarginBottom returnFactoryExtraReasonButton"
+                                            />
 
-                                            <FlexBox wrap="Wrap" class="returnFactoryCategoryGrid">
-                                            <VBox class="returnFactoryQuantityField">
-                                                <Label text="Üretim Hatalı"/>
-                                                <Input
-                                                    value="{returnFactoryShipmentModel>MengeUretimHatali}"
-                                                    type="Number"
-                                                    textAlign="End"
-                                                    class="returnFactoryQuantityInput"
-                                                    editable="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
-                                                    change="onCountChange"/>
-                                            </VBox>
-                                            <VBox class="returnFactoryQuantityField">
-                                                <Label text="Fabrika Lojistik"/>
-                                                <Input
-                                                    value="{returnFactoryShipmentModel>MengeFabrikaLojistik}"
-                                                    type="Number"
-                                                    textAlign="End"
-                                                    class="returnFactoryQuantityInput"
-                                                    editable="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
-                                                    change="onCountChange"/>
-                                            </VBox>
-                                            <VBox class="returnFactorySalesFireGroup">
-                                                <Title text="Satış Firesi" level="H6"/>
-                                                <FlexBox wrap="Wrap">
-                                                    <VBox class="returnFactoryQuantityField returnFactorySalesFireField">
-                                                        <Label text="Katı"/>
-                                                        <Input
-                                                            value="{returnFactoryShipmentModel>MengeSatisFireKati}"
-                                                            type="Number"
-                                                            textAlign="End"
-                                                            class="returnFactoryQuantityInput"
-                                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
-                                                            change="onCountChange"/>
-                                                    </VBox>
-                                                    <VBox class="returnFactoryQuantityField returnFactorySalesFireField">
-                                                        <Label text="Sıvı"/>
-                                                        <Input
-                                                            value="{returnFactoryShipmentModel>MengeSatisFireSivi}"
-                                                            type="Number"
-                                                            textAlign="End"
-                                                            class="returnFactoryQuantityInput"
-                                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
-                                                            change="onCountChange"/>
-                                                    </VBox>
-                                                    <VBox class="returnFactoryQuantityField returnFactorySalesFireField">
-                                                        <Label text="UHT"/>
-                                                        <Input
-                                                            value="{returnFactoryShipmentModel>MengeSatisFireUht}"
-                                                            type="Number"
-                                                            textAlign="End"
-                                                            class="returnFactoryQuantityInput"
-                                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
-                                                            change="onCountChange"/>
-                                                    </VBox>
-                                                    <VBox class="returnFactoryQuantityField returnFactorySalesFireField">
-                                                        <Label text="Cam"/>
-                                                        <Input
-                                                            value="{returnFactoryShipmentModel>MengeSatisFireCam}"
-                                                            type="Number"
-                                                            textAlign="End"
-                                                            class="returnFactoryQuantityInput"
-                                                            editable="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
-                                                            change="onCountChange"/>
-                                                    </VBox>
-                                                </FlexBox>
-                                            </VBox>
+                                            <FlexBox
+                                                wrap="Wrap"
+                                                class="returnFactoryCategoryGrid"
+                                            >
+                                                <VBox
+                                                    class="returnFactoryQuantityField"
+                                                >
+                                                    <Label
+                                                        text="Üretim Hatalı"
+                                                    />
+                                                    <Input
+                                                        value="{returnFactoryShipmentModel>MengeUretimHatali}"
+                                                        type="Number"
+                                                        textAlign="End"
+                                                        class="returnFactoryQuantityInput"
+                                                        editable="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
+                                                        change="onCountChange"
+                                                    />
+                                                </VBox>
+                                                <VBox
+                                                    class="returnFactoryQuantityField"
+                                                >
+                                                    <Label
+                                                        text="Fabrika Lojistik"
+                                                    />
+                                                    <Input
+                                                        value="{returnFactoryShipmentModel>MengeFabrikaLojistik}"
+                                                        type="Number"
+                                                        textAlign="End"
+                                                        class="returnFactoryQuantityInput"
+                                                        editable="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
+                                                        change="onCountChange"
+                                                    />
+                                                </VBox>
+                                                <VBox
+                                                    class="returnFactorySalesFireGroup"
+                                                >
+                                                    <Title
+                                                        text="Satış Firesi"
+                                                        level="H6"
+                                                    />
+                                                    <FlexBox wrap="Wrap">
+                                                        <VBox
+                                                            class="returnFactoryQuantityField returnFactorySalesFireField"
+                                                        >
+                                                            <Label
+                                                                text="Katı"
+                                                            />
+                                                            <Input
+                                                                value="{returnFactoryShipmentModel>MengeSatisFireKati}"
+                                                                type="Number"
+                                                                textAlign="End"
+                                                                class="returnFactoryQuantityInput"
+                                                                editable="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
+                                                                change="onCountChange"
+                                                            />
+                                                        </VBox>
+                                                        <VBox
+                                                            class="returnFactoryQuantityField returnFactorySalesFireField"
+                                                        >
+                                                            <Label
+                                                                text="Sıvı"
+                                                            />
+                                                            <Input
+                                                                value="{returnFactoryShipmentModel>MengeSatisFireSivi}"
+                                                                type="Number"
+                                                                textAlign="End"
+                                                                class="returnFactoryQuantityInput"
+                                                                editable="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
+                                                                change="onCountChange"
+                                                            />
+                                                        </VBox>
+                                                        <VBox
+                                                            class="returnFactoryQuantityField returnFactorySalesFireField"
+                                                        >
+                                                            <Label text="UHT" />
+                                                            <Input
+                                                                value="{returnFactoryShipmentModel>MengeSatisFireUht}"
+                                                                type="Number"
+                                                                textAlign="End"
+                                                                class="returnFactoryQuantityInput"
+                                                                editable="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
+                                                                change="onCountChange"
+                                                            />
+                                                        </VBox>
+                                                        <VBox
+                                                            class="returnFactoryQuantityField returnFactorySalesFireField"
+                                                        >
+                                                            <Label text="Cam" />
+                                                            <Input
+                                                                value="{returnFactoryShipmentModel>MengeSatisFireCam}"
+                                                                type="Number"
+                                                                textAlign="End"
+                                                                class="returnFactoryQuantityInput"
+                                                                editable="{= !${returnFactoryShipmentModel>_countConfirmed} &amp;&amp; ${returnFactoryShipmentModel>/createAllowed} }"
+                                                                change="onCountChange"
+                                                            />
+                                                        </VBox>
+                                                    </FlexBox>
+                                                </VBox>
                                             </FlexBox>
                                         </VBox>
                                     </VBox>
