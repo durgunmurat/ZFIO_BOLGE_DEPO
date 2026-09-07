@@ -42,6 +42,8 @@
 "   SapStock     Edm.Decimal        Precision 13, Scale 3
 "   MengeSayim   Edm.Decimal        Precision 13, Scale 3
 "   MengeUretimHatali     Edm.Decimal Precision 13, Scale 3
+"   UretimAltNeden        Edm.String  (ABAP type EKPO-ZZALTNDN)
+"   UretimSkt             Edm.DateTime (ABAP type EKPO-ZZSKTAR, Nullable)
 "   MengeFabrikaLojistik  Edm.Decimal Precision 13, Scale 3
 "   MengeSatisFireKati    Edm.Decimal Precision 13, Scale 3
 "   MengeSatisFireSivi    Edm.Decimal Precision 13, Scale 3
@@ -54,6 +56,7 @@
 "
 " Entity sets:
 "   ReturnFactoryVehicleSet, ReturnFactoryStockSet, ReturnFactoryShipmentSet
+"   ReturnFactorySubReasonSet (read-only value help; Grund='0002')
 
 " ----------------------------------------------------------------------
 " PRIVATE SECTION - yeni tipler ve metot tanimlari
@@ -243,6 +246,13 @@ ENDMETHOD.
 
 METHOD validate_return_factory_items.
   DATA lr_matnr TYPE RANGE OF matnr.
+  DATA lt_valid_altnd TYPE HASHED TABLE OF zsd_t_refund_008-altnd
+    WITH UNIQUE KEY table_line.
+
+  SELECT DISTINCT altnd
+    FROM zsd_t_refund_008
+    WHERE grund = '0002'
+    INTO TABLE @lt_valid_altnd.
 
   LOOP AT ct_items ASSIGNING FIELD-SYMBOL(<item>).
     <item>-matnr = |{ <item>-matnr ALPHA = IN }|.
@@ -257,6 +267,21 @@ METHOD validate_return_factory_items.
         EXPORTING
           textid  = /iwbep/cx_mgw_busi_exception=>business_error
           message = |{ <item>-matnr ALPHA = OUT }: negatif miktar girilemez|.
+    ENDIF.
+
+    IF <item>-mengeuretimhatali > 0.
+      IF <item>-uretimaltneden IS INITIAL OR <item>-uretimskt IS INITIAL.
+        RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+          EXPORTING
+            textid  = /iwbep/cx_mgw_busi_exception=>business_error
+            message = |{ <item>-matnr ALPHA = OUT }: uretim hatasi alt nedeni ve SKT zorunludur|.
+      ENDIF.
+      IF NOT line_exists( lt_valid_altnd[ table_line = <item>-uretimaltneden ] ).
+        RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+          EXPORTING
+            textid  = /iwbep/cx_mgw_busi_exception=>business_error
+            message = |{ <item>-matnr ALPHA = OUT }: uretim hatasi alt nedeni gecersizdir|.
+      ENDIF.
     ENDIF.
 
     DATA(lv_category_total) =
@@ -636,7 +661,9 @@ METHOD post_return_factory_shipment.
       quantity = <source_item>-mengeuretimhatali
       sap_stock = <source_item>-sapstock
       uom = <source_item>-meins
-      zzgrund = '2' zzaltndn = '01' zzsktar = sy-datum )
+      zzgrund = '0002'
+      zzaltndn = <source_item>-uretimaltneden
+      zzsktar = <source_item>-uretimskt )
       TO lt_category.
     APPEND VALUE #(
       po_group = '4' category = 'FABLOJ'

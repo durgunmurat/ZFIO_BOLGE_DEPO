@@ -7034,6 +7034,8 @@ ENDMETHOD.
     lt_poschedulex      TYPE TABLE OF bapimeposchedulx,
     lt_extensionin      TYPE TABLE OF bapiparex,
     lt_po_group         TYPE STANDARD TABLE OF char1 WITH EMPTY KEY,
+    lv_uretim_skt       TYPE ekpo-zzsktar,
+    lv_uretim_time      TYPE t,
     lv_awkey            TYPE awkey,
     lv_awtyp            TYPE awtyp VALUE 'MKPF',
     lo_op               TYPE REF TO /dsl/es10_cl_op,
@@ -7056,6 +7058,13 @@ ENDMETHOD.
   ENDIF.
 
   LOOP AT is_deep-toitems ASSIGNING FIELD-SYMBOL(<source_item>).
+    CLEAR: lv_uretim_skt, lv_uretim_time.
+    IF <source_item>-mengeuretimhatali > 0
+       AND <source_item>-uretimskt IS NOT INITIAL.
+      CONVERT TIME STAMP <source_item>-uretimskt TIME ZONE sy-zonlo
+        INTO DATE lv_uretim_skt TIME lv_uretim_time.
+    ENDIF.
+
     APPEND VALUE #(
       po_group = '2' category = 'URETIM'
       source_posnr = <source_item>-posnr
@@ -7063,7 +7072,9 @@ ENDMETHOD.
       quantity = <source_item>-mengeuretimhatali
       sap_stock = <source_item>-sapstock
       uom = <source_item>-meins
-      zzgrund = '2' zzaltndn = '01' zzsktar = sy-datum )
+      zzgrund = '0002'
+      zzaltndn = <source_item>-uretimaltneden
+      zzsktar = lv_uretim_skt )
       TO lt_category.
     APPEND VALUE #(
       po_group = '4' category = 'FABLOJ'
@@ -9796,6 +9807,11 @@ ENDMETHOD.
 
       CASE ls_log_i-category.
         WHEN 'URETIM'.
+          <deep_item>-uretimaltneden = ls_log_i-zzaltndn.
+          IF ls_log_i-zzsktar IS NOT INITIAL.
+            CONVERT DATE ls_log_i-zzsktar TIME '000000'
+              INTO TIME STAMP <deep_item>-uretimskt TIME ZONE sy-zonlo.
+          ENDIF.
           ADD ls_log_i-menge_cikis TO <deep_item>-mengeuretimhatali.
         WHEN 'FABLOJ'.
           ADD ls_log_i-menge_cikis TO <deep_item>-mengefabrikalojistik.
@@ -11714,6 +11730,13 @@ ENDMETHOD.
 METHOD validate_return_factory_items.
   DATA lr_matnr TYPE RANGE OF matnr.
   DATA lv_meins_in TYPE meins.
+  DATA lt_valid_altnd TYPE HASHED TABLE OF zsd_t_refund_008-altnd
+    WITH UNIQUE KEY table_line.
+
+  SELECT DISTINCT altnd
+    FROM zsd_t_refund_008
+    WHERE grund = '0002'
+    INTO TABLE @lt_valid_altnd.
   LOOP AT ct_items ASSIGNING FIELD-SYMBOL(<item>).
     CLEAR lv_meins_in.
 
@@ -11794,6 +11817,21 @@ METHOD validate_return_factory_items.
         EXPORTING
           textid  = /iwbep/cx_mgw_busi_exception=>business_error
           message = |{ <item>-matnr ALPHA = OUT }: sayim miktari mevcut stogu asamaz|.
+    ENDIF.
+
+    IF <item>-mengeuretimhatali > 0.
+      IF <item>-uretimaltneden IS INITIAL OR <item>-uretimskt IS INITIAL.
+        RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+          EXPORTING
+            textid  = /iwbep/cx_mgw_busi_exception=>business_error
+            message = |{ <item>-matnr ALPHA = OUT }: uretim hatasi alt nedeni ve SKT zorunludur|.
+      ENDIF.
+      IF NOT line_exists( lt_valid_altnd[ table_line = <item>-uretimaltneden ] ).
+        RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+          EXPORTING
+            textid  = /iwbep/cx_mgw_busi_exception=>business_error
+            message = |{ <item>-matnr ALPHA = OUT }: uretim hatasi alt nedeni gecersizdir|.
+      ENDIF.
     ENDIF.
 
     IF lv_validated_category_total > lv_stock.

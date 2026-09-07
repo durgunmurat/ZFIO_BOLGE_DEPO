@@ -7,7 +7,7 @@
         <content>
             <VBox class="sapUiResponsiveContentPadding factoryApprovalPage">
                 <VBox class="factoryApprovalFilterPanel sapUiSmallMarginBottom">
-                    <FlexBox wrap="Wrap" alignItems="End" class="factoryApprovalFilterFields">
+                    <FlexBox wrap="Wrap" alignItems="Start" class="factoryApprovalFilterFields">
                         <VBox class="factoryApprovalFilterField factoryApprovalDateField">
                             <Label text="{i18n>factoryApprovalFilterDate}" labelFor="factoryApprovalDateFilter"/>
                             <DatePicker
@@ -55,7 +55,6 @@
                             <core:Icon src="sap-icon://documents" size="1.1rem"/>
                             <Title text="{i18n>factoryApprovalDocuments}" level="H4"/>
                             <ToolbarSpacer/>
-                            <ObjectStatus visible="{= !!${factoryApprovalModel>/pollingLogUid} }" text="{i18n>factoryApprovalPollingActive}" state="None"/>
                             <Button text="{i18n>factoryApprovalRefresh}" icon="sap-icon://refresh" type="Transparent" enabled="{= !${factoryApprovalModel>/listBusy} }" press="onRefreshPress"/>
                             <Button text="{i18n>factoryApprovalApprove}" icon="sap-icon://accept" type="Emphasized" busy="{factoryApprovalModel>/approvalBusy}" busyIndicatorDelay="0" enabled="{factoryApprovalModel>/canApprove}" press="onApprovePress"/>
                             <Button text="{i18n>factoryApprovalReject}" icon="sap-icon://decline" type="Reject" busy="{factoryApprovalModel>/rejectionBusy}" busyIndicatorDelay="0" enabled="{factoryApprovalModel>/canReject}" press="onRejectPress"/>
@@ -73,7 +72,7 @@
                                         <Label text="{i18n>factoryApprovalTargetPlant}"/>
                                         <Text text="{factoryApprovalModel>Werks}"/>
                                     </VBox>
-                                    <VBox class="factoryApprovalMetric factoryApprovalWideMetric">
+                                    <VBox visible="{factoryApprovalModel>ShowStockComparison}" class="factoryApprovalMetric factoryApprovalWideMetric">
                                         <Label text="{i18n>factoryApprovalTotalWarehouseStock}"/>
                                         <FlexBox wrap="Wrap" items="{path: 'factoryApprovalModel>TotalStocks', templateShareable: false}">
                                             <items>
@@ -89,7 +88,7 @@
                                             </items>
                                         </FlexBox>
                                     </VBox>
-                                    <VBox class="factoryApprovalMetric factoryApprovalWideMetric">
+                                    <VBox visible="{factoryApprovalModel>ShowStockComparison}" class="factoryApprovalMetric factoryApprovalWideMetric">
                                         <Label text="{i18n>factoryApprovalTotalDifference}"/>
                                         <FlexBox wrap="Wrap" items="{path: 'factoryApprovalModel>TotalDifferences', templateShareable: false}">
                                             <items>
@@ -99,6 +98,7 @@
                                     </VBox>
                                 </FlexBox>
                                 <MessageStrip
+                                    visible="{factoryApprovalModel>ShowStockComparison}"
                                     text="{= ${factoryApprovalModel>DifferenceCount} > 0 ? ${i18n>factoryApprovalStockDifferenceInfo} : ${i18n>factoryApprovalStockClearedInfo} }"
                                     type="{= ${factoryApprovalModel>DifferenceCount} > 0 ? 'Warning' : 'Information' }"
                                     showIcon="true"
@@ -137,11 +137,7 @@
                     <content>
                         <VBox>
                             <MessageStrip visible="{= !!${factoryApprovalModel>/selectedDocument/LastMessage} }" text="{factoryApprovalModel>/selectedDocument/LastMessage}" type="Information" showIcon="true" showCloseButton="false" class="sapUiTinyMarginBottom"/>
-                            <HBox visible="{= ${factoryApprovalModel>/selectedLogUid} === ${factoryApprovalModel>/jobLogUid} &amp;&amp; (!!${factoryApprovalModel>/jobName} || !!${factoryApprovalModel>/jobCount}) }" wrap="Wrap" class="factoryApprovalTechnicalDetails sapUiTinyMarginBottom">
-                                <ObjectStatus title="{i18n>factoryApprovalJobName}" text="{factoryApprovalModel>/jobName}" class="sapUiSmallMarginEnd"/>
-                                <ObjectStatus title="{i18n>factoryApprovalJobCount}" text="{factoryApprovalModel>/jobCount}"/>
-                            </HBox>
-                            <VBox class="factoryApprovalCategoryFilterPanel sapUiTinyMarginBottom">
+                            <VBox visible="{factoryApprovalModel>/selectedDocument/ShowStockComparison}" class="factoryApprovalCategoryFilterPanel sapUiTinyMarginBottom">
                                 <HBox alignItems="Center" class="factoryApprovalCategoryFilterHeading">
                                     <core:Icon src="sap-icon://filter" size="1rem"/>
                                     <Label text="{i18n>factoryApprovalCategoryFilterTitle}"/>
@@ -169,9 +165,9 @@
                                                 <ObjectStatus text="{factoryApprovalModel>StatusText}" state="{factoryApprovalModel>StatusState}"/>
                                             </HBox>
                                             <FlexBox wrap="NoWrap" width="100%" class="factoryApprovalPrimaryMetrics">
-                                                <VBox class="factoryApprovalQuantityMetric"><Label text="{i18n>factoryApprovalCurrentStock}"/><ObjectNumber number="{factoryApprovalModel>MevcutStokText}" unit="{factoryApprovalModel>Meins}"/></VBox>
+                                                <VBox visible="{factoryApprovalModel>ShowStockComparison}" class="factoryApprovalQuantityMetric"><Label text="{i18n>factoryApprovalCurrentStock}"/><ObjectNumber number="{factoryApprovalModel>MevcutStokText}" unit="{factoryApprovalModel>Meins}"/></VBox>
                                                 <VBox class="factoryApprovalQuantityMetric"><Label text="{i18n>factoryApprovalTotalCount}"/><ObjectNumber number="{factoryApprovalModel>ToplamSayimText}" unit="{factoryApprovalModel>Meins}"/></VBox>
-                                                <VBox class="factoryApprovalQuantityMetric"><Label text="{i18n>factoryApprovalDifference}"/><ObjectNumber number="{factoryApprovalModel>FarkText}" unit="{factoryApprovalModel>Meins}" state="{factoryApprovalModel>DifferenceState}"/></VBox>
+                                                <VBox visible="{factoryApprovalModel>ShowStockComparison}" class="factoryApprovalQuantityMetric"><Label text="{i18n>factoryApprovalDifference}"/><ObjectNumber number="{factoryApprovalModel>FarkText}" unit="{factoryApprovalModel>Meins}" state="{factoryApprovalModel>DifferenceState}"/></VBox>
                                             </FlexBox>
                                             <VBox visible="{factoryApprovalModel>_expanded}">
                                                 <FlexBox wrap="NoWrap" width="100%" class="factoryApprovalCategoryMetrics">

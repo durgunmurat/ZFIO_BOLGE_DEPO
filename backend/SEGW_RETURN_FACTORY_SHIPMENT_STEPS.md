@@ -17,6 +17,8 @@ Bu akış, `fabrika gönderim.xlsx` içindeki yeni kategori modelini uygular. Es
 | Property | ABAP alanı | EDM tipi | Precision / Scale |
 |---|---|---|---|
 | `MengeUretimHatali` | `MENGEURETIMHATALI` | `Edm.Decimal` | 13 / 3 |
+| `UretimAltNeden` | `URETIMALTNEDEN` (`EKPO-ZZALTNDN`) | `Edm.String` | DDIC ile aynı |
+| `UretimSkt` | `URETIMSKT` (`EKPO-ZZSKTAR`) | `Edm.DateTime` | Precision 0, Nullable |
 | `MengeFabrikaLojistik` | `MENGEFABRIKALOJISTIK` | `Edm.Decimal` | 13 / 3 |
 | `MengeSatisFireKati` | `MENGESATISFIREKATI` | `Edm.Decimal` | 13 / 3 |
 | `MengeSatisFireSivi` | `MENGESATISFIRESIVI` | `Edm.Decimal` | 13 / 3 |
@@ -34,6 +36,21 @@ Navigation ve anahtar yapısı değişmez:
 
 - `ReturnFactoryShipment(Lgort, IrsTar, PlakaNo)`
 - `ToItems -> ReturnFactoryShipmentItem`
+
+Alt neden arama yardımı için ayrı, salt-okunur `ReturnFactorySubReason`
+entity'si ve `ReturnFactorySubReasonSet` entity set'i ekleyin:
+
+| Property | ABAP referansı | EDM tipi | Anahtar |
+|---|---|---|---|
+| `Grund` | `ZSD_T_REFUND_008-GRUND` | `Edm.String` | X |
+| `Altnd` | `ZSD_T_REFUND_008-ALTND` | `Edm.String` | X |
+| `AltndText` | `DD07T-DDTEXT` | `Edm.String` |  |
+
+Frontend bu seti `$filter=Grund eq '0002'` ile okur. Backend yine de filtreyi
+ve gönderilen alt nedeni doğrulamalı; frontend kontrolü güvenlik/doğruluk
+kontrolü yerine geçmez. Metin `DD07T` içinden `DOMNAME =
+'ZMM_IADE_NEDENI'`, `DDLANGUAGE = SY-LANGU`, `AS4LOCAL = 'A'` ve
+`DOMVALUE_L = ALTND` koşullarıyla okunur.
 Komisyon seçim listesi `KomisyonListSet` üzerinden `Bolge` filtresiyle okunur.
 Seçilen 0-4 üyenin sicil numaraları `ReturnFactoryShipmentSet` deep-create
 başlığındaki `Komisyon1`, `Komisyon2`, `Komisyon3`, `Komisyon4` alanlarıyla
@@ -50,7 +67,7 @@ en fazla iki UB siparişi oluşturur:
 
 | UB grubu | İçerik | `ZZGRUND` | `ZZALTNDN` | `ZZSKTAR` |
 |---|---|---:|---|---|
-| Üretim hatalı | Üretim Hatalı | `2` | `01` | `SY-DATUM` |
+| Üretim hatalı | Üretim Hatalı | `0002` | Fiori'den gelen `UretimAltNeden` | Fiori'den gelen `UretimSkt` |
 | Diğer | Fabrika Lojistik | `4` | boş | boş |
 | Diğer | Satış Firesi Katı/Sıvı/UHT/Cam | `4` | `09` | boş |
 
@@ -124,6 +141,10 @@ En az şu senaryoları çalıştırın:
    belgesi oluşmamalı.
 8. Aynı `LogUid` ile tekrar POST: `P` ve `S` durumlarında reddedilmeli; kısmi
    belge oluşmuş `E` kaydı otomatik tekrar edilmemelidir.
+9. Üretim hatalı miktar pozitifken alt neden veya SKT boş: hiçbir log/UB
+   belgesi oluşmadan business error dönmeli.
+10. `ZSD_T_REFUND_008` içinde `GRUND = '0002'` için bulunmayan alt neden:
+    business error dönmeli.
 
 Tutanak formu dokümanı henüz paylaşılmadığı için form içeriği bu pakete dahil
 değildir. Mevcut giden irsaliye tetiklemesi korunmuştur.

@@ -309,9 +309,16 @@
 }
 
 .factoryApprovalFilterField > .sapMLabel {
+    display: block;
+    min-height: 1.5rem;
     margin-bottom: 0.2rem;
     color: #52606d;
     font-weight: 600;
+}
+
+.factoryApprovalFilterField > .sapMInputBase,
+.factoryApprovalFilterField > .sapMSlt {
+    width: 100% !important;
 }
 
 .factoryApprovalFilterField .sapMInputBaseInner,
@@ -322,6 +329,7 @@
 
 .factoryApprovalFilterActions {
     margin-left: auto;
+    padding-top: 1.7rem;
 }
 
 .factoryApprovalDocumentList,
@@ -497,12 +505,6 @@
     font-size: 0.75rem;
 }
 
-.factoryApprovalTechnicalDetails {
-    padding: 0.5rem;
-    border-radius: 0.25rem;
-    background: #f7fafd;
-}
-
 .factoryApprovalCategoryFilterPanel {
     padding: 0.65rem 0.75rem;
     border: 1px solid #d9e2ec;
@@ -540,6 +542,7 @@
     .factoryApprovalFilterActions {
         width: 100%;
         margin-left: 0;
+        padding-top: 0;
         justify-content: flex-end;
     }
 
@@ -565,5 +568,100 @@
 
     .factoryApprovalFilterActions .sapMBtn {
         flex: 1 1 50%;
+    }
+}
+.productionDefectDialogContent {
+    box-sizing: border-box;
+    padding: 1rem;
+}
+
+.productionDefectList,
+.productionDefectList .sapMListUl {
+    background: transparent;
+}
+
+.productionDefectList .sapMLIB {
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+    border: 1px solid #d9e2ec;
+    border-radius: 0.5rem;
+    background: #fff;
+}
+
+.productionDefectList .sapMLIB:last-child {
+    margin-bottom: 0;
+}
+
+.productionDefectList .sapMLIBContent {
+    padding: 0 !important;
+}
+
+.productionDefectCard {
+    box-sizing: border-box;
+    padding: 1rem;
+}
+
+.productionDefectCardHeader {
+    gap: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e5e9f0;
+}
+
+.productionDefectIdentity {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.productionDefectIdentity .sapMObjectIdentifierTitle .sapMText {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.productionDefectQuantity {
+    flex: 0 0 auto;
+    text-align: right;
+}
+
+.productionDefectFields {
+    gap: 1rem;
+    padding-top: 0.75rem;
+}
+
+.productionDefectField {
+    min-width: 0;
+}
+
+.productionDefectField > .sapMLabel {
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+}
+
+.productionDefectReasonField {
+    flex: 1 1 20rem;
+}
+
+.productionDefectDateField {
+    flex: 1 1 13rem;
+}
+
+@media (max-width: 700px) {
+    .productionDefectDialogContent {
+        padding: 0.75rem;
+    }
+
+    .productionDefectCard {
+        padding: 0.75rem;
+    }
+
+    .productionDefectFields {
+        display: block !important;
+    }
+
+    .productionDefectField {
+        width: 100% !important;
+    }
+
+    .productionDefectField + .productionDefectField {
+        margin-top: 0.75rem;
     }
 }

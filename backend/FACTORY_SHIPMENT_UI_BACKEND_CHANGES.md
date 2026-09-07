@@ -137,10 +137,15 @@ Değiştirilecek metod: `APPROVE_FACTORY_SHIPMENT`.
 
 ## 5. SEGW / OData kontrol listesi
 
-Mevcut modelde alanlar varsa yeni property gerekmez:
+Mevcut miktar ve onay alanları için yeni property gerekmez:
 
 - `ReturnFactoryStock`: `MengeSayim` ve tüm kategori miktarları.
 - `ReturnFactoryApproval`: `MevcutStok`, `ToplamSayim`, `Fark`, `SatisFiresi`, `UretimHatali`, `FabrikaLojistik`, `Diger`.
+
+Üretim hatası alt neden/SKT talebi için ise `ReturnFactoryShipmentItem`
+entity'sine `UretimAltNeden` ve `UretimSkt`, ayrıca value help için
+`ReturnFactorySubReasonSet` eklenmelidir. Ayrıntılı sözleşme ve kod akışı
+`RETURN_FACTORY_PRODUCTION_DEFECT_DETAILS.md` dosyasındadır.
 
 Değişikliklerden sonra:
 

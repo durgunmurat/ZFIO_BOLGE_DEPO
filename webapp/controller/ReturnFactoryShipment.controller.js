@@ -66,6 +66,11 @@ sap.ui.define(
               region: "",
               busy: false,
             },
+            productionDefectDialog: {
+              items: [],
+              reasons: [],
+              busy: false,
+            },
             extraReturnDialog: {
               itemPath: "",
               materialText: "",
@@ -113,6 +118,10 @@ sap.ui.define(
           if (this._oCommissionDialog) {
             this._oCommissionDialog.destroy();
             this._oCommissionDialog = null;
+          }
+          if (this._oProductionDefectDetailsDialog) {
+            this._oProductionDefectDetailsDialog.destroy();
+            this._oProductionDefectDetailsDialog = null;
           }
         },
 
@@ -207,6 +216,11 @@ sap.ui.define(
                 region: "",
                 busy: false,
               },
+              productionDefectDialog: {
+                items: [],
+                reasons: [],
+                busy: false,
+              },
               extraReturnDialog: {
                 itemPath: "",
                 materialText: "",
@@ -295,6 +309,8 @@ sap.ui.define(
                     SelectedCategoryCount: this._calculateItemTotal(oItem),
                     MengeSayim: this._calculateItemTotal(oItem),
                     MengeUretimHatali: this._toNumber(oItem.MengeUretimHatali || 0),
+                    UretimAltNeden: oItem.UretimAltNeden || "",
+                    UretimSkt: oItem.UretimSkt || "",
                     MengeFabrikaLojistik: this._toNumber(oItem.MengeFabrikaLojistik || 0),
                     MengeSatisFireKati: this._toNumber(oItem.MengeSatisFireKati || 0),
                     MengeSatisFireSivi: this._toNumber(oItem.MengeSatisFireSivi || 0),
@@ -516,7 +532,7 @@ sap.ui.define(
           this.getView()
             .getModel("returnFactoryShipmentModel")
             .setProperty("/selectedCategoryFilter", sFilterKey || "ALL");
-          if (sFilterKey !== "ALL") {
+          if (sFilterKey !== "ALL" && sFilterKey !== "DIGER") {
             this._setAllItemExpansion(false, true);
           }
           this._applyCategoryFilter();
@@ -665,7 +681,7 @@ sap.ui.define(
             oModel.getProperty("/selectedCategoryFilter") || "ALL";
           var oDefinition;
 
-          if (sCategoryKey === "ALL") {
+          if (sCategoryKey === "ALL" || sCategoryKey === "DIGER") {
             return null;
           }
 
@@ -1236,7 +1252,11 @@ sap.ui.define(
           var oViewModel = this.getView().getModel(
             "returnFactoryShipmentModel",
           );
-          if (oViewModel.getProperty("/selectedCategoryFilter") !== "ALL") {
+          if (
+            ["ALL", "DIGER"].indexOf(
+              oViewModel.getProperty("/selectedCategoryFilter"),
+            ) === -1
+          ) {
             return;
           }
           var oContext = oEvent
@@ -1258,7 +1278,11 @@ sap.ui.define(
 
         onExpandAllItemsPress: function (oEvent) {
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
-          if (oModel.getProperty("/selectedCategoryFilter") !== "ALL") {
+          if (
+            ["ALL", "DIGER"].indexOf(
+              oModel.getProperty("/selectedCategoryFilter"),
+            ) === -1
+          ) {
             return;
           }
           var vExpanded = oEvent.getSource().data("expanded");
@@ -1270,9 +1294,13 @@ sap.ui.define(
         _setAllItemExpansion: function (bExpanded, bSkipUpdate) {
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
           var aItems = oModel.getProperty("/items") || [];
+          var bOtherSelected =
+            oModel.getProperty("/selectedCategoryFilter") === "DIGER";
 
           aItems.forEach(function (oItem) {
-            oItem._expanded = bExpanded;
+            if (!bOtherSelected || oItem._matchesSelectedCategory) {
+              oItem._expanded = bExpanded;
+            }
           });
           if (bSkipUpdate) {
             return;
@@ -1433,7 +1461,162 @@ sap.ui.define(
             return;
           }
 
+          if (
+            aItems.some(
+              function (oItem) {
+                return this._toNumber(oItem.MengeUretimHatali) > 0;
+              }.bind(this),
+            )
+          ) {
+            this._openProductionDefectDetailsDialog(oVehicle, aItems);
+            return;
+          }
+
           this._openCommissionDialog(oVehicle, aItems);
+        },
+
+        _openProductionDefectDetailsDialog: function (oVehicle, aItems) {
+          var oModel = this.getView().getModel("returnFactoryShipmentModel");
+          var aDialogItems = aItems
+            .map(
+              function (oItem, iIndex) {
+                if (this._toNumber(oItem.MengeUretimHatali) <= 0) {
+                  return null;
+                }
+                return {
+                  itemIndex: iIndex,
+                  MaterialDisplayCode:
+                    oItem.MaterialDisplayCode ||
+                    this._formatMaterialCode(oItem.Matnr),
+                  Maktx: oItem.Maktx || "",
+                  Meins: oItem.Meins || "",
+                  MengeUretimHatali: this._toNumber(
+                    oItem.MengeUretimHatali,
+                  ),
+                  UretimAltNeden: oItem.UretimAltNeden || "",
+                  UretimSkt: oItem.UretimSkt || "",
+                  _reasonInvalid: false,
+                  _dateInvalid: false,
+                };
+              }.bind(this),
+            )
+            .filter(Boolean);
+
+          this._oPendingProductionDefectSubmission = {
+            vehicle: oVehicle,
+            items: aItems,
+          };
+          oModel.setProperty("/productionDefectDialog/items", aDialogItems);
+          oModel.setProperty("/productionDefectDialog/reasons", []);
+          oModel.setProperty("/productionDefectDialog/busy", true);
+
+          if (!this._oProductionDefectDetailsDialog) {
+            this._oProductionDefectDetailsDialog = sap.ui.xmlfragment(
+              this.getView().getId(),
+              "com.sut.bolgeyonetim.view.ProductionDefectDetailsDialog",
+              this,
+            );
+            this.getView().addDependent(this._oProductionDefectDetailsDialog);
+          }
+          this._oProductionDefectDetailsDialog.open();
+
+          this._readSet("/ReturnFactorySubReasonSet", [
+            new Filter("Grund", FilterOperator.EQ, "0002"),
+          ])
+            .then(function (aReasons) {
+              oModel.setProperty("/productionDefectDialog/reasons", aReasons);
+            })
+            .catch(
+              function (oError) {
+                this._closeProductionDefectDetailsDialog();
+                MessageBox.error(
+                  this._getErrorMessage(
+                    oError,
+                    this.getResourceBundle().getText(
+                      "factoryShipmentProductionDefectReasonLoadError",
+                    ),
+                  ),
+                );
+              }.bind(this),
+            )
+            .finally(function () {
+              oModel.setProperty("/productionDefectDialog/busy", false);
+            });
+        },
+
+        onProductionDefectDetailsConfirm: function () {
+          var oModel = this.getView().getModel("returnFactoryShipmentModel");
+          var aDialogItems =
+            oModel.getProperty("/productionDefectDialog/items") || [];
+          var oPending = this._oPendingProductionDefectSubmission;
+          var bInvalid = false;
+
+          aDialogItems.forEach(function (oItem) {
+            oItem._reasonInvalid = !oItem.UretimAltNeden;
+            oItem._dateInvalid = !oItem.UretimSkt || oItem._dateInvalid;
+            bInvalid =
+              bInvalid || oItem._reasonInvalid || oItem._dateInvalid;
+          });
+          oModel.refresh(true);
+
+          if (bInvalid) {
+            MessageBox.warning(
+              this.getResourceBundle().getText(
+                "factoryShipmentProductionDefectRequired",
+              ),
+            );
+            return;
+          }
+          if (!oPending) {
+            return;
+          }
+
+          aDialogItems.forEach(function (oDialogItem) {
+            var oSourceItem = oPending.items[oDialogItem.itemIndex];
+            if (oSourceItem) {
+              oSourceItem.UretimAltNeden = oDialogItem.UretimAltNeden;
+              oSourceItem.UretimSkt = oDialogItem.UretimSkt;
+            }
+          });
+          this._oProductionDefectDetailsDialog.close();
+          this._oPendingProductionDefectSubmission = null;
+          this._openCommissionDialog(oPending.vehicle, oPending.items);
+        },
+
+        onProductionDefectDateChange: function (oEvent) {
+          var oContext = oEvent
+            .getSource()
+            .getBindingContext("returnFactoryShipmentModel");
+          if (oContext) {
+            oContext
+              .getModel()
+              .setProperty(
+                oContext.getPath() + "/_dateInvalid",
+                !oEvent.getParameter("valid"),
+              );
+          }
+        },
+
+        onProductionDefectReasonChange: function (oEvent) {
+          var oContext = oEvent
+            .getSource()
+            .getBindingContext("returnFactoryShipmentModel");
+          if (oContext) {
+            oContext
+              .getModel()
+              .setProperty(oContext.getPath() + "/_reasonInvalid", false);
+          }
+        },
+
+        onProductionDefectDetailsCancel: function () {
+          this._closeProductionDefectDetailsDialog();
+        },
+
+        _closeProductionDefectDetailsDialog: function () {
+          if (this._oProductionDefectDetailsDialog) {
+            this._oProductionDefectDetailsDialog.close();
+          }
+          this._oPendingProductionDefectSubmission = null;
         },
 
         _openCommissionDialog: function (oVehicle, aItems) {
@@ -1691,6 +1874,14 @@ sap.ui.define(
                   MengeUretimHatali: this._toODataDecimal(
                     oItem.MengeUretimHatali,
                   ),
+                  UretimAltNeden:
+                    this._toNumber(oItem.MengeUretimHatali) > 0
+                      ? oItem.UretimAltNeden || ""
+                      : "",
+                  UretimSkt:
+                    this._toNumber(oItem.MengeUretimHatali) > 0
+                      ? this._toODataJsonDate(oItem.UretimSkt)
+                      : null,
                   MengeFabrikaLojistik: this._toODataDecimal(
                     oItem.MengeFabrikaLojistik,
                   ),

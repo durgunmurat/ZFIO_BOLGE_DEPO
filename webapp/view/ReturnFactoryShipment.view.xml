@@ -101,7 +101,7 @@
                         text="Tümünü Genişlet"
                         icon="sap-icon://expand-all"
                         type="Transparent"
-                        enabled="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' &amp;&amp; ${returnFactoryShipmentModel>/totalItemCount} > 0 &amp;&amp; ${returnFactoryShipmentModel>/expandedItemCount} !== ${returnFactoryShipmentModel>/totalItemCount} }"
+                        enabled="{= (${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' || ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'DIGER') &amp;&amp; (${returnFactoryShipmentModel>/selectedCategoryFilter} === 'DIGER' ? ${returnFactoryShipmentModel>/visibleItemCount} : ${returnFactoryShipmentModel>/totalItemCount}) > 0 &amp;&amp; ${returnFactoryShipmentModel>/expandedItemCount} !== (${returnFactoryShipmentModel>/selectedCategoryFilter} === 'DIGER' ? ${returnFactoryShipmentModel>/visibleItemCount} : ${returnFactoryShipmentModel>/totalItemCount}) }"
                         press="onExpandAllItemsPress"
                     >
                         <customData>
@@ -115,7 +115,7 @@
                         text="Tümünü Sıkıştır"
                         icon="sap-icon://collapse-all"
                         type="Transparent"
-                        enabled="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' &amp;&amp; ${returnFactoryShipmentModel>/expandedItemCount} > 0 }"
+                        enabled="{= (${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' || ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'DIGER') &amp;&amp; ${returnFactoryShipmentModel>/expandedItemCount} > 0 }"
                         press="onExpandAllItemsPress"
                     >
                         <customData>
@@ -289,7 +289,7 @@
                             <items>
                                 <CustomListItem
                                     highlight="{returnFactoryShipmentModel>RowHighlight}"
-                                    type="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' ? 'Active' : 'Inactive' }"
+                                    type="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' || ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'DIGER' ? 'Active' : 'Inactive' }"
                                     press="onFactoryItemTogglePress"
                                     tooltip="Ürün detaylarını açmak veya kapatmak için tıklayın"
                                 >
@@ -307,7 +307,7 @@
                                                 class="returnFactoryMaterialBlock sapUiTinyMarginEnd"
                                             >
                                                 <core:Icon
-                                                    visible="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' }"
+                                                    visible="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' || ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'DIGER' }"
                                                     src="{= ${returnFactoryShipmentModel>_expanded} ? 'sap-icon://slim-arrow-up' : 'sap-icon://slim-arrow-down' }"
                                                     size="1rem"
                                                     class="sapUiTinyMarginEnd"
@@ -324,7 +324,7 @@
                                                 class="returnFactoryHeaderMetrics"
                                             >
                                                 <VBox
-                                                    visible="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' }"
+                                                    visible="{= ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'ALL' || ${returnFactoryShipmentModel>/selectedCategoryFilter} === 'DIGER' }"
                                                     class="returnFactoryStockMetric sapUiTinyMarginEnd"
                                                 >
                                                     <Label text="Stok" />

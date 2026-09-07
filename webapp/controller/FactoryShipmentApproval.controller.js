@@ -56,9 +56,6 @@ sap.ui.define(
             canApprove: false,
             canReject: false,
             pollingLogUid: "",
-            jobName: "",
-            jobCount: "",
-            jobLogUid: "",
             confirmation: {
               question: "",
               plate: "",
@@ -457,9 +454,35 @@ sap.ui.define(
                 oDocument.Status,
                 oDocument.LastStep,
               );
-              oDocument.StatusText = this._getStatusText(oDocument.StatusKey);
-              oDocument.StatusState = this._getStatusState(oDocument.StatusKey);
+              oDocument.ShowStockComparison =
+                oDocument.StatusKey !== "COMPLETE";
+              var bSubmitted =
+                ["WAIT_APPROVAL", "QUEUED", "RUNNING"].indexOf(
+                  oDocument.StatusKey,
+                ) !== -1 &&
+                Boolean(
+                  this._mProcessingLogUids[oDocument.LogUid] ||
+                    this._getStoredPollingLogUid() === oDocument.LogUid ||
+                    oDocument.StatusKey === "QUEUED" ||
+                    oDocument.StatusKey === "RUNNING",
+                );
+              oDocument.StatusText = bSubmitted
+                ? this._text("factoryStatusSubmitted")
+                : this._getStatusText(oDocument.StatusKey);
+              oDocument.StatusState = bSubmitted
+                ? "Success"
+                : this._getStatusState(oDocument.StatusKey);
+              if (bSubmitted) {
+                oDocument.LastMessage = this._text(
+                  "factoryApprovalSubmittedMessage",
+                );
+              } else if (oDocument.StatusKey === "COMPLETE") {
+                oDocument.LastMessage = this._text(
+                  "factoryApprovalCompleteMessage",
+                );
+              }
               oDocument.ActionAllowed =
+                !bSubmitted &&
                 String(oDocument.Status || "").toUpperCase() === "P" &&
                 String(oDocument.LastStep || "").toUpperCase() ===
                   "WAIT_APPROVAL";
@@ -471,6 +494,10 @@ sap.ui.define(
               oDocument.Items.forEach(function (oItem) {
                 oItem.StatusText = oDocument.StatusText;
                 oItem.StatusState = oDocument.StatusState;
+                oItem.ShowStockComparison = oDocument.ShowStockComparison;
+                if (!oDocument.ShowStockComparison) {
+                  oItem.DifferenceHighlight = "None";
+                }
               });
               return oDocument;
             }.bind(this),
@@ -596,6 +623,10 @@ sap.ui.define(
           var aItems = (oDocument && oDocument.Items) || [];
           var sCategoryKey =
             oViewModel.getProperty("/selectedApprovalCategory") || "ALL";
+          if (oDocument && !oDocument.ShowStockComparison) {
+            sCategoryKey = "ALL";
+            oViewModel.setProperty("/selectedApprovalCategory", "ALL");
+          }
           var aDefinitions = this._getApprovalCategoryFilterDefinitions();
           var oDefinition = aDefinitions.find(function (oItem) {
             return oItem.key === sCategoryKey;
@@ -799,22 +830,25 @@ sap.ui.define(
                 LogUid: oDocument.LogUid,
                 SnapshotHash: oDocument.SnapshotHash,
               },
-              success: function (oData) {
-                var oResult = oData || {};
+              success: function () {
                 oViewModel.setProperty("/approvalBusy", false);
-                oViewModel.setProperty("/jobName", oResult.JobName || "");
-                oViewModel.setProperty("/jobCount", oResult.JobCount || "");
-                oViewModel.setProperty("/jobLogUid", oDocument.LogUid);
                 if (this._oApprovalDialog) {
                   this._oApprovalDialog.close();
                 }
-                if (
-                  oResult.Message &&
-                  this._getStatusKey(oResult.Status, oResult.LastStep) !==
-                    "ERROR"
-                ) {
-                  MessageToast.show(oResult.Message);
-                }
+                oDocument.StatusText = this._text("factoryStatusSubmitted");
+                oDocument.StatusState = "Success";
+                oDocument.LastMessage = this._text(
+                  "factoryApprovalSubmittedMessage",
+                );
+                oDocument.ActionAllowed = false;
+                oDocument.Items.forEach(function (oItem) {
+                  oItem.StatusText = oDocument.StatusText;
+                  oItem.StatusState = oDocument.StatusState;
+                });
+                oViewModel.refresh(true);
+                MessageToast.show(
+                  this._text("factoryApprovalSubmittedMessage"),
+                );
                 this._storePollingLogUid(oDocument.LogUid);
                 if (this._bApprovalRouteActive) {
                   this._startPolling(oDocument.LogUid, true);
@@ -1087,11 +1121,7 @@ sap.ui.define(
                 this._stopPolling(true);
                 if (oDocument.StatusKey === "COMPLETE") {
                   MessageBox.success(
-                    this._text("factoryApprovalCompleteMessage", [
-                      oDocument.Ebeln || "-",
-                      oDocument.Mblnr351 || "-",
-                      oDocument.Mjahr351 || "-",
-                    ]),
+                    this._text("factoryApprovalCompleteMessage"),
                   );
                 } else if (oDocument.StatusKey === "ERROR") {
                   // BAPI ayrintisi secili kayitta kalir; tablet akisini teknik

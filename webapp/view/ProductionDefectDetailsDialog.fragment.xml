@@ -1,0 +1,123 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+>
+    <Dialog
+        title="{i18n>factoryShipmentProductionDefectDialogTitle}"
+        contentWidth="48rem"
+        stretchOnPhone="true"
+        verticalScrolling="true"
+        busy="{returnFactoryShipmentModel>/productionDefectDialog/busy}"
+        busyIndicatorDelay="0"
+        class="productionDefectDialog"
+    >
+        <content>
+            <VBox class="productionDefectDialogContent">
+                <MessageStrip
+                    text="{i18n>factoryShipmentProductionDefectDialogInfo}"
+                    type="Information"
+                    showIcon="true"
+                    class="sapUiTinyMarginBottom"
+                />
+                <List
+                    id="productionDefectDetailsList"
+                    showSeparators="None"
+                    noDataText="{i18n>factoryShipmentProductionDefectNoData}"
+                    class="productionDefectList"
+                    items="{
+                        path: 'returnFactoryShipmentModel>/productionDefectDialog/items',
+                        templateShareable: false
+                    }"
+                >
+                    <CustomListItem>
+                        <VBox class="productionDefectCard">
+                            <HBox
+                                alignItems="Start"
+                                justifyContent="SpaceBetween"
+                                class="productionDefectCardHeader"
+                            >
+                                <ObjectIdentifier
+                                    title="{returnFactoryShipmentModel>Maktx}"
+                                    text="{= ${i18n>factoryShipmentProductionDefectMaterial} + ': ' + ${returnFactoryShipmentModel>MaterialDisplayCode} }"
+                                    class="productionDefectIdentity"
+                                />
+                                <ObjectStatus
+                                    title="{i18n>factoryShipmentProductionDefectQuantity}"
+                                    text="{= ${returnFactoryShipmentModel>MengeUretimHatali} + ' ' + ${returnFactoryShipmentModel>Meins} }"
+                                    state="Warning"
+                                    class="productionDefectQuantity"
+                                />
+                            </HBox>
+
+                            <FlexBox
+                                wrap="Wrap"
+                                alignItems="Start"
+                                class="productionDefectFields"
+                            >
+                                <VBox class="productionDefectField productionDefectReasonField">
+                                    <Label
+                                        text="{i18n>factoryShipmentProductionDefectSubReason}"
+                                        required="true"
+                                        labelFor="productionDefectReasonCombo"
+                                    />
+                                    <ComboBox
+                                        id="productionDefectReasonCombo"
+                                        width="100%"
+                                        selectedKey="{returnFactoryShipmentModel>UretimAltNeden}"
+                                        placeholder="{i18n>factoryShipmentProductionDefectSubReasonPlaceholder}"
+                                        showSecondaryValues="true"
+                                        filterSecondaryValues="true"
+                                        valueState="{= ${returnFactoryShipmentModel>_reasonInvalid} ? 'Error' : 'None' }"
+                                        selectionChange="onProductionDefectReasonChange"
+                                        items="{
+                                            path: 'returnFactoryShipmentModel>/productionDefectDialog/reasons',
+                                            templateShareable: false
+                                        }"
+                                    >
+                                        <core:ListItem
+                                            key="{returnFactoryShipmentModel>Altnd}"
+                                            text="{returnFactoryShipmentModel>AltndText}"
+                                            additionalText="{returnFactoryShipmentModel>Altnd}"
+                                        />
+                                    </ComboBox>
+                                </VBox>
+                                <VBox class="productionDefectField productionDefectDateField">
+                                    <Label
+                                        text="{i18n>factoryShipmentProductionDefectExpiryDate}"
+                                        required="true"
+                                        labelFor="productionDefectDatePicker"
+                                    />
+                                    <DatePicker
+                                        id="productionDefectDatePicker"
+                                        width="100%"
+                                        value="{returnFactoryShipmentModel>UretimSkt}"
+                                        valueFormat="yyyy-MM-dd"
+                                        displayFormat="dd.MM.yyyy"
+                                        placeholder="{i18n>factoryShipmentProductionDefectExpiryDatePlaceholder}"
+                                        valueState="{= ${returnFactoryShipmentModel>_dateInvalid} ? 'Error' : 'None' }"
+                                        change="onProductionDefectDateChange"
+                                    />
+                                </VBox>
+                            </FlexBox>
+                        </VBox>
+                    </CustomListItem>
+                </List>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button
+                text="{i18n>factoryShipmentProductionDefectContinue}"
+                type="Emphasized"
+                enabled="{= !${returnFactoryShipmentModel>/productionDefectDialog/busy} }"
+                press="onProductionDefectDetailsConfirm"
+            />
+        </beginButton>
+        <endButton>
+            <Button
+                text="{i18n>factoryApprovalCancel}"
+                enabled="{= !${returnFactoryShipmentModel>/productionDefectDialog/busy} }"
+                press="onProductionDefectDetailsCancel"
+            />
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>
