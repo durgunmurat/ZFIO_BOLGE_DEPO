@@ -67,8 +67,10 @@ sap.ui.define(
               busy: false,
             },
             productionDefectDialog: {
+              allItems: [],
               items: [],
               reasons: [],
+              searchQuery: "",
               busy: false,
             },
             extraReturnDialog: {
@@ -217,8 +219,10 @@ sap.ui.define(
                 busy: false,
               },
               productionDefectDialog: {
+                allItems: [],
                 items: [],
                 reasons: [],
+                searchQuery: "",
                 busy: false,
               },
               extraReturnDialog: {
@@ -1497,6 +1501,13 @@ sap.ui.define(
                   UretimSkt: oItem.UretimSkt || "",
                   _reasonInvalid: false,
                   _dateInvalid: false,
+                  _normalizedSearchText: this._normalizeTurkishSearchText(
+                    [
+                      oItem.MaterialDisplayCode,
+                      oItem.Matnr,
+                      oItem.Maktx,
+                    ].join(" "),
+                  ),
                 };
               }.bind(this),
             )
@@ -1506,8 +1517,13 @@ sap.ui.define(
             vehicle: oVehicle,
             items: aItems,
           };
-          oModel.setProperty("/productionDefectDialog/items", aDialogItems);
+          oModel.setProperty("/productionDefectDialog/allItems", aDialogItems);
+          oModel.setProperty(
+            "/productionDefectDialog/items",
+            aDialogItems.slice(),
+          );
           oModel.setProperty("/productionDefectDialog/reasons", []);
+          oModel.setProperty("/productionDefectDialog/searchQuery", "");
           oModel.setProperty("/productionDefectDialog/busy", true);
 
           if (!this._oProductionDefectDetailsDialog) {
@@ -1544,10 +1560,30 @@ sap.ui.define(
             });
         },
 
+        onProductionDefectSearch: function (oEvent) {
+          var oModel = this.getView().getModel("returnFactoryShipmentModel");
+          var sQuery = this._normalizeTurkishSearchText(
+            oEvent.getParameter("newValue") !== undefined
+              ? oEvent.getParameter("newValue")
+              : oEvent.getParameter("query"),
+          );
+          var aAllItems =
+            oModel.getProperty("/productionDefectDialog/allItems") || [];
+
+          oModel.setProperty(
+            "/productionDefectDialog/items",
+            sQuery
+              ? aAllItems.filter(function (oItem) {
+                  return oItem._normalizedSearchText.indexOf(sQuery) !== -1;
+                })
+              : aAllItems.slice(),
+          );
+        },
+
         onProductionDefectDetailsConfirm: function () {
           var oModel = this.getView().getModel("returnFactoryShipmentModel");
           var aDialogItems =
-            oModel.getProperty("/productionDefectDialog/items") || [];
+            oModel.getProperty("/productionDefectDialog/allItems") || [];
           var oPending = this._oPendingProductionDefectSubmission;
           var bInvalid = false;
 
@@ -1560,6 +1596,11 @@ sap.ui.define(
           oModel.refresh(true);
 
           if (bInvalid) {
+            oModel.setProperty("/productionDefectDialog/searchQuery", "");
+            oModel.setProperty(
+              "/productionDefectDialog/items",
+              aDialogItems.slice(),
+            );
             MessageBox.warning(
               this.getResourceBundle().getText(
                 "factoryShipmentProductionDefectRequired",
@@ -1987,13 +2028,15 @@ sap.ui.define(
         _normalizeTurkishSearchText: function (vValue) {
           return String(vValue || "")
             .toLocaleLowerCase("tr-TR")
-            .replace(/[çÇ]/g, "c")
-            .replace(/[ğĞ]/g, "g")
-            .replace(/[ıİiI]/g, "i")
-            .replace(/[öÖ]/g, "o")
-            .replace(/[şŞ]/g, "s")
-            .replace(/[üÜ]/g, "u")
-            .trim();
+            .replace(/[ç]/g, "c")
+            .replace(/[ğ]/g, "g")
+            .replace(/[ıi]/g, "i")
+            .replace(/[ö]/g, "o")
+            .replace(/[ş]/g, "s")
+            .replace(/[ü]/g, "u")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]/g, "");
         },
 
         _formatMaterialCode: function (sMatnr) {

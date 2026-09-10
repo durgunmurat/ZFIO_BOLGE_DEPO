@@ -19,10 +19,18 @@
                     showIcon="true"
                     class="sapUiTinyMarginBottom"
                 />
+                <SearchField
+                    value="{returnFactoryShipmentModel>/productionDefectDialog/searchQuery}"
+                    placeholder="{i18n>factoryShipmentProductionDefectSearchPlaceholder}"
+                    liveChange="onProductionDefectSearch"
+                    search="onProductionDefectSearch"
+                    width="100%"
+                    class="sapUiTinyMarginBottom"
+                />
                 <List
                     id="productionDefectDetailsList"
                     showSeparators="None"
-                    noDataText="{i18n>factoryShipmentProductionDefectNoData}"
+                    noDataText="{= ${returnFactoryShipmentModel>/productionDefectDialog/searchQuery} ? ${i18n>factoryShipmentProductionDefectSearchNoData} : ${i18n>factoryShipmentProductionDefectNoData} }"
                     class="productionDefectList"
                     items="{
                         path: 'returnFactoryShipmentModel>/productionDefectDialog/items',

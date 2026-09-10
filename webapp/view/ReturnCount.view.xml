@@ -60,6 +60,19 @@
                 </items>
             </IconTabBar>
 
+            <OverflowToolbar
+                visible="{= ${returnCountModel>/selectedType} === 'OP' &amp;&amp; ${returnCountModel>/selectedStatus} === 'pending' }"
+                class="sapUiResponsiveContentPadding returnOPDepositActionBar"
+            >
+                <ToolbarSpacer />
+                <Button
+                    text="Depozito İadesi Ekle"
+                    icon="sap-icon://add"
+                    type="Emphasized"
+                    press="onReturnOPDepositAddPress"
+                />
+            </OverflowToolbar>
+
             <VBox
                 visible="{= ${returnCountModel>/selectedType} === 'MD' &amp;&amp; ${returnCountModel>/selectedStatus} === 'pending' }"
                 class="sapUiResponsiveContentPadding returnMDPlasiyerBar"
@@ -137,6 +150,13 @@
                                     <Title
                                         text="{returnCountModel>PlasiyerDisplay} - {returnCountModel>PlasiyerName}"
                                         level="H3"
+                                        class="sapUiTinyMarginBegin"
+                                    />
+                                    <ObjectStatus
+                                        text="Sadece depozito"
+                                        state="Information"
+                                        icon="sap-icon://inventory-deposit"
+                                        visible="{returnCountModel>isDepositOnly}"
                                         class="sapUiTinyMarginBegin"
                                     />
                                     <ToolbarSpacer />
@@ -259,7 +279,7 @@
                                             </CustomListItem>
                                         </items>
                                     </List>
-                                    <Toolbar visible="{= !${returnCountModel>isMD} }">
+                                    <Toolbar visible="{= !${returnCountModel>isMD} &amp;&amp; !${returnCountModel>isDepositOnly} }">
                                         <Title
                                             text="Toplam İrsaliye: {returnCountModel>TotalWaybills}"
                                             level="H3"
@@ -269,6 +289,7 @@
                                     <Panel
                                         expandable="true"
                                         expanded="true"
+                                        visible="{= !${returnCountModel>isDepositOnly} }"
                                         class="sapUiSmallMarginTop returnProductPanel"
                                     >
                                         <headerToolbar>
@@ -371,7 +392,7 @@
                                                                 width="100%"
                                                                 textAlign="End"
                                                                 class="returnCountQuantityInput"
-                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} &amp;&amp; (!${returnCountModel>_isMD} || !${returnCountModel>_isLansman}) }"
+                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} &amp;&amp; (${returnCountModel>_isMD} ? !${returnCountModel>_isLansman} : ${returnCountModel>NoLansman} !== 'L') }"
                                                                 change="onCountChange"
                                                             />
                                                             <Input
@@ -380,7 +401,7 @@
                                                                 width="100%"
                                                                 textAlign="End"
                                                                 class="returnCountQuantityInput"
-                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} &amp;&amp; (!${returnCountModel>_isMD} || !${returnCountModel>_isLansman}) }"
+                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} &amp;&amp; (${returnCountModel>_isMD} ? !${returnCountModel>_isLansman} : ${returnCountModel>NoLansman} !== 'L') }"
                                                                 change="onCountChange"
                                                             />
                                                             <Input
@@ -389,7 +410,7 @@
                                                                 width="100%"
                                                                 textAlign="End"
                                                                 class="returnCountQuantityInput"
-                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} &amp;&amp; (${returnCountModel>_isMD} ? ${returnCountModel>_isLansman} : ${returnCountModel>NoLansman} !== 'X') }"
+                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} &amp;&amp; (${returnCountModel>_isMD} ? ${returnCountModel>_isLansman} : ${returnCountModel>NoLansman} === 'L') }"
                                                                 change="onCountChange"
                                                             />
                                                             <Input
@@ -398,7 +419,7 @@
                                                                 width="100%"
                                                                 textAlign="End"
                                                                 class="returnCountQuantityInput"
-                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} &amp;&amp; (!${returnCountModel>_isMD} || !${returnCountModel>_isLansman}) }"
+                                                                editable="{= !${returnCountModel>_completed} &amp;&amp; !${returnCountModel>_countConfirmed} &amp;&amp; (${returnCountModel>_isMD} ? !${returnCountModel>_isLansman} : ${returnCountModel>NoLansman} !== 'L') }"
                                                                 change="onCountChange"
                                                             />
                                                             <CheckBox

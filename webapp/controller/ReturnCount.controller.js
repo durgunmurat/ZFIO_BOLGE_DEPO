@@ -30,6 +30,7 @@ sap.ui.define(
         _oReturnMDProductDialog: null,
         _oReturnMDProductGroupContext: null,
         _oReturnMDPlasiyerDialog: null,
+        _plasiyerSelectionMode: "MD",
 
         onInit: function () {
           var oReturnCountModel = new JSONModel({
@@ -46,6 +47,7 @@ sap.ui.define(
             selectedMDPlasiyerName: "",
             selectedMDPlasiyerText: "",
             mdEntryGroup: null,
+            opDepositEntryGroup: null,
           });
           oReturnCountModel.setSizeLimit(9999);
           this.getView().setModel(oReturnCountModel, "returnCountModel");
@@ -113,6 +115,8 @@ sap.ui.define(
           oModel.setProperty("/selectedMDPlasiyerName", "");
           oModel.setProperty("/selectedMDPlasiyerText", "");
           oModel.setProperty("/mdEntryGroup", null);
+          oModel.setProperty("/opDepositEntryGroup", null);
+          this._plasiyerSelectionMode = "MD";
           this._mdSelectionRequestId++;
           this._loadReturnCountData();
         },
@@ -169,7 +173,7 @@ sap.ui.define(
               MessageBox.error(
                 this._getErrorMessage(
                   oError,
-                  "Monodistribütör plasiyer listesi yüklenemedi.",
+                  "Plasiyer listesi yüklenemedi.",
                 ),
               );
             }.bind(this),
@@ -319,11 +323,28 @@ sap.ui.define(
               oHeader.Status = String(oHeader.Status || "")
                 .trim()
                 .toUpperCase();
-              var sGroupKey = oHeader.Plasiyer || "";
               var aItems =
                 oHeader.ToItems && oHeader.ToItems.results
                   ? oHeader.ToItems.results
                   : oHeader.ToItems || [];
+
+              oHeader.IsDepositOnly =
+                this._isAbapTrue(oHeader.IsDepositOnly) ||
+                (oHeader.ShipmentType === "OP" &&
+                  !oHeader.VbelnVa &&
+                  !oHeader.IrsNo &&
+                  aItems.length > 0 &&
+                  aItems.every(
+                    function (oItem) {
+                      return this._isAbapTrue(oItem.IsDepozito);
+                    }.bind(this),
+                  ));
+              var sGroupKey =
+                oHeader.ShipmentType +
+                "|" +
+                (oHeader.Plasiyer || "") +
+                "|" +
+                (oHeader.IsDepositOnly ? "D" : "R");
 
               oHeader.selected = false;
               oHeader.ReturnTypeText =
@@ -334,6 +355,9 @@ sap.ui.define(
 
               aItems.forEach(
                 function (oItem) {
+                  oItem.IsDepozito = this._isAbapTrue(oItem.IsDepozito);
+                  oItem.IsConfirmed = this._isAbapTrue(oItem.IsConfirmed);
+                  oItem.IsExternal = this._isAbapTrue(oItem.IsExternal);
                   oItem.MengeSiparis = this._toNumber(oItem.MengeSiparis);
                   oItem.MengeFire = this._toNumber(oItem.MengeFire);
                   oItem.MengeKalite = this._toNumber(oItem.MengeKalite);
@@ -344,7 +368,9 @@ sap.ui.define(
                     oItem.Matnr,
                   );
                   oItem._completed = oHeader.Status === "S";
-                  oItem._countConfirmed = oHeader.Status === "S";
+                  oItem._countConfirmed =
+                    oHeader.Status === "S" || oItem.IsConfirmed;
+                  oItem._isExternalDeposit = oItem.IsExternal;
                   oItem.MengeSayim = this._getProductCountTotal(oItem);
                 }.bind(this),
               );
@@ -364,6 +390,7 @@ sap.ui.define(
                   ProductCount: 0,
                   DepositCount: 0,
                   TotalWaybills: 0,
+                  isDepositOnly: oHeader.IsDepositOnly,
                 };
                 aGroups.push(mGroups[sGroupKey]);
               }
@@ -433,6 +460,22 @@ sap.ui.define(
         },
 
         onMDPlasiyerValueHelpRequest: function () {
+          this._plasiyerSelectionMode = "MD";
+          this._openReturnPlasiyerDialog();
+        },
+
+        onReturnOPDepositAddPress: function () {
+          var oModel = this.getView().getModel("returnCountModel");
+
+          this._plasiyerSelectionMode = "OP_DEPOSIT";
+          oModel.setProperty("/opDepositEntryGroup", null);
+          if (!(oModel.getProperty("/mdPlasiyerItems") || []).length) {
+            this._loadReturnMDPlasiyerCatalog();
+          }
+          this._openReturnPlasiyerDialog();
+        },
+
+        _openReturnPlasiyerDialog: function () {
           if (!this._oReturnMDPlasiyerDialog) {
             this._oReturnMDPlasiyerDialog = sap.ui.xmlfragment(
               "returnMDPlasiyer",
@@ -498,6 +541,14 @@ sap.ui.define(
             ? oSelectedItem.getBindingContext("returnCountModel").getObject()
             : null;
 
+          if (this._plasiyerSelectionMode === "OP_DEPOSIT") {
+            if (oPlasiyer) {
+              this._startReturnOPDepositEntry(oPlasiyer);
+            }
+            this._plasiyerSelectionMode = "MD";
+            return;
+          }
+
           if (
             oCurrentGroup &&
             oPlasiyer &&
@@ -544,6 +595,78 @@ sap.ui.define(
           }
 
           this._selectMDPlasiyer(oPlasiyer);
+        },
+
+        _startReturnOPDepositEntry: function (oPlasiyer) {
+          var oModel = this.getView().getModel("returnCountModel");
+          var aVisibleGroups = oModel.getProperty("/visibleGroups") || [];
+          var iExistingIndex = aVisibleGroups.findIndex(function (oGroup) {
+            return (
+              oGroup.isDepositOnly === true &&
+              oGroup.Plasiyer === oPlasiyer.PlasiyerNo
+            );
+          });
+
+          if (iExistingIndex >= 0) {
+            this._oReturnDepositGroupContext = oModel.getContext(
+              "/visibleGroups/" + iExistingIndex,
+            );
+            this._loadReturnDepositCatalog();
+            return;
+          }
+
+          var oGroup = this._createOPDepositEntryGroup(oPlasiyer);
+
+          oModel.setProperty("/opDepositEntryGroup", oGroup);
+          this._oReturnDepositGroupContext = oModel.getContext(
+            "/opDepositEntryGroup",
+          );
+          this._loadReturnDepositCatalog();
+        },
+
+        _createOPDepositEntryGroup: function (oPlasiyer) {
+          var oSessionModel = this.getOwnerComponent().getModel("sessionModel");
+          var sWarehouseNum = oSessionModel
+            ? oSessionModel.getProperty("/Login/WarehouseNum")
+            : "";
+          var oHeader = {
+            LogUid: "",
+            VbelnVa: "",
+            IrsNo: "",
+            IrsTar: this._getSelectedReturnDate(),
+            Lgort: sWarehouseNum,
+            Plasiyer: oPlasiyer.PlasiyerNo || "",
+            PlasiyerName: oPlasiyer.PlasiyerName || "",
+            Kunnr: oPlasiyer.PlasiyerNo || "",
+            KunnrName: oPlasiyer.PlasiyerName || "",
+            ShipmentType: "OP",
+            ReturnType: "P",
+            Status: "N",
+            IsDepositOnly: true,
+            selected: true,
+            ToItems: { results: [] },
+          };
+
+          return {
+            Plasiyer: oHeader.Plasiyer,
+            PlasiyerDisplay: this._formatNumericCode(oHeader.Plasiyer),
+            PlasiyerName: oHeader.PlasiyerName,
+            expanded: true,
+            selectionScope: "ALL",
+            canApprove: false,
+            isCompleted: false,
+            isMD: false,
+            isDepositOnly: true,
+            Waybills: [oHeader],
+            ProductItems: [],
+            ProductItemsSource: [],
+            DepositItems: [],
+            DepositItemsSource: [],
+            ExternalDeposits: [],
+            ProductCount: 0,
+            DepositCount: 0,
+            TotalWaybills: 0,
+          };
         },
 
         _selectMDPlasiyer: function (oPlasiyer) {
@@ -874,10 +997,18 @@ sap.ui.define(
                 var aAggregatedDepositItems = this._aggregateReturnDepositItems(
                   aDepositItems,
                 );
+                var bDepositOnly = aWaybills.every(function (oWaybill) {
+                  return oWaybill.IsDepositOnly === true;
+                });
 
                 if (sType === "MD") {
                   aAggregatedProductItems.forEach(function (oItem) {
                     oItem._isMD = true;
+                  });
+                }
+                if (bDepositOnly) {
+                  aAggregatedDepositItems.forEach(function (oItem) {
+                    oItem._isExternalDeposit = true;
                   });
                 }
 
@@ -890,12 +1021,15 @@ sap.ui.define(
                   canApprove: false,
                   isCompleted: sStatus === "completed",
                   isMD: sType === "MD",
+                  isDepositOnly: bDepositOnly,
                   Waybills: aWaybills,
                   ProductItems: aAggregatedProductItems,
                   ProductItemsSource: aProductItems,
                   DepositItems: aAggregatedDepositItems,
                   DepositItemsSource: aDepositItems,
-                  ExternalDeposits: [],
+                  ExternalDeposits: bDepositOnly
+                    ? aAggregatedDepositItems.slice()
+                    : [],
                   ProductCount: aAggregatedProductItems.length,
                   DepositCount: aAggregatedDepositItems.length,
                   TotalWaybills: aWaybills.length,
@@ -907,6 +1041,16 @@ sap.ui.define(
           oModel.setProperty("/pendingCount", iPendingCount);
           oModel.setProperty("/completedCount", iCompletedCount);
           oModel.setProperty("/visibleGroups", aVisibleGroups);
+          aVisibleGroups.forEach(
+            function (oGroup, iIndex) {
+              if (!oGroup.isCompleted) {
+                this._updateGroupApprovalState(
+                  oModel,
+                  "/visibleGroups/" + iIndex,
+                );
+              }
+            }.bind(this),
+          );
         },
 
         _countReturnGroupsByStatus: function (aGroups, sType, sStatus) {
@@ -2037,6 +2181,7 @@ sap.ui.define(
             new JSONModel({
               items: aItems,
               isMD: oGroup.isMD === true,
+              isDepositOnly: oGroup.isDepositOnly === true,
             }),
             "returnDepositAddModel",
           );
@@ -2177,6 +2322,14 @@ sap.ui.define(
               return !oItem._isExternalDeposit;
             },
           );
+          if (
+            oGroup.isDepositOnly &&
+            !aBackendDeposits.length &&
+            !aExternalDeposits.length
+          ) {
+            MessageBox.warning("En az bir depozito miktarı girin.");
+            return;
+          }
           var mSelectedMaterials = {};
           aExternalDeposits.forEach(
             function (oItem) {
@@ -2208,29 +2361,34 @@ sap.ui.define(
           oModel.refresh(true);
 
           sap.ui.core.BusyIndicator.show(0);
-          Promise.all(
-            aExternalDeposits
-              .map(
-                function (oItem) {
-                  return this._saveReturnDepositDraftObject(
-                    oGroupContext,
-                    oItem,
-                    false,
-                  );
-                }.bind(this),
-              )
-              .concat(
-                aDeletedDeposits.map(
-                  function (oItem) {
-                    return this._saveReturnDepositDraftObject(
-                      oGroupContext,
-                      oItem,
-                      true,
-                    );
-                  }.bind(this),
-                ),
-              ),
-          )
+          this._ensureReturnDepositOnlyDraft(oGroupContext)
+            .then(
+              function () {
+                return Promise.all(
+                  aExternalDeposits
+                    .map(
+                      function (oItem) {
+                        return this._saveReturnDepositDraftObject(
+                          oGroupContext,
+                          oItem,
+                          false,
+                        );
+                      }.bind(this),
+                    )
+                    .concat(
+                      aDeletedDeposits.map(
+                        function (oItem) {
+                          return this._saveReturnDepositDraftObject(
+                            oGroupContext,
+                            oItem,
+                            true,
+                          );
+                        }.bind(this),
+                      ),
+                    ),
+                );
+              }.bind(this),
+            )
             .then(
               function () {
                 this._oReturnDepositDialog.close();
@@ -2239,6 +2397,10 @@ sap.ui.define(
                     ? "Depozito listesi güncellendi."
                     : "Depozito taslağı güncellendi.",
                 );
+                if (oGroup.isDepositOnly) {
+                  oModel.setProperty("/opDepositEntryGroup", null);
+                  this._loadReturnCountData();
+                }
               }.bind(this),
             )
             .catch(
@@ -2256,8 +2418,74 @@ sap.ui.define(
             });
         },
 
+        _ensureReturnDepositOnlyDraft: function (oGroupContext) {
+          var oGroup = oGroupContext.getObject();
+          var oHeader = this._getReturnDepositDraftHeader(oGroup);
+
+          if (!oGroup.isDepositOnly || (oHeader && oHeader.LogUid)) {
+            return Promise.resolve(oHeader);
+          }
+
+          if (!oHeader || !oHeader.Plasiyer || !oHeader.Lgort || !oHeader.IrsTar) {
+            return Promise.reject(
+              new Error("Manuel depozito taslağının başlık bilgileri eksik."),
+            );
+          }
+
+          return new Promise(
+            function (resolve, reject) {
+              this.getOwnerComponent()
+                .getModel()
+                .callFunction("/CreateReturnDepositDraft", {
+                  method: "POST",
+                  urlParameters: {
+                    Plasiyer: oHeader.Plasiyer,
+                    Lgort: oHeader.Lgort,
+                    IrsTar: this._toODataDate(oHeader.IrsTar),
+                    ShipmentType: "OP",
+                  },
+                  success: function (oData) {
+                    var sLogUid =
+                      (oData && (oData.LogUid || oData.loguid)) || "";
+
+                    if (!sLogUid) {
+                      reject(
+                        new Error(
+                          "Manuel depozito taslağı oluşturuldu ancak LogUid dönmedi.",
+                        ),
+                      );
+                      return;
+                    }
+
+                    oHeader.LogUid = sLogUid;
+                    oHeader.IsDepositOnly = true;
+                    oGroupContext.getModel().setProperty(
+                      oGroupContext.getPath() + "/Waybills/0/LogUid",
+                      sLogUid,
+                    );
+                    resolve(oHeader);
+                  },
+                  error: reject,
+                });
+            }.bind(this),
+          );
+        },
+
         onReturnDepositAddCancel: function () {
+          var oGroup =
+            this._oReturnDepositGroupContext &&
+            this._oReturnDepositGroupContext.getObject();
+
           this._oReturnDepositDialog.close();
+          if (
+            oGroup &&
+            oGroup.isDepositOnly &&
+            !this._getReturnDepositDraftHeader(oGroup).LogUid
+          ) {
+            this.getView()
+              .getModel("returnCountModel")
+              .setProperty("/opDepositEntryGroup", null);
+          }
         },
 
         _normalizeMaterialNumber: function (sMatnr) {
@@ -2415,7 +2643,7 @@ sap.ui.define(
 
           if (!aSelectedWaybills.length) {
             MessageBox.warning(
-              oGroup.isMD
+              oGroup.isMD || oGroup.isDepositOnly
                 ? "Onaylamak için önce plasiyer seçin."
                 : "Onaylamak için en az bir irsaliye seçin.",
             );
@@ -2474,11 +2702,13 @@ sap.ui.define(
         _confirmApproveCount: function (oGroupContext, aPayloads) {
           var oGroup = oGroupContext.getObject();
           MessageBox.confirm(
-            oGroup.isMD
+            oGroup.isMD || oGroup.isDepositOnly
               ? oGroup.PlasiyerDisplay +
                   " - " +
                   oGroup.PlasiyerName +
-                  " için sayım onaylanacak."
+                  (oGroup.isDepositOnly
+                    ? " için yalnız depozito sayımı onaylanacak."
+                    : " için sayım onaylanacak.")
               : aPayloads.length + " irsaliyenin sayımı onaylanacak.",
             {
               title: "Sayımı Onayla",
@@ -2532,7 +2762,7 @@ sap.ui.define(
           var oIrsTar =
             this._toODataDate(oHeader.IrsTar) || this._getSelectedReturnDate();
 
-          return {
+          var oPayload = {
             LogUid: oHeader.LogUid || "",
             VbelnVa: oHeader.VbelnVa || "",
             IrsNo: oHeader.IrsNo || "",
@@ -2565,6 +2795,12 @@ sap.ui.define(
               }.bind(this),
             ),
           };
+
+          if (oHeader.IsDepositOnly === true) {
+            oPayload.IsDepositOnly = true;
+          }
+
+          return oPayload;
         },
 
         _rebalanceReturnPayloadItems: function (aPayloads) {

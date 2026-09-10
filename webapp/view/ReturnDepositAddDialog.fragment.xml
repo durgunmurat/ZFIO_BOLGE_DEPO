@@ -13,7 +13,7 @@
         <content>
             <VBox class="sapUiSmallMargin returnDepositAddContent">
                 <MessageStrip
-                    text="{= ${returnDepositAddModel>/isMD} ? 'Sayıma eklemek istediğiniz depozito malzemelerinin miktarını girin.' : 'Eklemek istediğiniz depozito malzemelerinin miktarını girin. Son ZDAI siparişinden gelen malzemeler değiştirilemez.' }"
+                    text="{= ${returnDepositAddModel>/isDepositOnly} ? 'Plasiyer için iade alınan depozito malzemelerinin miktarını girin.' : (${returnDepositAddModel>/isMD} ? 'Sayıma eklemek istediğiniz depozito malzemelerinin miktarını girin.' : 'Eklemek istediğiniz depozito malzemelerinin miktarını girin. Son ZDAI siparişinden gelen malzemeler değiştirilemez.') }"
                     type="Information"
                     showIcon="true"
                     class="sapUiSmallMarginBottom"/>
